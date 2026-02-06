@@ -34,6 +34,7 @@ export interface ProductRecord {
   productPublicId: string // Product의 Public ID (FK reference)
   stockDelta: number // 재고 변화량 (양수: 증가, 음수: 감소)
   reason: string // 'INITIAL_STOCK', 'STOCK_RESERVED', 'STOCK_RESTORED', 'STOCK_REPLENISHMENT' 등
+  orderPublicId?: string // TODO: Backend에서 추가 예정 - 주문 차감 시 Order Public ID
 
   // === Timestamps ===
   createdAt: string

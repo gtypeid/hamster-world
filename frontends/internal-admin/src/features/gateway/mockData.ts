@@ -29,9 +29,15 @@ export const mockProcesses: PaymentProcess[] = [
     pgApprovalNo: null,
     failureReason: null,
 
+    // PG Request Tracking
+    requestedAt: new Date(Date.now() - 7000).toISOString(), // 7초 전 PG 요청 시작
+    ackReceivedAt: new Date(Date.now() - 6500).toISOString(), // 6.5초 전 PG 202 응답
+    lastRequestAttemptAt: new Date(Date.now() - 7000).toISOString(),
+    requestAttemptCount: 1,
+
     // Timestamps
     createdAt: new Date(Date.now() - 10000).toISOString(), // 10초 전
-    modifiedAt: null,
+    modifiedAt: null, // 아직 Webhook 안받음
   },
   {
     // Public IDs
@@ -52,9 +58,15 @@ export const mockProcesses: PaymentProcess[] = [
     pgApprovalNo: 'AUTH789',
     failureReason: null,
 
+    // PG Request Tracking
+    requestedAt: new Date(Date.now() - 297000).toISOString(), // PG 요청
+    ackReceivedAt: new Date(Date.now() - 296800).toISOString(), // PG 202 응답
+    lastRequestAttemptAt: new Date(Date.now() - 297000).toISOString(),
+    requestAttemptCount: 1,
+
     // Timestamps
     createdAt: new Date(Date.now() - 300000).toISOString(), // 5분 전
-    modifiedAt: new Date(Date.now() - 295000).toISOString(),
+    modifiedAt: new Date(Date.now() - 295000).toISOString(), // Webhook 받은 시각
   },
   {
     // Public IDs
@@ -75,9 +87,15 @@ export const mockProcesses: PaymentProcess[] = [
     pgApprovalNo: null,
     failureReason: '잔액 부족 (INSUFFICIENT_BALANCE)',
 
+    // PG Request Tracking
+    requestedAt: new Date(Date.now() - 3598500).toISOString(), // PG 요청
+    ackReceivedAt: new Date(Date.now() - 3598300).toISOString(), // PG 202 응답
+    lastRequestAttemptAt: new Date(Date.now() - 3598500).toISOString(),
+    requestAttemptCount: 1,
+
     // Timestamps
     createdAt: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
-    modifiedAt: new Date(Date.now() - 3598000).toISOString(),
+    modifiedAt: new Date(Date.now() - 3598000).toISOString(), // Webhook으로 FAILED 받은 시각
   },
   {
     // Public IDs
@@ -98,9 +116,15 @@ export const mockProcesses: PaymentProcess[] = [
     pgApprovalNo: 'AUTH456',
     failureReason: null,
 
+    // PG Request Tracking
+    requestedAt: new Date(Date.now() - 7198000).toISOString(), // PG 요청
+    ackReceivedAt: new Date(Date.now() - 7197500).toISOString(), // PG 202 응답
+    lastRequestAttemptAt: new Date(Date.now() - 7198000).toISOString(),
+    requestAttemptCount: 1,
+
     // Timestamps
     createdAt: new Date(Date.now() - 7200000).toISOString(), // 2시간 전
-    modifiedAt: new Date(Date.now() - 7195000).toISOString(),
+    modifiedAt: new Date(Date.now() - 7195000).toISOString(), // Webhook 받은 시각
   },
 ]
 

@@ -58,8 +58,8 @@ class SecurityConfig {
                     ).permitAll()
                     // PG Webhook은 인증 없이 허용 (PG사에서 호출)
                     .requestMatchers("/api/webhook/**").permitAll()
-                    // 나머지는 모두 인증 필요 (Internal Admin만 접근)
-                    .anyRequest().authenticated()
+                    // 나머지는 DEVELOPER role 필요 (Internal Admin만 접근)
+                    .anyRequest().hasRole("DEVELOPER")
             }
             .oauth2ResourceServer { oauth2 ->
                 oauth2.jwt { jwt ->

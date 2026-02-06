@@ -24,9 +24,15 @@ export interface PaymentProcess {
   pgApprovalNo: string | null // PG approval number
   failureReason: string | null // Failure reason if status is FAILED
 
+  // === PG Request Tracking ===
+  requestedAt: string | null // PG 요청 시작 시각
+  ackReceivedAt: string | null // PG 202/200 응답 받은 시각 (큐에 넣었다는 응답)
+  lastRequestAttemptAt: string | null // 마지막 재시도 시각
+  requestAttemptCount: number // 총 요청 시도 횟수
+
   // === Timestamps ===
   createdAt: string
-  modifiedAt: string | null
+  modifiedAt: string | null // Webhook으로 최종 상태 변경 시각
 }
 
 // Payment (확정된 거래 기록)

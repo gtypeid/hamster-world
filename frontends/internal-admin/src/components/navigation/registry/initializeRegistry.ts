@@ -11,6 +11,10 @@ import { fetchProductDetail } from '@/api/productService'
 import { fetchEcommerceProductDetail } from '@/api/ecommerceProductService'
 import { fetchOrderDetail } from '@/api/orderService'
 import { fetchUserDetail } from '@/api/userService'
+// import { fetchProcessDetail } from '@/api/gatewayService' // TODO: 백엔드 Admin API 구현 후 주석 해제
+
+// Mock Data (Cash Gateway - 백엔드 API 구현 전)
+import { getMockProcessDetail } from '@/features/gateway/mockData'
 
 /**
  * Registry 초기화
@@ -20,13 +24,31 @@ import { fetchUserDetail } from '@/api/userService'
 export function initializeRegistry() {
   // ===== Viewer 등록 =====
 
-  // Process Detail (Cash Gateway) - TODO: API 구현 후 fetcher 추가
+  // Process Detail (Cash Gateway) - Mock 데이터 사용 (TODO: 백엔드 API 구현 후 교체)
   ViewerRegistry.register({
     type: 'process-detail',
     title: 'PaymentProcess 상세',
     component: ProcessDetailViewer,
     service: 'gateway',
-    // fetcher: fetchProcessDetail, // TODO: Cash Gateway API 구현 후 추가
+    fetcher: async (id: string) => {
+      // TODO: 백엔드 Admin API 구현되면 아래 주석 해제하고 Mock 제거
+      // return await fetchProcessDetail(id)
+
+      // Mock (임시)
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          const data = getMockProcessDetail(id)
+          if (data) {
+            resolve(data)
+          } else {
+            reject(new Error('Process not found'))
+          }
+        }, 300)
+      })
+    },
+    myItem: {
+      searchBy: (id) => ({ field: 'publicId', value: id }),
+    },
   })
 
   // Product Detail (Payment Service) - Event Sourcing 포함

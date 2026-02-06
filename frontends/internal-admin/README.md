@@ -426,18 +426,14 @@ colors: {
 - `/` - 통합 대시보드 (redirect to `/dashboard`)
 - `/dashboard` - 통합 대시보드
 
-### Cash Gateway
-- `/gateway/processes` - 프로세스 추적 (Expandable)
-- `/gateway/payments` - 거래 이력
-- `/gateway/events` - 이벤트 발행
-
 ### Ecommerce Service
 - `/ecommerce/orders` - 주문 관리 (Order List + Detail)
-- `/ecommerce/products` - 상품 관리 (예정)
+
+### Cash Gateway
+- `/gateway/processes` - 프로세스 추적 (Expandable)
 
 ### Payment Service
 - `/payment/resource` - 자원 관리 (Product List + Event Sourcing)
-- `/payment/settlement` - 정산 관리
 
 ## 최근 업데이트 (2026-02-04)
 

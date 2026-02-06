@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Navigable } from '@/components/navigation/Navigable'
+import { useListSearch } from '@/hooks/useListSearch'
+// import { fetchProcessList } from '@/api/gatewayService' // TODO: 백엔드 Admin API 구현 후 주석 해제
 import { mockProcesses } from './mockData'
 import type { PaymentProcess, PaymentProcessStatus } from '@/types/gateway'
 
@@ -47,28 +49,64 @@ const getElapsedTime = (createdAt: string): string => {
 
 export function ProcessTracker() {
   const [filter, setFilter] = useState<'all' | PaymentProcessStatus>('all')
-  const isLoading = false
+  const [processes, setProcesses] = useState<PaymentProcess[]>(mockProcesses)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // TODO: 백엔드 Admin API 구현되면 실제 API 호출로 교체
+  useEffect(() => {
+    // const loadProcesses = async () => {
+    //   try {
+    //     setIsLoading(true)
+    //     const data = await fetchProcessList()
+    //     setProcesses(data)
+    //   } catch (error) {
+    //     console.error('Failed to load processes:', error)
+    //   } finally {
+    //     setIsLoading(false)
+    //   }
+    // }
+    // loadProcesses()
+
+    // Mock (임시)
+    setProcesses(mockProcesses)
+  }, [])
+
+  // URL 파라미터 검색 + 하이라이트 (Hook으로 추상화)
+  const { highlightedId, itemRefs } = useListSearch(
+    processes,
+    {
+      publicId: (p) => p.publicId,
+      orderPublicId: (p) => p.orderPublicId || '',
+      userPublicId: (p) => p.userPublicId || '',
+    },
+    (p) => p.publicId,
+    isLoading
+  )
 
   // 필터링
   const filteredProcesses =
-    filter === 'all' ? mockProcesses : mockProcesses.filter((p) => p.status === filter)
+    filter === 'all' ? processes : processes.filter((p) => p.status === filter)
 
   // 통계
   const stats = {
-    inProgress: mockProcesses.filter((p) => p.status === 'UNKNOWN').length,
-    success: mockProcesses.filter((p) => p.status === 'SUCCESS').length,
-    failed: mockProcesses.filter((p) => p.status === 'FAILED').length,
-    cancelled: mockProcesses.filter((p) => p.status === 'CANCELLED').length,
+    inProgress: processes.filter((p) => p.status === 'UNKNOWN').length,
+    success: processes.filter((p) => p.status === 'SUCCESS').length,
+    failed: processes.filter((p) => p.status === 'FAILED').length,
+    cancelled: processes.filter((p) => p.status === 'CANCELLED').length,
   }
 
 
-  // Auto-refresh for UNKNOWN processes
+  // Auto-refresh for UNKNOWN processes (TODO: 백엔드 API 구현 후 활성화)
   useEffect(() => {
     const interval = setInterval(() => {
-      // 실제 구현 시 UNKNOWN 프로세스만 refetch
+      // TODO: UNKNOWN 상태인 프로세스만 다시 조회
+      // const unknownProcesses = processes.filter(p => p.status === 'UNKNOWN')
+      // if (unknownProcesses.length > 0) {
+      //   loadProcesses()
+      // }
     }, 3000)
     return () => clearInterval(interval)
-  }, [])
+  }, [processes])
 
   return (
     <div className="p-8">
@@ -144,8 +182,15 @@ export function ProcessTracker() {
       {!isLoading && filteredProcesses.length > 0 && (
         <div className="space-y-4">
           {filteredProcesses.map((process) => {
+            const isHighlighted = highlightedId === process.publicId
             return (
-              <div key={process.publicId} className="bg-white rounded-lg shadow-md">
+              <div
+                key={process.publicId}
+                ref={(el) => (itemRefs.current[process.publicId] = el)}
+                className={`bg-white rounded-lg shadow-md transition-all duration-500 ${
+                  isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''
+                }`}
+              >
                 {/* Process Card */}
                 <div className="p-6 border-2 border-transparent hover:border-hamster-orange rounded-lg transition-colors">
                   <div className="flex items-start justify-between mb-3">

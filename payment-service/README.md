@@ -3,13 +3,17 @@
 > **🔒 INTERNAL ONLY - HTTP API 노출 금지**
 > 메인 README 읽은 후 이 문서를 읽으세요.
 
-**정산/재고/권한 관리 (완전 내부 전용)**
+**주문 이행 핵심 시스템 (Business Truth의 Source of Truth ⭐)**
 
 ---
 
 ## 서비스 개요
 
-**역할:** 정산/재고/권한 관리 (INTERNAL ONLY - Kafka 리액티브 전용)
+**역할:** Payment + Stock + OrderSnapshot 관리 (INTERNAL ONLY - Kafka 리액티브 전용)
+
+**설계 철학:**
+> "Payment Service가 진짜 핵심 시스템입니다. Cash Gateway는 방화벽 역할로
+> 복잡한 PG 통신을 처리하고, Payment Service는 비즈니스 진실을 보호합니다."
 
 ### 비즈니스 위치
 
@@ -28,51 +32,76 @@
 - 🔒 **INTERNAL ONLY**: HTTP API 노출 안 함!
 - 📡 **리액티브 전용**: Kafka 이벤트만 구독
 - 👻 **투명한 서비스**: 사용자는 Ecommerce를 통해 간접 사용
-- 🎯 **단일 책임**: 재고 관리의 유일한 소유자 (Master)
+- 🎯 **Business Truth**: Payment + Stock의 진실의 원천 (Source of Truth ⭐)
 
-### 책임 범위
-- ✅ **재고 관리 (Master)**: Product + Stock의 유일한 소유자
+### 책임 범위 (진실의 원천)
+- ✅ **Payment 관리**: 확정된 거래 기록 (Business Truth)
+- ✅ **Stock 관리**: Product + 재고의 유일한 소유자
+- ✅ **OrderSnapshot**: 주문 스냅샷 (Payment와 한 몸)
 - ✅ **Event Sourcing**: ProductRecord 기반 재고 이력 추적 (Delta 방식)
-- ✅ **주문 재고 검증**: 선차감 (Pre-deduction) + Two-Phase Locking
+- ✅ **선차감 전략**: 재고 선차감 + Two-Phase Locking (초과판매 방지)
+- ✅ **원자성 보장**: Payment + Stock + OrderSnapshot 같은 트랜잭션 ⭐
 - ✅ **재고 복원**: 결제 취소 시 재고 복원
-- ✅ **OrderSnapshot**: 결제 취소 시 복원용 스냅샷 저장
 - ✅ **정산 계산**: 수수료 계산 로직
-- ✅ **권한 관리**: 벤더 권한 처리
 - ❌ **HTTP API 금지**: PRIVATE 서비스, Kafka만 사용
 - ❌ **Order 참조 금지**: Ecommerce Service 소유 도메인
 
 ### 아키텍처 위치
+
 ```
-Ecommerce Service (벤더용 SaaS)
-   ↓ Kafka (ProductCreatedEvent, StockAdjustmentRequestedEvent, OrderCreatedEvent)
-Payment Service (이 서비스) ⭐ REACTIVE ONLY
-   ↓ Kafka (ProductStockChangedEvent, OrderStockReservedEvent, OrderStockValidationFailedEvent)
-   ↓
-├─→ Ecommerce Service (재고 캐시 동기화)
-└─→ Cash Gateway Service (PG 요청 진행)
+┌───────────────────────────────────────────────┐
+│  Cash Gateway (방화벽)                         │
+│  - PaymentProcess (Communication Truth)      │
+│  - PG 통신 담당                                │
+└───────────────────────────────────────────────┘
+         ↓ Kafka: PaymentApprovedEvent
+┌───────────────────────────────────────────────┐
+│  Payment Service (핵심) ⭐                      │
+│  - Payment (Business Truth)                   │
+│  - Stock (재고)                                │
+│  - OrderSnapshot (주문 스냅샷)                 │
+│                                               │
+│  @Transactional {                             │
+│    Payment + Stock + OrderSnapshot            │
+│  }  ← 원자성 보장!                             │
+└───────────────────────────────────────────────┘
 ```
 
 **전체 플로우:**
 ```
 [1] Ecommerce: OrderCreatedEvent 발행
     ↓
-[2] Payment Service: 재고 검증 (validateStockForOrder)
+[2] Payment Service: 재고 선차감 (validateStockForOrder)
+    @Transactional
     - Phase 1: ID 정렬 + 비관 락 획득 (Deadlock 방지)
     - Phase 2: 재고 검증 (재고 충분 여부)
     - Phase 3: 재고 차감 (선차감 - Product.updateStockByDelta)
     - Phase 4: OrderSnapshot 생성 및 저장
+    → OrderStockReservedEvent 발행
     ↓
-[3-A] 재고 충분: OrderStockReservedEvent 발행 + OrderSnapshot 저장
-      → Cash Gateway가 PG 요청 진행
-[3-B] 재고 부족: OrderStockValidationFailedEvent 발행
-      → Ecommerce가 Order.status = PAYMENT_FAILED 처리
+[3] Cash Gateway: PG 요청 진행
+    - PaymentProcess: UNKNOWN → PENDING → SUCCESS
+    → PaymentApprovedEvent 발행
     ↓
-[4] Cash Gateway: PaymentCancelledEvent 발행 (PG 실패/취소 시)
+[4] Payment Service: Payment 생성 ⭐
+    @Transactional
+    - Payment 생성 (Business Truth)
+    - OrderSnapshot 연결 (이미 존재)
+    - ProductRecord 확인 (이미 존재)
+    → Payment + Stock + OrderSnapshot 원자성 보장!
     ↓
-[5] Payment Service: 재고 복원 (restoreStockForOrder)
+[5] 결제 취소 시: Cash Gateway → PaymentCancelledEvent 발행
+    ↓
+[6] Payment Service: 재고 복원 (restoreStockForOrder)
+    @Transactional
     - OrderSnapshot 조회 (findByOrderIdWithItems)
     - Product.updateStockByDelta (+수량)
 ```
+
+**핵심 설계 결정:**
+> OrderSnapshot이 Payment Service에 이미 존재합니다.
+> 결제(Payment)는 스냅샷과 한 몸이어야 하므로, Payment도 Payment Service에 있어야 합니다.
+> **Payment + Stock + OrderSnapshot = 같은 트랜잭션 ⭐**
 
 ---
 
@@ -84,11 +113,17 @@ payment-service/
 │   ├── products.sql                        # Product 테이블
 │   ├── product_records.sql                 # ProductRecord 테이블 (Event Sourcing)
 │   ├── product_order_snapshots.sql         # OrderSnapshot 테이블 (결제 취소용)
-│   └── product_order_snapshot_items.sql    # OrderSnapshotItem 테이블
+│   ├── product_order_snapshot_items.sql    # OrderSnapshotItem 테이블
+│   └── payments.sql                        # Payment 테이블 ⭐ NEW
 │
 └── src/main/kotlin/com/hamsterworld/payment/
     │
     ├── domain/
+    │   │
+    │   ├── payment/                        # Payment 도메인 ⭐ NEW
+    │   │   ├── model/Payment.kt            # 확정된 거래 기록 (Business Truth)
+    │   │   ├── constant/PaymentStatus.kt   # APPROVED, CANCELLED
+    │   │   └── repository/PaymentRepository.kt
     │   │
     │   ├── product/                        # Product 도메인
     │   │   ├── model/Product.kt            # Aggregate Root
@@ -141,12 +176,56 @@ payment-service/
         │   - handleOrderCreated()          # 재고 검증 + 선차감 ⭐
         │
         └── CashGatewayEventConsumer.kt     # Cash Gateway 이벤트 수신
+            - handlePaymentApproved()       # Payment 생성 ⭐ NEW
             - handlePaymentCancelled()      # 재고 복원 ⭐
 ```
 
 ---
 
-## 🎯 핵심 구현: 재고 관리 (Stock Management)
+## 🎯 핵심 구현
+
+### 0. Payment 도메인 (Business Truth) ⭐ NEW
+
+```kotlin
+// domain/payment/model/Payment.kt
+@Entity
+@Table(
+    name = "payments",
+    indexes = [
+        Index(name = "idx_payments_public_id", columnList = "public_id", unique = true),
+        Index(name = "idx_process_public_id", columnList = "processPublicId")
+    ]
+)
+class Payment(
+    @Column(name = "process_public_id", length = 20)
+    var processPublicId: String,  // Cash Gateway의 PaymentProcess publicId
+
+    @Column(name = "order_id")
+    var orderId: Long,
+
+    var amount: BigDecimal,
+
+    @Enumerated(EnumType.STRING)
+    var status: PaymentStatus,  // APPROVED, CANCELLED
+
+    var pgTransaction: String?
+) : AbsDomain()
+
+enum class PaymentStatus {
+    APPROVED,   // 승인
+    CANCELLED   // 취소
+}
+```
+
+**특징:**
+- ✅ **Business Truth**: 우리 시스템이 확정한 거래의 진실
+- ✅ **완전 불변**: INSERT만 발생, UPDATE 없음
+- ✅ **원자성**: Stock + OrderSnapshot과 같은 트랜잭션
+- ✅ **processPublicId**: Cash Gateway의 PaymentProcess 참조 (논리적 FK)
+
+---
+
+### 1. 재고 관리 (Stock Management)
 
 ### 1. Product 도메인 (Aggregate Root)
 

@@ -68,8 +68,186 @@ export function ProcessDetailViewer({ id }: ViewerProps) {
     }
   }
 
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+    })
+  }
+
+  const calculateDuration = (start: string, end: string): string => {
+    const duration = new Date(end).getTime() - new Date(start).getTime()
+    if (duration < 1000) return `${duration}ms`
+    return `${(duration / 1000).toFixed(2)}초`
+  }
+
   return (
     <div className="space-y-6">
+      {/* Payment Flow Timeline - 새로운 섹션 */}
+      <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-6">
+        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔄 결제 흐름 타임라인</h4>
+
+        <div className="space-y-4">
+          {/* 1. Order 생성 → Process 생성 */}
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
+              1
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-gray-800">🛒 주문 생성 → Process 생성</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {process.orderNumber}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 font-mono">
+                {formatTimestamp(process.createdAt)}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. PG 요청 발송 */}
+          {process.requestedAt && (
+            <>
+              <div className="ml-4 border-l-2 border-blue-300 h-6"></div>
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-sm">
+                  2
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-800">📤 PG 요청 발송</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      {process.provider}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 font-mono space-y-1">
+                    <div>{formatTimestamp(process.requestedAt)}</div>
+                    <div className="text-gray-500">
+                      ⏱️ Process 생성 후 {calculateDuration(process.createdAt, process.requestedAt)}
+                    </div>
+                    {process.requestAttemptCount > 1 && (
+                      <div className="text-orange-600">
+                        🔄 재시도 횟수: {process.requestAttemptCount}회
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* 3. PG 응답 수신 (202 Queued) */}
+          {process.ackReceivedAt && (
+            <>
+              <div className="ml-4 border-l-2 border-blue-300 h-6"></div>
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-sm">
+                  3
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-800">📥 PG 응답 수신 (큐 등록)</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      202 Accepted
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 font-mono space-y-1">
+                    <div>{formatTimestamp(process.ackReceivedAt)}</div>
+                    {process.requestedAt && (
+                      <div className="text-gray-500">
+                        ⏱️ 요청 후 {calculateDuration(process.requestedAt, process.ackReceivedAt)}
+                      </div>
+                    )}
+                    {process.pgTransaction && (
+                      <div className="text-gray-700">
+                        TID: {process.pgTransaction}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* 4. Webhook 수신 */}
+          {process.modifiedAt ? (
+            <>
+              <div className="ml-4 border-l-2 border-blue-300 h-6"></div>
+              <div className="flex items-start gap-4">
+                <div
+                  className={`flex-shrink-0 w-8 h-8 rounded-full text-white flex items-center justify-center font-bold text-sm ${
+                    process.status === 'SUCCESS'
+                      ? 'bg-green-500'
+                      : process.status === 'FAILED'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                  }`}
+                >
+                  4
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-800">🔔 Webhook 수신</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(process.status)}`}
+                    >
+                      {process.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 font-mono space-y-1">
+                    <div>{formatTimestamp(process.modifiedAt)}</div>
+                    {process.ackReceivedAt && (
+                      <div className="text-gray-500">
+                        ⏱️ PG 응답 후 {calculateDuration(process.ackReceivedAt, process.modifiedAt)}
+                      </div>
+                    )}
+                    {process.createdAt && (
+                      <div className="text-blue-600 font-bold">
+                        🎯 전체 소요시간: {calculateDuration(process.createdAt, process.modifiedAt)}
+                      </div>
+                    )}
+                    {process.pgApprovalNo && (
+                      <div className="text-green-700 font-medium">
+                        ✅ 승인번호: {process.pgApprovalNo}
+                      </div>
+                    )}
+                    {process.failureReason && (
+                      <div className="text-red-600 font-medium">
+                        ❌ 실패 사유: {process.failureReason}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="ml-4 border-l-2 border-blue-300 h-6 border-dashed"></div>
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold text-sm animate-pulse">
+                  4
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-600">🔔 Webhook 대기 중...</span>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-500 border-t-transparent"></div>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    PG사에서 결제 처리 중입니다 (비동기)
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
       {/* Process Info */}
       <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
         <h4 className="text-lg font-bold text-hamster-brown mb-4">💳 프로세스 정보</h4>

@@ -3,14 +3,14 @@
 > **🔒 INTERNAL ADMIN - Hamster World 운영진 전용**
 > 메인 README 읽은 후 이 문서를 읽으세요.
 
-**결제 방화벽 + 중개 플랫폼 (Source of Truth ⭐)**
+**결제 방화벽 + 중개 플랫폼**
 
 > **핵심 책임**:
 > - 결제 중개 (PG Aggregator)
+> - PG 통신 및 상태 관리 (PaymentProcess - Source of Truth ⭐)
 > - 복잡한 결제 로직/검증 처리
 > - 모든 결제 이벤트의 집합점
-> - 정산 수수료 계산
-> - 외부 파트너 정산 기록
+> - Payment Service 보호 (방화벽 역할)
 
 ---
 
@@ -29,8 +29,12 @@
 
 ## 개요
 
-Cash Gateway Service는 **Hamster World의 핵심 결제 중개 서비스**로,
-모든 결제 이벤트의 **집합점**이자 **진실의 원천(Source of Truth)**입니다.
+Cash Gateway Service는 **Hamster World의 결제 방화벽 서비스**로,
+PG 통신을 담당하며 **PaymentProcess의 진실의 원천(Source of Truth)**입니다.
+
+**설계 철학:**
+> "Payment Service가 핵심 시스템이지만, 외부 노출하면 복잡해진다.
+> Cash Gateway가 방화벽 역할을 하여 Payment Service를 보호한다."
 
 ### 서비스 위치
 
@@ -67,22 +71,24 @@ Cash Gateway Service는 **Hamster World의 핵심 결제 중개 서비스**로,
 
 #### 경로 A: 벤더 직접 PG 계약 (낮은 수수료)
 ```
-Ecommerce → 외부 PG → Webhook → Cash Gateway
-                                     ↓
-                              Payment 생성
+Ecommerce → 외부 PG → Webhook → Cash Gateway → Kafka → Payment Service
+                                     ↓                      ↓
+                            PaymentProcess 생성        Payment 생성
 ```
 - 벤더가 PG사와 직접 계약
-- Cash Gateway는 Webhook만 수신
+- Cash Gateway는 Webhook만 수신 (PaymentProcess 관리)
+- Payment Service가 Payment 생성 (Kafka 이벤트)
 - 낮은 수수료 (모니터링/정산만)
 
 #### 경로 B: Hamster 중개 (높은 수수료)
 ```
-Ecommerce → Cash Gateway → 외부 PG → Webhook → Cash Gateway
-                                                     ↓
-                                              Payment 생성
+Ecommerce → Cash Gateway → 외부 PG → Webhook → Cash Gateway → Kafka → Payment Service
+                                                     ↓                      ↓
+                                            PaymentProcess 생성        Payment 생성
 ```
 - Hamster World가 PG사와 직접 통신
-- 벤더는 PG 계약 불필요
+- Cash Gateway가 PG 요청 대행 (PaymentProcess 관리)
+- Payment Service가 Payment 생성 (Kafka 이벤트)
 - 높은 수수료 부과 (결제 대행 + 정산)
 
 ### 모든 결제 이벤트 집합
@@ -145,30 +151,51 @@ fun recordProcess(process: PaymentProcess) {
 ### 객체 분리 설계 철학
 
 ```
-┌─────────────────────────────────────────────┐
-│  PaymentProcess (Mutable, CAS)              │  ← "지저분한" 상태 관리
-│  - 상태 전이 (UNKNOWN → SUCCESS)            │
-│  - CAS 업데이트 (동시성 제어)               │
-│  - gatewayReferenceId (생성 시점부터 존재)  │
-└─────────────────┬───────────────────────────┘
-                  │ 1:1
+┌────────────────────────────────────────────────────────────┐
+│  Cash Gateway: PaymentProcess                             │
+│  "외부 PG와 우리가 주고받은 메시지의 진실"                  │
+│  (Communication Truth)                                     │
+│                                                            │
+│  - PG 요청/응답 상태 추적                                  │
+│  - 상태 전이 (UNKNOWN → SUCCESS)                          │
+│  - CAS 업데이트 (동시성 제어)                             │
+│  - gatewayReferenceId (생성 시점부터 존재)                │
+└────────────────────────────────────────────────────────────┘
+                  │ Kafka Event
                   ↓
-┌─────────────────────────────────────────────┐
-│  Payment (Immutable)                        │  ← "깨끗한" 불변 기록
-│  - 완전 불변 (INSERT만)                     │
-│  - 취소도 새 레코드 (originPaymentId)       │
-│  - Source of Truth의 확정본                 │
-└─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  Payment Service: Payment                                 │
+│  "그 결과로 우리 시스템이 확정한 거래의 진실"               │
+│  (Business Truth)                                          │
+│                                                            │
+│  - 완전 불변 (INSERT만)                                    │
+│  - 취소도 새 레코드 (originPaymentId)                      │
+│  - Stock, OrderSnapshot과 같은 트랜잭션                    │
+└────────────────────────────────────────────────────────────┘
 ```
 
 **왜 분리했는가?**
-1. **Payment의 불변성 보장**: 거래 기록은 절대 변경되면 안 됨
-2. **상태 관리 격리**: "지저분한" 상태 전이는 PaymentProcess가 담당
-3. **책임 분리**: Process = 진행 중 상태, Payment = 확정 기록
 
-**진짜 이력(History)이 필요하다면?**
-- `PaymentLog` 같은 별도 객체 사용
-- `PaymentProcess`는 상태 관리 용도
+1. **관심사의 분리 (Separation of Concerns)**
+   - Cash Gateway: PG 통신 계층 (필터링 + 중계)
+   - Payment Service: 비즈니스 도메인 (재고 + 정산)
+
+2. **방화벽 역할**
+   > "방화벽의 역할은 '필터링'과 '중계'지, 그 안에서 비즈니스 자산(재고, 정산)을
+   > 직접 관리하는 게 아닙니다."
+
+3. **확장성**
+   - Cash Gateway를 가볍게 유지
+   - PG사 교체/추가 시 Payment Service의 핵심 로직 보존
+
+4. **원자성 보장**
+   - Payment + Stock + OrderSnapshot 같은 트랜잭션 (중요!)
+   - PaymentProcess는 Eventually Consistent로 충분
+
+**진실의 원천 계층:**
+- **PG사**: 최종 진실의 원천 (실제 돈의 흐름)
+- **Cash Gateway**: PaymentProcess (통신 진실)
+- **Payment Service**: Payment + Stock (비즈니스 진실)
 
 ---
 
@@ -177,18 +204,25 @@ fun recordProcess(process: PaymentProcess) {
 ### 1. PaymentProcess와 Payment의 관계
 
 ```
-PaymentProcess (1) ───────→ Payment (1)
-     ↑                           ↑
-   Mutable                   Immutable
-  (CAS 업데이트)              (INSERT만)
-   상태 관리                  거래 기록
+Cash Gateway                     Payment Service
+    ↓                                 ↓
+PaymentProcess  ──Kafka Event──→  Payment
+     ↑                                ↑
+   Mutable                        Immutable
+  (CAS 업데이트)                   (INSERT만)
+  PG 상태 추적                    비즈니스 거래 기록
 ```
 
 **핵심 규칙**:
 - **모든 Payment는 반드시 PaymentProcess가 먼저 존재**
-- **1:1 관계 엄격히 유지** (processId FK)
-- **PaymentProcess**: 결제 프로세스 상태 관리 (Mutable, Source of Truth)
-- **Payment**: 확정된 거래 기록 (Immutable, 불변 스냅샷)
+- **1:1 관계 (논리적)**: Payment.processPublicId → PaymentProcess.publicId
+- **PaymentProcess (Cash Gateway)**: PG 통신 상태 관리 (Communication Truth)
+- **Payment (Payment Service)**: 확정된 거래 기록 (Business Truth)
+
+**왜 서비스를 분리했는가?**
+> OrderSnapshot이 Payment Service에 이미 존재합니다.
+> 결제(Payment)는 스냅샷과 한 몸이어야 하므로, Payment도 Payment Service에 있어야 합니다.
+> Payment + Stock + OrderSnapshot = 같은 트랜잭션 ⭐
 
 ---
 
@@ -302,77 +336,17 @@ enum class PaymentProcessStatus {
    ├─ PENDING → FAILED    (PG 실패)
    └─ PENDING → CANCELLED (PG 취소)
    ↓
-[Payment 생성] 불변 거래 기록 생성
+[Kafka 이벤트 발행] PaymentApprovedEvent → Payment Service
+   ↓
+[Payment 생성] Payment Service에서 생성 (Business Truth)
 ```
 
 **특징**:
-- ✅ **Source of Truth**: 결제 프로세스의 유일한 진실
+- ✅ **Communication Truth**: PG 통신 상태의 유일한 진실
 - ✅ **Mutable**: 상태 전이 가능 (CAS 업데이트)
 - ✅ **Mandatory ID**: `gatewayReferenceId`는 생성 시점부터 존재
 - ✅ **동시성 제어**: CAS(Compare-And-Swap)로 안전한 상태 전이
-
----
-
-### Payment (Immutable)
-
-**역할**: 확정된 거래 기록 (불변 스냅샷)
-
-**개념**: PaymentProcess의 "확정본"
-- PaymentProcess가 SUCCESS/CANCELLED 상태가 되면 Payment 생성
-- Payment = PaymentProcess 상태의 불변 스냅샷
-- 거래 기록은 절대 변경되지 않음 (완전 불변)
-
-```kotlin
-@Entity
-@Table(name = "payments")
-class Payment(
-    var processId: Long,  // PaymentProcess FK (1:1, NOT NULL)
-
-    var orderPublicId: String?,
-    var userPublicId: String?,
-
-    var mid: String?,  // MID (Merchant ID)
-
-    var amount: BigDecimal,  // 양수(승인) or 음수(취소)
-
-    @Enumerated(EnumType.STRING)
-    var status: PaymentStatus,  // APPROVED, CANCELLED
-
-    var provider: String?,
-    var pgTransaction: String?,
-    var pgApprovalNo: String?,
-
-    var originPaymentId: Long?,  // 취소건이면 원본 Payment 참조
-
-    var originSource: String?  // null = 내부, "partner-a" = 외부
-) : AbsDomain()
-
-enum class PaymentStatus {
-    APPROVED,   // 승인
-    CANCELLED   // 취소
-}
-```
-
-**특징**:
-- ✅ **완전 불변** (INSERT만 발생, UPDATE 없음)
-- ✅ **취소도 새 레코드** (originPaymentId로 연결)
-- ✅ **금액**: 양수(승인), 음수(취소)
-- ✅ **스냅샷**: PaymentProcess 확정 시점의 불변 기록
-
-**현재 잔액 조회**:
-```sql
-SELECT SUM(amount) as balance
-FROM payments
-WHERE id = :paymentId OR origin_payment_id = :paymentId;
-```
-
-**PaymentProcess vs Payment 비교**:
-| 구분 | PaymentProcess | Payment |
-|------|----------------|---------|
-| **성격** | 상태 관리 (Mutable) | 거래 기록 (Immutable) |
-| **변경** | CAS 업데이트 가능 | 절대 변경 불가 |
-| **역할** | Source of Truth | 확정본 스냅샷 |
-| **생성 시점** | 프로세스 시작 | 프로세스 완료 |
+- ✅ **방화벽 역할**: Payment 생성은 Payment Service에 위임
 
 ---
 

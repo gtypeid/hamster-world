@@ -29,6 +29,7 @@ interface ProductDetailResponse {
     productPublicId: string
     stockDelta: number
     reason: string
+    orderPublicId?: string // TODO: Backend에서 추가 예정
     createdAt: string
   }[]
 }
@@ -56,6 +57,7 @@ export async function fetchProductDetail(publicId: string): Promise<ResourceDeta
       productPublicId: record.productPublicId,
       stockDelta: record.stockDelta,
       reason: record.reason,
+      orderPublicId: record.orderPublicId, // TODO: Backend에서 추가 예정
       createdAt: record.createdAt,
     }))
   }

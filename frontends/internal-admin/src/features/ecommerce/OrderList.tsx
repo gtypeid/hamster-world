@@ -1,18 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { Navigable } from '@/components/navigation/Navigable'
 import { fetchOrderList } from '@/api/orderService'
+import { useListSearch } from '@/hooks/useListSearch'
 import type { OrderListItem, OrderStatus } from '@/types/order'
 
 export function OrderList() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<OrderListItem[]>([])
   const [filter, setFilter] = useState<OrderStatus | 'ALL'>('ALL')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [highlightedId, setHighlightedId] = useState<string | null>(null)
-  const orderRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
+  // 데이터 로드
   useEffect(() => {
     const loadOrders = async () => {
       try {
@@ -31,50 +29,16 @@ export function OrderList() {
     loadOrders()
   }, [])
 
-  // URL 파라미터에서 searchBy 읽고 해당 아이템 찾아서 스크롤/하이라이트
-  useEffect(() => {
-    const searchByField = searchParams.get('searchBy')
-    const searchValue = searchParams.get('searchValue')
-
-    if (!searchByField || !searchValue || isLoading || orders.length === 0) return
-
-    // searchBy 조건에 맞는 Order 찾기
-    let targetOrder: OrderListItem | undefined
-    if (searchByField === 'orderPublicId') {
-      targetOrder = orders.find((o) => o.orderPublicId === searchValue)
-    }
-
-    if (!targetOrder) {
-      console.warn(`Order not found: ${searchByField}=${searchValue}`)
-      setSearchParams({})
-      return
-    }
-
-    setHighlightedId(targetOrder.orderPublicId)
-
-    // 해당 아이템으로 스크롤 (헤더 영역 고려)
-    setTimeout(() => {
-      const element = orderRefs.current[targetOrder.orderPublicId]
-      if (element) {
-        const headerOffset = 200
-        const elementPosition = element.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth',
-        })
-      }
-    }, 100)
-
-    // 3초 후 하이라이트 제거 & URL 파라미터 제거
-    const timer = setTimeout(() => {
-      setHighlightedId(null)
-      setSearchParams({})
-    }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [searchParams, isLoading, orders, setSearchParams])
+  // URL 파라미터 검색 + 하이라이트 (Hook으로 추상화)
+  const { highlightedId, itemRefs } = useListSearch(
+    orders,
+    {
+      orderPublicId: (o) => o.orderPublicId,
+      publicId: (o) => o.userPublicId, // User ID로도 검색 가능
+    },
+    (o) => o.orderPublicId,
+    isLoading
+  )
 
   const filteredOrders =
     filter === 'ALL'
@@ -128,6 +92,20 @@ export function OrderList() {
             color="gray"
           />
           <FilterButton
+            active={filter === 'PAYMENT_REQUESTED'}
+            onClick={() => setFilter('PAYMENT_REQUESTED')}
+            label="결제 요청"
+            count={orders.filter((o) => o.status === 'PAYMENT_REQUESTED').length}
+            color="yellow"
+          />
+          <FilterButton
+            active={filter === 'PAYMENT_APPROVED'}
+            onClick={() => setFilter('PAYMENT_APPROVED')}
+            label="결제 승인"
+            count={orders.filter((o) => o.status === 'PAYMENT_APPROVED').length}
+            color="green"
+          />
+          <FilterButton
             active={filter === 'PAYMENT_FAILED'}
             onClick={() => setFilter('PAYMENT_FAILED')}
             label="결제 실패"
@@ -135,38 +113,10 @@ export function OrderList() {
             color="red"
           />
           <FilterButton
-            active={filter === 'PAYMENT_COMPLETED'}
-            onClick={() => setFilter('PAYMENT_COMPLETED')}
-            label="결제 완료"
-            count={orders.filter((o) => o.status === 'PAYMENT_COMPLETED').length}
-            color="blue"
-          />
-          <FilterButton
-            active={filter === 'PREPARING'}
-            onClick={() => setFilter('PREPARING')}
-            label="준비 중"
-            count={orders.filter((o) => o.status === 'PREPARING').length}
-            color="yellow"
-          />
-          <FilterButton
-            active={filter === 'SHIPPED'}
-            onClick={() => setFilter('SHIPPED')}
-            label="배송 중"
-            count={orders.filter((o) => o.status === 'SHIPPED').length}
-            color="purple"
-          />
-          <FilterButton
-            active={filter === 'DELIVERED'}
-            onClick={() => setFilter('DELIVERED')}
-            label="배송 완료"
-            count={orders.filter((o) => o.status === 'DELIVERED').length}
-            color="green"
-          />
-          <FilterButton
-            active={filter === 'CANCELLED'}
-            onClick={() => setFilter('CANCELLED')}
+            active={filter === 'CANCELED'}
+            onClick={() => setFilter('CANCELED')}
             label="취소됨"
-            count={orders.filter((o) => o.status === 'CANCELLED').length}
+            count={orders.filter((o) => o.status === 'CANCELED').length}
             color="gray"
           />
         </div>
@@ -184,7 +134,7 @@ export function OrderList() {
             return (
               <div
                 key={order.orderPublicId}
-                ref={(el) => (orderRefs.current[order.orderPublicId] = el)}
+                ref={(el) => (itemRefs.current[order.orderPublicId] = el)}
                 className={`transition-all duration-500 ${
                   isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2 rounded-lg' : ''
                 }`}
@@ -289,13 +239,10 @@ function OrderCard({ order }: OrderCardProps) {
 function StatusBadge({ status }: { status: OrderStatus }) {
   const statusStyles: Record<OrderStatus, { label: string; className: string }> = {
     CREATED: { label: '생성됨', className: 'bg-gray-100 text-gray-700' },
+    PAYMENT_REQUESTED: { label: '결제 요청', className: 'bg-yellow-100 text-yellow-700' },
+    PAYMENT_APPROVED: { label: '결제 승인', className: 'bg-green-100 text-green-700' },
     PAYMENT_FAILED: { label: '결제 실패', className: 'bg-red-100 text-red-700' },
-    PAYMENT_COMPLETED: { label: '결제 완료', className: 'bg-blue-100 text-blue-700' },
-    PREPARING: { label: '준비 중', className: 'bg-yellow-100 text-yellow-700' },
-    SHIPPED: { label: '배송 중', className: 'bg-purple-100 text-purple-700' },
-    DELIVERED: { label: '배송 완료', className: 'bg-green-100 text-green-700' },
-    CANCELLED: { label: '취소됨', className: 'bg-gray-100 text-gray-700' },
-    REFUNDED: { label: '환불됨', className: 'bg-gray-100 text-gray-700' },
+    CANCELED: { label: '취소됨', className: 'bg-gray-100 text-gray-700' },
   }
 
   const { label, className } = statusStyles[status]

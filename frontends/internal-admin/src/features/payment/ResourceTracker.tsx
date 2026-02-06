@@ -1,19 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Navigable } from '@/components/navigation/Navigable'
 import { fetchProductList } from '@/api/productService'
+import { useListSearch } from '@/hooks/useListSearch'
 import type { Product } from '@/types/payment'
 
 export function ResourceTracker() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [filter, setFilter] = useState<'all' | 'available' | 'soldout'>('all')
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [highlightedId, setHighlightedId] = useState<string | null>(null)
-  const productRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
   // 데이터 로드
   useEffect(() => {
@@ -34,53 +31,16 @@ export function ResourceTracker() {
     loadProducts()
   }, [])
 
-  // URL 파라미터에서 searchBy 읽고 해당 아이템 찾아서 스크롤/하이라이트
-  useEffect(() => {
-    const searchByField = searchParams.get('searchBy')
-    const searchValue = searchParams.get('searchValue')
-
-    if (!searchByField || !searchValue || isLoading || products.length === 0) return
-
-    // searchBy 조건에 맞는 Product 찾기
-    let targetProduct: Product | undefined
-    if (searchByField === 'publicId') {
-      targetProduct = products.find((p) => p.publicId === searchValue)
-    } else if (searchByField === 'ecommerceProductId') {
-      targetProduct = products.find((p) => p.ecommerceProductId === searchValue)
-    }
-
-    if (!targetProduct) {
-      console.warn(`Product not found: ${searchByField}=${searchValue}`)
-      setSearchParams({}) // 파라미터 제거
-      return
-    }
-
-    setHighlightedId(targetProduct.publicId)
-
-    // 해당 아이템으로 스크롤 (헤더 영역 고려)
-    setTimeout(() => {
-      const element = productRefs.current[targetProduct.publicId]
-      if (element) {
-        // 헤더 높이만큼 offset 추가
-        const headerOffset = 200 // 헤더 + 통계 카드 영역
-        const elementPosition = element.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth',
-        })
-      }
-    }, 100)
-
-    // 3초 후 하이라이트 제거 & URL 파라미터 제거
-    const timer = setTimeout(() => {
-      setHighlightedId(null)
-      setSearchParams({}) // 파라미터 제거
-    }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [searchParams, isLoading, products, setSearchParams])
+  // URL 파라미터 검색 + 하이라이트 (Hook으로 추상화)
+  const { highlightedId, itemRefs } = useListSearch(
+    products,
+    {
+      publicId: (p) => p.publicId,
+      ecommerceProductId: (p) => p.ecommerceProductId || '',
+    },
+    (p) => p.publicId,
+    isLoading
+  )
 
   // 필터링
   const filteredProducts =
@@ -193,7 +153,7 @@ export function ResourceTracker() {
             return (
               <div
                 key={product.publicId}
-                ref={(el) => (productRefs.current[product.publicId] = el)}
+                ref={(el) => (itemRefs.current[product.publicId] = el)}
                 className={`bg-white rounded-lg shadow-md transition-all duration-500 ${
                   isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''
                 }`}

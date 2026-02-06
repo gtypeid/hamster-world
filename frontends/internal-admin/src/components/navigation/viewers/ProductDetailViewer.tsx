@@ -95,7 +95,7 @@ export function ProductDetailViewer({ id, data: initialData }: ViewerProps) {
     if (reason.includes('INITIAL') || reason.includes('REPLENISHMENT')) {
       return 'bg-blue-100 text-blue-800'
     }
-    if (reason.includes('RESERVED')) {
+    if (reason.includes('RESERVED') || reason.includes('주문 차감')) {
       return 'bg-orange-100 text-orange-800'
     }
     if (reason.includes('RESTORED')) {
@@ -106,9 +106,30 @@ export function ProductDetailViewer({ id, data: initialData }: ViewerProps) {
 
   const getReasonIcon = (reason: string) => {
     if (reason.includes('INITIAL') || reason.includes('REPLENISHMENT')) return '📦'
-    if (reason.includes('RESERVED')) return '🔒'
+    if (reason.includes('RESERVED') || reason.includes('주문 차감')) return '🔒'
     if (reason.includes('RESTORED')) return '♻️'
     return '📝'
+  }
+
+  const getReasonLabel = (reason: string) => {
+    // "[주문 차감] orderPublicId=xxx" 형태를 "주문 차감"으로 정리
+    if (reason.includes('[주문 차감]')) {
+      return '주문 차감'
+    }
+    // "STOCK_RESERVED (ORD_xxx)" 형태를 "재고 차감"으로 정리
+    if (reason.includes('RESERVED')) {
+      return '재고 차감'
+    }
+    if (reason.includes('INITIAL')) return '초기 재고'
+    if (reason.includes('REPLENISHMENT')) return '재고 보충'
+    if (reason.includes('RESTORED')) return '재고 복구'
+    return reason
+  }
+
+  const extractOrderPublicId = (reason: string): string | null => {
+    // "[주문 차감] orderPublicId=KW0VVh0L8i" 형태에서 추출
+    const match = reason.match(/orderPublicId=([A-Za-z0-9]+)/)
+    return match ? match[1] : null
   }
 
   return (
@@ -226,7 +247,7 @@ export function ProductDetailViewer({ id, data: initialData }: ViewerProps) {
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium ${getReasonStyle(record.reason)}`}
                           >
-                            {record.reason}
+                            {getReasonLabel(record.reason)}
                           </span>
                         </div>
 
@@ -243,12 +264,26 @@ export function ProductDetailViewer({ id, data: initialData }: ViewerProps) {
                           </div>
                         </div>
 
-                        <div className="text-xs text-gray-500 space-y-1">
-                          <div className="flex justify-between items-center font-mono">
+                        <div className="text-xs space-y-1">
+                          <div className="flex justify-between items-center font-mono text-gray-500">
                             <span>Record ID:</span>
                             <span className="text-gray-600">{record.recordPublicId}</span>
                           </div>
-                          <div>{new Date(record.createdAt).toLocaleString('ko-KR')}</div>
+                          {(() => {
+                            // 1. Backend에서 orderPublicId 제공하면 우선 사용
+                            const orderId = record.orderPublicId || extractOrderPublicId(record.reason)
+
+                            if (orderId) {
+                              return (
+                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                  <span className="text-gray-500">Order ID:</span>
+                                  <Navigable id={orderId} type="order-id" />
+                                </div>
+                              )
+                            }
+                            return null
+                          })()}
+                          <div className="text-gray-500">{new Date(record.createdAt).toLocaleString('ko-KR')}</div>
                         </div>
                       </div>
                     </div>

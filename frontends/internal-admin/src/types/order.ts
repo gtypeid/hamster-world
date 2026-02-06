@@ -2,13 +2,10 @@
 
 export type OrderStatus =
   | 'CREATED' // 주문 생성
+  | 'PAYMENT_REQUESTED' // 결제 요청
+  | 'PAYMENT_APPROVED' // 결제 승인
   | 'PAYMENT_FAILED' // 결제 실패
-  | 'PAYMENT_COMPLETED' // 결제 완료
-  | 'PREPARING' // 배송 준비
-  | 'SHIPPED' // 배송 중
-  | 'DELIVERED' // 배송 완료
-  | 'CANCELLED' // 취소됨
-  | 'REFUNDED' // 환불됨
+  | 'CANCELED' // 취소됨
 
 /**
  * 주문 목록 아이템 (Admin API 응답)
