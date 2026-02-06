@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useNavigation } from './NavigationContext'
 import { ViewerRegistry } from './registry/ViewerRegistry'
 import { ServiceRegistry } from './registry/ServiceRegistry'
+import { FieldRegistry } from './registry/FieldRegistry'
 import type { IdType, ViewerType } from '@/types/navigation'
 
 interface NavigableProps {
@@ -68,77 +69,55 @@ export function Navigable({
 
 /**
  * ID 타입으로 ViewerType 추론
+ * - FieldRegistry 기반으로 자동 추론
  */
 function inferViewerType(idType: IdType): ViewerType {
+  const viewerType = FieldRegistry.inferViewerType(idType)
+  if (viewerType) return viewerType
+
+  // Fallback for special types not in FieldRegistry (event-timeline, trace-timeline)
   switch (idType) {
-    case 'process-id':
-      return 'process-detail'
-    case 'payment-id':
-      return 'payment-detail'
     case 'event-id':
       return 'event-timeline'
     case 'trace-id':
       return 'trace-timeline'
-    case 'product-id':
-      return 'product-detail'
-    case 'ecommerce-product-id':
-      return 'ecommerce-product-detail'
-    case 'order-id':
-      return 'order-detail'
-    case 'user-id':
-      return 'user-detail'
     default:
-      return 'process-detail' // fallback
+      console.warn(`[Navigable] Unknown idType: ${idType}, falling back to process-detail`)
+      return 'process-detail'
   }
 }
 
 /**
  * 라벨 포맷팅
+ * - FieldRegistry 기반으로 일관된 라벨 사용
  */
 function formatLabel(type: IdType, id: string): string {
-  const typeLabels: Record<IdType, string> = {
-    'process-id': 'Process',
-    'payment-id': 'Payment',
-    'event-id': 'Event',
-    'trace-id': 'Trace',
-    'product-id': 'Product',
-    'order-id': 'Order',
-    'user-id': 'User',
-    'ecommerce-product-id': 'E-Product',
+  const label = FieldRegistry.getLabelForIdType(type)
+
+  // FieldRegistry에 없으면 fallback
+  if (label === type) {
+    // Special cases for event-id, trace-id
+    const fallbackLabels: Partial<Record<IdType, string>> = {
+      'event-id': 'Event',
+      'trace-id': 'Trace',
+    }
+    const fallbackLabel = fallbackLabels[type] || type
+    return `${fallbackLabel}: ${id}`
   }
 
-  return `${typeLabels[type]}: ${id}`
+  return `${label.replace(' ID', '')}: ${id}`
 }
 
 /**
- * ID 타입별 색상 - ServiceRegistry 기반
+ * ID 타입별 색상 - FieldRegistry + ServiceRegistry 기반
  */
 function getColorForIdType(type: IdType): string {
-  // ID 타입을 서비스로 매핑
-  let service: 'payment' | 'gateway' | 'ecommerce' | null = null
+  // FieldRegistry에서 서비스 정보 가져오기
+  const service = FieldRegistry.getServiceForIdType(type)
 
-  switch (type) {
-    case 'process-id':
-    case 'payment-id':
-    case 'event-id':
-      service = 'gateway'
-      break
-
-    case 'product-id':
-      service = 'payment'
-      break
-
-    case 'order-id':
-    case 'ecommerce-product-id':
-    case 'user-id':
-      service = 'ecommerce'
-      break
-
-    case 'trace-id':
-      return 'text-gray-600 hover:text-gray-700' // Trace는 특별 (회색)
-
-    default:
-      return 'text-blue-600 hover:text-blue-700'
+  // Special case: trace-id는 회색
+  if (type === 'trace-id') {
+    return 'text-gray-600 hover:text-gray-700'
   }
 
   // ServiceRegistry에서 색상 가져오기
@@ -153,5 +132,6 @@ function getColorForIdType(type: IdType): string {
     return colorMap[serviceConfig.color] || 'text-blue-600 hover:text-blue-700'
   }
 
+  // Fallback for event-id and unknown types
   return 'text-blue-600 hover:text-blue-700'
 }

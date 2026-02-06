@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { ViewerProps } from '@/types/navigation'
 import type { ProcessDetail } from '@/types/gateway'
-import { getMockProcessDetail } from '@/features/gateway/mockData'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
+import { FieldRenderer } from '../FieldRenderer'
 
 /**
  * ProcessDetailViewer
@@ -11,19 +11,22 @@ import { Navigable } from '../Navigable'
  * - Event Timeline 포함
  * - Payment 결과 포함 (있는 경우)
  */
-export function ProcessDetailViewer({ id }: ViewerProps) {
-  const [detail, setDetail] = useState<ProcessDetail | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export function ProcessDetailViewer({ id, data: initialData }: ViewerProps) {
+  const [detail, setDetail] = useState<ProcessDetail | null>(initialData || null)
+  const [isLoading, setIsLoading] = useState(!initialData)
 
   useEffect(() => {
-    setIsLoading(true)
-    // Mock 데이터 로드 (실제로는 API 호출)
-    setTimeout(() => {
-      const data = getMockProcessDetail(id)
-      setDetail(data)
+    // initialData가 있으면 그대로 사용 (fetcher가 이미 호출됨)
+    if (initialData) {
+      setDetail(initialData)
       setIsLoading(false)
-    }, 300)
-  }, [id])
+      return
+    }
+
+    // initialData가 없으면 에러 (fetcher가 실행되어야 함)
+    setIsLoading(false)
+    setDetail(null)
+  }, [id, initialData])
 
   if (isLoading) {
     return <LoadingSpinner />
@@ -292,31 +295,55 @@ export function ProcessDetailViewer({ id }: ViewerProps) {
         </div>
       </section>
 
-      {/* Related IDs */}
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
+      {/* Related IDs - Using FieldRenderer */}
+      <FieldRenderer viewerType="process-detail" data={process} />
 
-        <div className="space-y-2 text-sm font-mono">
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">Process ID:</span>
-            <Navigable id={process.publicId} type="process-id" />
+      {/* Request/Response Payloads */}
+      {(process.requestPayload || process.responsePayload) && (
+        <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
+          <h4 className="text-lg font-bold text-hamster-brown mb-4">📦 Request/Response Payload</h4>
+
+          <div className="space-y-4">
+            {/* Request Payload */}
+            {process.requestPayload && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-bold text-blue-600">→ Request Payload</span>
+                  <span className="text-xs text-gray-500">(PG에 전송한 데이터)</span>
+                </div>
+                <pre className="bg-blue-50 border border-blue-200 p-4 rounded text-xs overflow-x-auto font-mono">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(process.requestPayload), null, 2)
+                    } catch {
+                      return process.requestPayload
+                    }
+                  })()}
+                </pre>
+              </div>
+            )}
+
+            {/* Response Payload */}
+            {process.responsePayload && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-bold text-green-600">← Response Payload</span>
+                  <span className="text-xs text-gray-500">(PG에서 받은 데이터)</span>
+                </div>
+                <pre className="bg-green-50 border border-green-200 p-4 rounded text-xs overflow-x-auto font-mono">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(process.responsePayload), null, 2)
+                    } catch {
+                      return process.responsePayload
+                    }
+                  })()}
+                </pre>
+              </div>
+            )}
           </div>
-
-          {process.orderPublicId && (
-            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-              <span className="text-gray-500 flex-shrink-0">Order ID:</span>
-              <Navigable id={process.orderPublicId} type="order-id" />
-            </div>
-          )}
-
-          {process.userPublicId && (
-            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-              <span className="text-gray-500 flex-shrink-0">User ID:</span>
-              <Navigable id={process.userPublicId} type="user-id" />
-            </div>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Event Timeline */}
       <section className="bg-white rounded-lg border-2 border-gray-200 p-6">

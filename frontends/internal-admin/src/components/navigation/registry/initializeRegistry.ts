@@ -1,54 +1,66 @@
 import { ViewerRegistry } from './ViewerRegistry'
 import { RelationRegistry } from './RelationRegistry'
+import { FieldRegistry } from './FieldRegistry'
 import { ProcessDetailViewer } from '../viewers/ProcessDetailViewer'
+import { GatewayPaymentDetailViewer } from '../viewers/GatewayPaymentDetailViewer'
 import { ProductDetailViewer } from '../viewers/ProductDetailViewer'
+import { PaymentDetailViewer } from '../viewers/PaymentDetailViewer'
 import { EcommerceProductDetailViewer } from '../viewers/EcommerceProductDetailViewer'
 import { OrderDetailViewer } from '../viewers/OrderDetailViewer'
 import { UserDetailViewer } from '../viewers/UserDetailViewer'
 
 // API Services
-import { fetchProductDetail } from '@/api/productService'
+import { fetchProductDetail, fetchPaymentDetail } from '@/api/productService'
 import { fetchEcommerceProductDetail } from '@/api/ecommerceProductService'
 import { fetchOrderDetail } from '@/api/orderService'
 import { fetchUserDetail } from '@/api/userService'
-// import { fetchProcessDetail } from '@/api/gatewayService' // TODO: 백엔드 Admin API 구현 후 주석 해제
+import { fetchProcessDetail } from '@/api/gatewayService'
 
-// Mock Data (Cash Gateway - 백엔드 API 구현 전)
-import { getMockProcessDetail } from '@/features/gateway/mockData'
+// Field Registry Config
+import { FIELD_REGISTRY_CONFIG } from '@/config/navigation-field-registry.config'
 
 /**
  * Registry 초기화
  * - 앱 시작 시 한 번만 호출
- * - 모든 뷰어와 관계 등록
+ * - 모든 뷰어, 관계, 필드 등록
  */
 export function initializeRegistry() {
+  // ===== Field Registry 초기화 =====
+  FIELD_REGISTRY_CONFIG.fields.forEach((field) => {
+    FieldRegistry.registerField(field)
+  })
+
+  FIELD_REGISTRY_CONFIG.viewerMappings.forEach((mapping) => {
+    FieldRegistry.registerViewerMapping(mapping)
+  })
+
+  console.log('✅ Field Registry initialized:', {
+    fields: FieldRegistry.getAllFieldNames(),
+    idTypes: FieldRegistry.getAllIdTypes(),
+  })
   // ===== Viewer 등록 =====
 
-  // Process Detail (Cash Gateway) - Mock 데이터 사용 (TODO: 백엔드 API 구현 후 교체)
+  // Process Detail (Cash Gateway)
   ViewerRegistry.register({
     type: 'process-detail',
     title: 'PaymentProcess 상세',
     component: ProcessDetailViewer,
     service: 'gateway',
-    fetcher: async (id: string) => {
-      // TODO: 백엔드 Admin API 구현되면 아래 주석 해제하고 Mock 제거
-      // return await fetchProcessDetail(id)
-
-      // Mock (임시)
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          const data = getMockProcessDetail(id)
-          if (data) {
-            resolve(data)
-          } else {
-            reject(new Error('Process not found'))
-          }
-        }, 300)
-      })
-    },
+    fetcher: fetchProcessDetail, // Cash Gateway API
     myItem: {
       searchBy: (id) => ({ field: 'publicId', value: id }),
     },
+  })
+
+  // Gateway Payment Detail (Cash Gateway Communication Truth)
+  ViewerRegistry.register({
+    type: 'gateway-payment-detail',
+    title: 'Gateway Payment 상세',
+    component: GatewayPaymentDetailViewer,
+    service: 'gateway',
+    // fetcher: fetchGatewayPayment, // TODO: 백엔드 API 구현 필요 (GET /api/payments/{publicId})
+    isEmbeddedOnly: true, // Order에 포함된 데이터로만 조회 가능
+    myItem: false, // 단독 리스트 페이지 없음 (Order에서만 참조)
   })
 
   // Product Detail (Payment Service) - Event Sourcing 포함
@@ -60,6 +72,19 @@ export function initializeRegistry() {
     fetcher: fetchProductDetail, // Payment Service API
     myItem: {
       searchBy: (id) => ({ field: 'publicId', value: id }),
+    },
+  })
+
+  // Payment Detail (Payment Service) - 거래 내역
+  ViewerRegistry.register({
+    type: 'payment-detail',
+    title: 'Payment 상세',
+    component: PaymentDetailViewer,
+    service: 'payment',
+    fetcher: fetchPaymentDetail, // Payment Service API
+    myItem: {
+      searchBy: (id) => ({ field: 'paymentPublicId', value: id }),
+      listRoute: '/payment/transactions',
     },
   })
 

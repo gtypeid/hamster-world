@@ -108,6 +108,39 @@ class OrderSnapshotRepository(
     }
 
     /**
+     * OrderSnapshot + Items 조회 (by orderSnapshotId)
+     *
+     * ## 사용처
+     * - PaymentEventHandler.handleInternalStockRestore()
+     * - Payment 내부에서 orderSnapshotId로 조회 (Internal PK)
+     *
+     * @param orderSnapshotId OrderSnapshot Internal PK
+     * @return OrderSnapshotWithItems (없으면 null)
+     */
+    fun findByOrderSnapshotIdWithItems(orderSnapshotId: Long): OrderSnapshotWithItems? {
+        // 1. OrderSnapshot 조회
+        val snapshot = orderSnapshotJpaRepository.findById(orderSnapshotId).orElse(null) ?: return null
+
+        // 2. OrderSnapshotItems 조회
+        val itemEntities = orderSnapshotItemJpaRepository.findBySnapshotId(snapshot.id!!)
+
+        // 3. OrderItemDto로 변환 (Internal PK → Public ID)
+        val items = itemEntities.map { item ->
+            val product = productRepository.findById(item.productId)
+            OrderItemDto(
+                productPublicId = product.ecommerceProductId!!,  // Internal PK → Public ID
+                quantity = item.quantity,
+                price = item.price
+            )
+        }
+
+        return OrderSnapshotWithItems(
+            snapshot = snapshot,
+            items = items
+        )
+    }
+
+    /**
      * OrderSnapshot + OrderSnapshotItems 삭제 (선택적)
      *
      * @param orderPublicId E-commerce Service의 Order Public ID (Snowflake Base62)

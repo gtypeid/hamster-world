@@ -9,4 +9,4 @@ class ApprovePaymentCtx(
     orderNumber: String,
     amount: BigDecimal,
     mid: String
-) : PaymentCtx(PaymentStatus.APPROVED, userPublicId, orderPublicId, orderNumber, amount, mid, null)
+) : PaymentCtx(PaymentStatus.APPROVED, userPublicId, orderPublicId, orderNumber, amount, mid)

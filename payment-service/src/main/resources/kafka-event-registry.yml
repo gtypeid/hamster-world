@@ -16,11 +16,16 @@ event:
 
     - topic: ${kafka.topics.cash-gateway-events}
       events:
+        - PaymentApprovedEvent   # 결제 승인 → Payment 생성 + PaymentConfirmedEvent 발행
+        - PaymentFailedEvent     # 결제 실패 → 재고 복원 + PaymentProcessFailedEvent 발행
         - PaymentCancelledEvent  # 결제 취소 → 재고 복원
 
   # 발행하는 이벤트 (Publish)
   publishes:
     - topic: ${kafka.service.payment-service.topic}
       events:
+        - PaymentConfirmedEvent         # 결제 확정 완료 → Ecommerce Order 상태 PAID
+        - PaymentProcessFailedEvent     # 결제 실패 확정 → Ecommerce Order 상태 PAYMENT_FAILED
+        - PaymentCancelConfirmedEvent   # 결제 취소 확정 → Ecommerce Order 상태 CANCELED
         - OrderStockReservedEvent       # 재고 확보 완료 → Cash Gateway가 PG 요청
         - ProductStockSynchronizedEvent # 재고 변경 → Ecommerce 동기화

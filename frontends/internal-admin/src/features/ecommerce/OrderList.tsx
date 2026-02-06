@@ -218,7 +218,7 @@ function OrderCard({ order }: OrderCardProps) {
         {order.gatewayPaymentPublicId && (
           <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
             <span className="text-gray-500 flex-shrink-0">Gateway Payment ID:</span>
-            <Navigable id={order.gatewayPaymentPublicId} type="process-id" />
+            <Navigable id={order.gatewayPaymentPublicId} type="gateway-payment-id" />
           </div>
         )}
       </div>

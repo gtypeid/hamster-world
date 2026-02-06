@@ -19,14 +19,22 @@ export function GenericDataViewer({ id, type, data: initialData }: GenericDataVi
   const [data, setData] = useState<any>(initialData || null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [prevId, setPrevId] = useState(id)
+  const [prevType, setPrevType] = useState(type)
+
+  // Derived state pattern: 프롭스가 변경되면 즉시 상태 초기화 (useEffect 전에 실행)
+  if (id !== prevId || type !== prevType) {
+    setPrevId(id)
+    setPrevType(type)
+    setData(initialData || null)
+    setError(null)
+    setIsLoading(false)
+  }
 
   const viewerConfig = ViewerRegistry.get(type)
 
   useEffect(() => {
-    // 뷰어 타입이나 ID가 변경되면 데이터 초기화
-    setData(null)
-    setError(null)
-    setIsLoading(false)
+    // 이미 초기화됨 (위의 derived state pattern에서 처리)
 
     // 이미 data가 전달되었으면 API 호출 안함
     if (initialData) {
@@ -98,6 +106,11 @@ export function GenericDataViewer({ id, type, data: initialData }: GenericDataVi
         <p className="text-sm">ViewerType: {type}</p>
       </div>
     )
+  }
+
+  // 데이터 없으면 렌더링 안함 (에러가 이미 표시됨)
+  if (!data) {
+    return null
   }
 
   // 실제 Viewer 컴포넌트 렌더링

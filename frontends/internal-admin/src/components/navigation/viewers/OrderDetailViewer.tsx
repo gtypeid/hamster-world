@@ -4,6 +4,7 @@ import type { OrderDetail } from '@/types/order'
 import { fetchOrderDetail } from '@/api/orderService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
+import { FieldRenderer } from '../FieldRenderer'
 
 /**
  * OrderDetailViewer
@@ -198,29 +199,8 @@ export function OrderDetailViewer({ id, data: initialData }: ViewerProps) {
         )}
       </section>
 
-      {/* Related IDs */}
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
-
-        <div className="space-y-2 text-sm font-mono">
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">Order ID:</span>
-            <Navigable id={order.orderPublicId} type="order-id" />
-          </div>
-
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">User ID:</span>
-            <Navigable id={order.userPublicId} type="user-id" />
-          </div>
-
-          {order.gatewayPaymentPublicId && (
-            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-              <span className="text-gray-500 flex-shrink-0">Gateway Payment ID:</span>
-              <Navigable id={order.gatewayPaymentPublicId} type="process-id" />
-            </div>
-          )}
-        </div>
-      </section>
+      {/* Related IDs - Using FieldRenderer */}
+      <FieldRenderer viewerType="order-detail" data={order} />
 
       {/* Timestamps */}
       <section className="bg-white rounded-lg border-2 border-gray-200 p-6">

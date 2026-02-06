@@ -1,9 +1,10 @@
 import { paymentClient } from './client'
-import type { Product, ResourceDetail } from '@/types/payment'
+import type { Product, ResourceDetail, Payment, PaymentDetail } from '@/types/payment'
 
 /**
- * Product Service API
- * Payment Service의 Product 관련 API
+ * Payment Service API
+ * - Product 관련 (자원 관리)
+ * - Payment 관련 (거래 내역)
  */
 
 interface ProductListResponse {
@@ -82,4 +83,24 @@ function mapProductResponse(data: ProductListResponse): Product {
     createdAt: data.createdAt,
     modifiedAt: data.modifiedAt,
   }
+}
+
+// ===== Payment (거래 내역) =====
+
+/**
+ * Payment 목록 조회
+ * GET /api/payments/list
+ */
+export async function fetchPaymentList(): Promise<Payment[]> {
+  const response = await paymentClient.get<Payment[]>('/api/payments/list')
+  return response.data
+}
+
+/**
+ * Payment 상세 조회
+ * GET /api/payments/{publicId}
+ */
+export async function fetchPaymentDetail(publicId: string): Promise<PaymentDetail> {
+  const response = await paymentClient.get<PaymentDetail>(`/api/payments/${publicId}`)
+  return response.data
 }

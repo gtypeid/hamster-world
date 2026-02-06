@@ -8,6 +8,19 @@ import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.common.domain.converter.DomainConverter
 import org.springframework.stereotype.Component
 
+/**
+ * PaymentResponse → PaymentProcess 변환기
+ *
+ * ## 주의사항
+ * - 현재는 Webhook 전용 정책으로 이 converter는 사용되지 않음
+ * - 동기 응답 처리는 단순히 UNKNOWN 상태 유지만 함
+ * - 실제 SUCCESS/FAILED 전환은 Webhook에서 처리
+ *
+ * ## 변경 사항
+ * - 기존: ctx.payment (Payment 엔티티) 참조
+ * - 변경: Payment 제거
+ * - 이유: originProcessId는 PaymentCancelledRequestToProcessConverter에서 이미 설정됨
+ */
 @Component
 class PaymentResponseToProcessConverter(
     private val objectMapper: ObjectMapper
@@ -24,7 +37,6 @@ class PaymentResponseToProcessConverter(
             val pgSuccess = provider.isSuccess(paymentResponse)
 
             val ctx = source.paymentCtx
-            val originPayment = ctx.payment
             val ctxStatus = ctx.paymentStatus
 
             val status = if (ctxStatus == PaymentStatus.CANCELLED) {
@@ -34,7 +46,7 @@ class PaymentResponseToProcessConverter(
             }
 
             val providerEnum = provider.getProvider()
-            var process = PaymentProcess(
+            val process = PaymentProcess(
                 orderPublicId = ctx.orderPublicId,
                 userPublicId = ctx.userPublicId,
                 provider = providerEnum,
@@ -48,16 +60,12 @@ class PaymentResponseToProcessConverter(
                 pgTransaction = paymentResponse.getPgTransaction(),
                 pgApprovalNo = paymentResponse.getPgApprovalNo(),
                 responsePayload = objectMapper.writeValueAsString(paymentResponse)
+                // originProcessId는 PaymentCancelledRequestToProcessConverter에서 이미 설정됨
             )
-
-            // 취소 플로우인 경우 originProcessId 세팅
-            if (ctxStatus == PaymentStatus.CANCELLED && originPayment != null) {
-               process.originProcessId = originPayment.processId
-            }
 
             return process
         } catch (e: Exception) {
-            throw RuntimeException("결제 응답 -> PaymentAttempt 변환 실패", e)
+            throw RuntimeException("결제 응답 -> PaymentProcess 변환 실패", e)
         }
     }
 }

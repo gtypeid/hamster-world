@@ -7,11 +7,12 @@
 export type IdType =
   // Cash Gateway Service
   | 'process-id' // PaymentProcess publicId
-  | 'payment-id' // Payment publicId
+  | 'gateway-payment-id' // Cash Gateway Payment publicId (Communication Truth)
   | 'event-id' // ProcessEvent eventId
   | 'trace-id' // Distributed trace ID
 
   // Payment Service
+  | 'payment-id' // Payment Service Payment publicId (Business Truth)
   | 'product-id' // Product publicId
 
   // Ecommerce Service (Cross-service references)
@@ -24,8 +25,9 @@ export type IdType =
  * - TracerPane에 표시될 뷰어들
  */
 export type ViewerType =
-  | 'process-detail' // PaymentProcess 상세
-  | 'payment-detail' // Payment 상세
+  | 'process-detail' // PaymentProcess 상세 (Cash Gateway)
+  | 'gateway-payment-detail' // Gateway Payment 상세 (Cash Gateway Communication Truth)
+  | 'payment-detail' // Payment 상세 (Payment Service Business Truth)
   | 'event-timeline' // Event Timeline
   | 'trace-timeline' // Trace ID로 묶인 전체 타임라인
   | 'product-detail' // Product 상세 + Event Sourcing (Payment Service)

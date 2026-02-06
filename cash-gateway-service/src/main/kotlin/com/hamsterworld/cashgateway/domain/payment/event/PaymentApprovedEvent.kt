@@ -1,6 +1,6 @@
 package com.hamsterworld.cashgateway.domain.payment.event
 
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
+import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -42,18 +42,29 @@ data class PaymentApprovedEvent(
     occurredAt = occurredAt
 ) {
     companion object {
-        fun from(payment: Payment, userPublicId: String?): PaymentApprovedEvent {
+        /**
+         * PaymentProcess로부터 PaymentApprovedEvent 생성
+         *
+         * ## 변경 사항
+         * - Payment 엔티티 제거로 인해 PaymentProcess에서 직접 이벤트 생성
+         * - paymentPublicId: PaymentProcess.publicId 사용
+         * - gatewayPaymentPublicId: PaymentProcess.publicId 사용
+         *
+         * @param process PaymentProcess (SUCCESS 상태)
+         * @return PaymentApprovedEvent
+         */
+        fun from(process: PaymentProcess): PaymentApprovedEvent {
             return PaymentApprovedEvent(
-                paymentPublicId = payment.publicId,
-                orderPublicId = payment.orderPublicId,
-                userPublicId = userPublicId,
-                provider = payment.provider.name,  // NOT NULL
-                mid = payment.mid,
-                amount = payment.amount,
-                pgTransaction = payment.pgTransaction,  // NOT NULL
-                pgApprovalNo = payment.pgApprovalNo,    // NOT NULL
-                gatewayPaymentPublicId = payment.publicId,  // Payment의 Public ID 사용
-                originSource = payment.originSource
+                paymentPublicId = process.publicId,  // PaymentProcess의 Public ID 사용
+                orderPublicId = process.orderPublicId,
+                userPublicId = process.userPublicId,
+                provider = process.provider?.name ?: "UNKNOWN",
+                mid = process.mid,
+                amount = process.amount,
+                pgTransaction = process.pgTransaction!!,  // NOT NULL (SUCCESS 시점엔 항상 있음)
+                pgApprovalNo = process.pgApprovalNo!!,    // NOT NULL
+                gatewayPaymentPublicId = process.publicId,  // PaymentProcess의 Public ID 사용
+                originSource = process.originSource ?: "INTERNAL"
             )
         }
     }

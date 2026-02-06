@@ -8,14 +8,11 @@
 event:
   # 구독하는 이벤트 (Consume)
   subscribes:
-    - topic: ${kafka.topics.cash-gateway-events}
-      events:
-        - PaymentApprovedEvent   # 결제 승인 → Order 상태 PAYMENT_APPROVED
-        - PaymentFailedEvent     # 결제 실패 → Order 상태 PAYMENT_FAILED
-        - PaymentCancelledEvent  # 결제 취소 → Order 상태 CANCELED
-
     - topic: ${kafka.topics.payment-events}
       events:
+        - PaymentConfirmedEvent           # 결제 확정 완료 (Business Truth) → Order 상태 PAID
+        - PaymentProcessFailedEvent       # 결제 실패 확정 (Business Truth) → Order 상태 PAYMENT_FAILED
+        - PaymentCancelConfirmedEvent     # 결제 취소 확정 (Business Truth) → Order 상태 CANCELED
         - ProductStockSynchronizedEvent   # 재고 동기화 → Product.stock 업데이트
         - OrderStockValidationFailedEvent # 재고 검증 실패 → Order 상태 FAILED
 

@@ -29,7 +29,7 @@ class SecurityConfig {
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
         // Internal Admin Portal (Frontend)
-        configuration.allowedOriginPatterns = listOf("http://localhost:3006", "http://localhost:3007")
+        configuration.allowedOriginPatterns = listOf("http://localhost:3002")
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
         configuration.allowCredentials = true

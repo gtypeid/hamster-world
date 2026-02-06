@@ -1,6 +1,5 @@
 package com.hamsterworld.cashgateway.app.webhook.service
 
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
 import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayClient
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.common.web.exception.CustomRuntimeException
@@ -27,12 +26,13 @@ class PgWebhookService(
      * 실제 비즈니스 로직은 PaymentGatewayClientProtocolCore.handleWebhook()에 구현됨
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    fun handleWebhook(provider: Provider, rawPayload: String): Payment? {
+    fun handleWebhook(provider: Provider, rawPayload: String) {
         log.info("[Webhook 수신] provider={}", provider)
 
-        return try {
+        try {
             // Provider 바인딩하여 handleWebhook 호출
             // 실제 로직은 PaymentGatewayClientProtocolCore.handleWebhook()에 구현됨
+            // 이벤트 발행으로 처리되므로 반환값 없음
             paymentGatewayClient.bind(provider).handleWebhook(rawPayload)
         } catch (e: Exception) {
             log.error("[Webhook 처리 실패] provider={}, error={}", provider, e.message, e)

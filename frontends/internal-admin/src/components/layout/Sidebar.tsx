@@ -22,13 +22,14 @@ export function Sidebar() {
     {
       title: '💸 Cash Gateway',
       items: [
-        { to: '/gateway/processes', icon: '', label: '프로세스 추적' }
+        { to: '/gateway/processes', icon: '', label: '통신 프로세스' }
       ]
     },
     {
       title: '📦 Payment Service',
       items: [
-        { to: '/payment/resource', icon: '', label: '자원 관리' }
+        { to: '/payment/resource', icon: '', label: '자원 관리' },
+        { to: '/payment/transactions', icon: '', label: '거래 내역' }
       ]
     }
   ]

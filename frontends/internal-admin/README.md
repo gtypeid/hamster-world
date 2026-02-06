@@ -430,10 +430,11 @@ colors: {
 - `/ecommerce/orders` - 주문 관리 (Order List + Detail)
 
 ### Cash Gateway
-- `/gateway/processes` - 프로세스 추적 (Expandable)
+- `/gateway/processes` - 통신 프로세스 (PG 통신 상태)
 
 ### Payment Service
-- `/payment/resource` - 자원 관리 (Product List + Event Sourcing)
+- `/payment/resource` - 자원 관리 (Product + Event Sourcing)
+- `/payment/transactions` - 거래 내역 (Payment - Business Truth)
 
 ## 최근 업데이트 (2026-02-04)
 

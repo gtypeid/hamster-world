@@ -2,14 +2,25 @@ package com.hamsterworld.cashgateway.domain.paymentprocess.converter
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus
+import com.hamsterworld.cashgateway.domain.paymentprocess.repository.PaymentProcessRepository
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentCancelledRequestWithCtx
 import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
+import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.CancelPaymentCtx
 import com.hamsterworld.common.domain.converter.DomainConverter
 import org.springframework.stereotype.Component
 
+/**
+ * CancelPaymentCtx → PaymentProcess 변환기
+ *
+ * ## 변경 사항
+ * - 기존: ctx.payment (Payment 엔티티) 참조
+ * - 변경: PaymentProcessRepository로 originProcess 조회
+ * - 이유: Cash Gateway에서 Payment 제거, PaymentProcess만 관리
+ */
 @Component
 class PaymentCancelledRequestToProcessConverter(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val paymentProcessRepository: PaymentProcessRepository
 ) : DomainConverter<PaymentCancelledRequestWithCtx, PaymentProcess> {
 
     override fun isSupport(sourceType: Class<*>, targetType: Class<*>): Boolean {
@@ -19,32 +30,37 @@ class PaymentCancelledRequestToProcessConverter(
     override fun convert(source: PaymentCancelledRequestWithCtx): PaymentProcess {
         try {
             val provider = source.provider
-            val ctx = source.paymentCtx
+            val ctx = source.paymentCtx as CancelPaymentCtx
             val paymentRequest = source.paymentRequest
-
-            // 원 결제 정보 (CancelPaymentCtx는 payment가 반드시 존재)
-            val approvedPayment = ctx.payment!!
             val providerEnum = provider.getProvider()
 
+            // 원본 PaymentProcess 조회 (SUCCESS 상태)
+            val originProcess = paymentProcessRepository.findByOrderPublicIdAndStatus(
+                ctx.orderPublicId,
+                PaymentProcessStatus.SUCCESS
+            ) ?: throw RuntimeException(
+                "원본 결제 프로세스를 찾을 수 없습니다. orderPublicId=${ctx.orderPublicId}"
+            )
+
             return PaymentProcess(
-                orderPublicId = approvedPayment.orderPublicId,
-                userPublicId = approvedPayment.userPublicId,
+                orderPublicId = ctx.orderPublicId,
+                userPublicId = ctx.userPublicId,
                 provider = providerEnum,
-                mid = approvedPayment.mid,
-                // 음수
-                amount = approvedPayment.amount.negate(),
-                orderNumber = ctx.orderNumber,  // PaymentCtx에서 가져옴
-                // 원 결제 정보
-                originProcessId = approvedPayment.processId,
-                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, approvedPayment.mid),
-                pgTransaction = approvedPayment.pgTransaction,
-                pgApprovalNo = approvedPayment.pgApprovalNo,
+                mid = ctx.mid,
+                // 취소는 음수 금액
+                amount = ctx.amount.negate(),
+                orderNumber = ctx.orderNumber,
+                // 원본 PaymentProcess 참조
+                originProcessId = originProcess.id,
+                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.mid),
+                pgTransaction = null,  // 취소 요청 시점엔 아직 없음 (응답에서 받음)
+                pgApprovalNo = null,    // 취소 요청 시점엔 아직 없음
                 status = PaymentProcessStatus.UNKNOWN,
-                activeRequestKey = "${approvedPayment.userPublicId}-${approvedPayment.orderPublicId}-${providerEnum}",
+                activeRequestKey = "${ctx.userPublicId}-${ctx.orderPublicId}-${providerEnum}",
                 requestPayload = objectMapper.writeValueAsString(paymentRequest)
             )
         } catch (e: Exception) {
-            throw RuntimeException("원 결제 기반 -> 취소 PaymentAttempt 변환 실패", e)
+            throw RuntimeException("취소 요청 -> PaymentProcess 변환 실패", e)
         }
     }
 }

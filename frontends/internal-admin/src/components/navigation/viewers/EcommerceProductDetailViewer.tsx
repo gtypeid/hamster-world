@@ -4,6 +4,7 @@ import type { EcommerceProduct } from '@/types/ecommerce'
 import { fetchEcommerceProductDetail } from '@/api/ecommerceProductService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
+import { FieldRenderer } from '../FieldRenderer'
 
 /**
  * EcommerceProductDetailViewer
@@ -218,17 +219,8 @@ export function EcommerceProductDetailViewer({ id, data: initialData }: ViewerPr
         </div>
       </section>
 
-      {/* Related IDs */}
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
-
-        <div className="space-y-2 text-sm font-mono">
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">Ecommerce Product ID:</span>
-            <Navigable id={product.publicId} type="ecommerce-product-id" />
-          </div>
-        </div>
-      </section>
+      {/* Related IDs - Using FieldRenderer */}
+      <FieldRenderer viewerType="ecommerce-product-detail" data={product} />
 
       {/* Timestamps */}
       <section className="bg-white rounded-lg border-2 border-gray-200 p-6">

@@ -1,13 +1,10 @@
 package com.hamsterworld.cashgateway.external.paymentgateway.abs
 
-import com.hamsterworld.cashgateway.domain.payment.constant.PaymentStatus
 import com.hamsterworld.cashgateway.domain.payment.event.PaymentApprovedEvent
 import com.hamsterworld.cashgateway.domain.payment.event.PaymentCancelledEvent
 import com.hamsterworld.cashgateway.domain.payment.event.PaymentFailedEvent
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
 import com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus
 import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
-import com.hamsterworld.cashgateway.domain.payment.repository.PaymentRepository
 import com.hamsterworld.cashgateway.domain.paymentprocess.repository.PaymentProcessRepository
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.common.web.exception.CustomRuntimeException
@@ -21,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class PaymentGatewayCoreService(
     private val paymentProcessRepository: PaymentProcessRepository,
-    private val paymentRepository: PaymentRepository,
     private val eventPublisher: ApplicationEventPublisher
 ) {
 
@@ -186,9 +182,7 @@ class PaymentGatewayCoreService(
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    fun handleResponseSuccess(event: PaymentProcess): Payment? {
-        val processId: Long
-
+    fun handleResponseSuccess(event: PaymentProcess) {
         // Webhook에서 호출 시 이미 id가 있음 (PENDING 상태)
         if (event.id != null) {
             val updated = paymentProcessRepository.casUpdateWebhookResponse(
@@ -203,131 +197,62 @@ class PaymentGatewayCoreService(
             )
 
             if (updated > 0) {
-                processId = event.id!!
                 log.info("[PG 응답 성공 기록 완료] processId={}, orderPublicId={}, transactionId={}",
-                    processId, event.orderPublicId, event.pgTransaction)
+                    event.id, event.orderPublicId, event.pgTransaction)
+
+                // PaymentProcess에서 직접 PaymentApprovedEvent 발행
+                eventPublisher.publishEvent(PaymentApprovedEvent.from(event))
+                log.debug("[이벤트 발행] PaymentApprovedEvent, processId={}, orderPublicId={}",
+                    event.id, event.orderPublicId)
             } else {
                 log.warn("[CAS 업데이트 실패] processId={}, orderPublicId={}, expected=PENDING",
                     event.id, event.orderPublicId)
-                return null
             }
         } else {
             // Legacy path (현재 사용 안함)
             val updatedIdOpt = paymentProcessRepository.casUpdatedMarking(event)
             if (updatedIdOpt.isPresent) {
-                processId = updatedIdOpt.get()
                 log.info("[PG 응답 기록 완료] orderPublicId={}, status={}, transactionId={}",
                     event.orderPublicId, event.status, event.pgTransaction)
+
+                // PaymentProcess에서 직접 PaymentApprovedEvent 발행
+                eventPublisher.publishEvent(PaymentApprovedEvent.from(event))
+                log.debug("[이벤트 발행] PaymentApprovedEvent, orderPublicId={}", event.orderPublicId)
             } else {
                 log.warn("[CAS 업데이트 실패] orderPublicId={}, status={}",
                     event.orderPublicId, event.status)
-                return null
             }
         }
-
-        // PG사 승인에 준하는 페이먼트 생성
-        val payment = createApprovePayment(event, processId)
-
-        // Payment.onCreate()가 내부적으로 PaymentApprovedEvent 등록
-        // repository.save() 시 자동 발행됨
-        log.debug("[이벤트 등록] PaymentApprovedEvent (save 시 자동 발행), paymentId={}, orderPublicId={}",
-            payment.id, payment.orderPublicId)
-
-        return payment
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    fun handleCancelledResponseSuccess(
-        event: PaymentProcess,
-        originPayment: Payment
-    ): Payment? {
+    fun handleCancelledResponseSuccess(event: PaymentProcess) {
         val updatedIdOpt = paymentProcessRepository.casUpdatedMarking(event)
         if (updatedIdOpt.isPresent) {
-            val processId = updatedIdOpt.get()
-
             log.info("[PG 취소 응답 기록 완료] orderPublicId={}, status={}, transactionId={}",
                 event.orderPublicId,
                 event.status,
                 event.pgTransaction)
 
-            // PG사 취소 승인에 준하는 페이먼트 생성
+            // PG사 취소 승인 시 이벤트 직접 발행
             if (event.status == PaymentProcessStatus.CANCELLED) {
-                val payment = createCancelPayment(event, processId, originPayment)
+                // 원본 SUCCESS 프로세스 조회 (같은 orderPublicId의 승인건)
+                val originProcess = paymentProcessRepository.findByOrderPublicIdAndStatus(
+                    event.orderPublicId!!,
+                    PaymentProcessStatus.SUCCESS
+                ) ?: throw CustomRuntimeException(
+                    "원본 결제 프로세스를 찾을 수 없습니다. orderPublicId=${event.orderPublicId}"
+                )
 
-                // Payment.onCancel()가 내부적으로 PaymentCancelledEvent 등록
-                // repository.save() 시 자동 발행됨
-                log.debug("[이벤트 등록] PaymentCancelledEvent (save 시 자동 발행), paymentId={}, originPaymentId={}",
-                    payment.id, originPayment.id)
-
-                return payment
+                // PaymentCancelledEvent 직접 발행
+                eventPublisher.publishEvent(PaymentCancelledEvent.from(event, originProcess))
+                log.debug("[이벤트 발행] PaymentCancelledEvent, orderPublicId={}, originProcessId={}",
+                    event.orderPublicId, originProcess.id)
             }
-
         } else {
             log.warn("[CAS 업데이트 실패] orderPublicId={}, status={}",
                 event.orderPublicId,
                 event.status)
         }
-
-        return null
-    }
-
-    private fun createApprovePayment(event: PaymentProcess, processId: Long): Payment {
-        val payment = Payment(
-            processId = processId,
-            orderPublicId = event.orderPublicId,  // nullable (외부 거래)
-            userPublicId = event.userPublicId,    // nullable (외부 거래)
-            provider = event.provider!!,  // NOT NULL (Payment 생성 시점엔 항상 있음)
-            mid = event.mid,
-            amount = event.amount,
-            pgTransaction = event.pgTransaction!!,  // NOT NULL (Payment 생성 = PG 응답 받음)
-            pgApprovalNo = event.pgApprovalNo!!,    // NOT NULL
-            gatewayReferenceId = event.gatewayReferenceId,  // NOT NULL (자동 생성됨)
-            status = PaymentStatus.APPROVED,
-            originSource = event.originSource ?: "UNKNOWN"  // nullable 처리
-        ).onCreate()  // 이벤트 등록 (save 시 자동 발행)
-
-        val savedPayment = paymentRepository.save(payment)
-
-        if (event.isExternal()) {
-            log.info("[Payment 생성 완료 (외부)] originSource={}, mid={}, tid={}, approvalNo={}",
-                savedPayment.originSource, savedPayment.mid, savedPayment.pgTransaction, savedPayment.pgApprovalNo)
-        } else {
-            log.info("[Payment 생성 완료] orderPublicId={}, provider={}, mid={}, approvalNo={}",
-                savedPayment.orderPublicId, savedPayment.provider, savedPayment.mid, savedPayment.pgApprovalNo)
-        }
-
-        return savedPayment
-    }
-
-    private fun createCancelPayment(
-        event: PaymentProcess,
-        processId: Long,
-        originPayment: Payment
-    ): Payment {
-        val cancelPayment = Payment(
-            processId = processId,
-            orderPublicId = event.orderPublicId,  // nullable (외부 거래)
-            userPublicId = event.userPublicId,    // nullable (외부 거래)
-            provider = event.provider!!,  // NOT NULL (Payment 생성 시점엔 항상 있음)
-            mid = event.mid,
-            amount = event.amount,
-            pgTransaction = event.pgTransaction!!,  // NOT NULL (취소도 PG 응답 받음)
-            pgApprovalNo = originPayment.pgApprovalNo,  // 원본 승인번호 사용 (NOT NULL)
-            gatewayReferenceId = originPayment.gatewayReferenceId,  // 원본 gatewayReferenceId 사용 (NOT NULL)
-            status = PaymentStatus.CANCELLED,
-            originPaymentId = originPayment.id,
-            originSource = event.originSource ?: "UNKNOWN"  // nullable 처리
-        ).onCancel(originPayment.publicId)  // 이벤트 등록 (save 시 자동 발행)
-
-        val savedPayment = paymentRepository.save(cancelPayment)
-
-        log.info("[Payment 취소 생성 완료] orderPublicId={}, originPaymentId={}, provider={}, mid={}, cancelTid={}",
-            savedPayment.orderPublicId,
-            savedPayment.originPaymentId,
-            savedPayment.provider,
-            savedPayment.mid,
-            savedPayment.pgTransaction)
-
-        return savedPayment
     }
 }

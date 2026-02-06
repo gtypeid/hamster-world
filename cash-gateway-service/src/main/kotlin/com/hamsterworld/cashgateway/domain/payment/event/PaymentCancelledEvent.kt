@@ -1,6 +1,5 @@
 package com.hamsterworld.cashgateway.domain.payment.event
 
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
 import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -43,19 +42,35 @@ data class PaymentCancelledEvent(
     occurredAt = occurredAt
 ) {
     companion object {
-        fun from(cancelPayment: Payment, originPaymentPublicId: String, userPublicId: String?): PaymentCancelledEvent {
+        /**
+         * PaymentProcess로부터 PaymentCancelledEvent 생성
+         *
+         * ## 변경 사항
+         * - Payment 엔티티 제거로 인해 PaymentProcess에서 직접 이벤트 생성
+         * - paymentPublicId: 취소 PaymentProcess.publicId 사용
+         * - gatewayPaymentPublicId: 취소 PaymentProcess.publicId 사용
+         * - originPaymentPublicId: 원본 PaymentProcess.publicId 사용
+         *
+         * @param cancelProcess 취소 PaymentProcess (CANCELLED 상태)
+         * @param originProcess 원본 PaymentProcess (SUCCESS 상태)
+         * @return PaymentCancelledEvent
+         */
+        fun from(
+            cancelProcess: com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess,
+            originProcess: com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
+        ): PaymentCancelledEvent {
             return PaymentCancelledEvent(
-                paymentPublicId = cancelPayment.publicId,
-                originPaymentPublicId = originPaymentPublicId,
-                orderPublicId = cancelPayment.orderPublicId,
-                userPublicId = userPublicId,
-                provider = cancelPayment.provider.name,  // NOT NULL
-                mid = cancelPayment.mid,
-                amount = cancelPayment.amount,
-                pgTransaction = cancelPayment.pgTransaction,  // NOT NULL
-                pgApprovalNo = cancelPayment.pgApprovalNo,    // NOT NULL
-                gatewayPaymentPublicId = cancelPayment.publicId,  // Payment의 Public ID 사용
-                originSource = cancelPayment.originSource
+                paymentPublicId = cancelProcess.publicId,  // 취소 PaymentProcess의 Public ID
+                originPaymentPublicId = originProcess.publicId,  // 원본 PaymentProcess의 Public ID
+                orderPublicId = cancelProcess.orderPublicId,
+                userPublicId = cancelProcess.userPublicId,
+                provider = cancelProcess.provider?.name ?: "UNKNOWN",
+                mid = cancelProcess.mid,
+                amount = cancelProcess.amount,
+                pgTransaction = cancelProcess.pgTransaction!!,  // NOT NULL
+                pgApprovalNo = originProcess.pgApprovalNo!!,  // 원본 승인번호 사용
+                gatewayPaymentPublicId = cancelProcess.publicId,  // 취소 PaymentProcess의 Public ID
+                originSource = cancelProcess.originSource ?: "INTERNAL"
             )
         }
     }

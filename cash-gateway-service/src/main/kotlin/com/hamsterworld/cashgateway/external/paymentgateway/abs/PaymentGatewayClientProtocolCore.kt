@@ -1,6 +1,5 @@
 package com.hamsterworld.cashgateway.external.paymentgateway.abs
 
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentApprovedRequestWithCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentCancelledRequestWithCtx
@@ -49,7 +48,7 @@ abstract class PaymentGatewayClientProtocolCore(
      * - PaymentAttempt는 UNKNOWN 상태 유지, Webhook에서 SUCCESS/FAILED로 CAS 업데이트
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    override fun payment(paymentCtx: ApprovePaymentCtx): Payment? {
+    override fun payment(paymentCtx: ApprovePaymentCtx) {
         // TODO: Webhook 전용 정책 적용
         // - 배경: 동기/비동기 혼재 시 복잡도 증가 (응답 처리 vs Webhook 처리 중복)
         //   1) 동기 PG라도 Webhook도 보낼 수 있음 (중복 처리 문제)
@@ -101,7 +100,7 @@ abstract class PaymentGatewayClientProtocolCore(
             log.warn("[{}] PaymentProcess를 FAILED로 기록 | processId={}",
                 provider.getProvider().name, requestPaymentProcess.id)
 
-            return null
+            return
         }
 
         val rawResponse = responseEntity.body
@@ -146,11 +145,10 @@ abstract class PaymentGatewayClientProtocolCore(
             provider.getProvider().name
         )
 
-        // Payment는 Webhook에서만 생성
-        return null
+        // 이벤트는 Webhook에서만 발행
     }
 
-    override fun cancel(paymentCtx: CancelPaymentCtx): Payment {
+    override fun cancel(paymentCtx: CancelPaymentCtx) {
         val request: PaymentRequest = provider.prepareRequest(paymentCtx)
 
         val jsonBody: String
@@ -221,10 +219,8 @@ abstract class PaymentGatewayClientProtocolCore(
             throw CustomRuntimeException(errorMsg)
         }
 
-        return paymentGatewayCoreService.handleCancelledResponseSuccess(
-            responseAttempt,
-            paymentCtx.payment!!
-        )!!
+        // 취소 성공 처리 (이벤트 발행)
+        paymentGatewayCoreService.handleCancelledResponseSuccess(responseAttempt)
     }
 
     /**
@@ -243,7 +239,7 @@ abstract class PaymentGatewayClientProtocolCore(
      * 5. 외부: PaymentProcess + Payment 신규 생성
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    override fun handleWebhook(rawPayload: String): Payment? {
+    override fun handleWebhook(rawPayload: String) {
         log.info("[{}] Webhook 수신", provider.getProvider().name)
         log.debug("Webhook Payload = {}", rawPayload)
 
@@ -280,11 +276,11 @@ abstract class PaymentGatewayClientProtocolCore(
         if (existingProcess.status != com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus.PENDING) {
             log.warn("[{}] PENDING 상태가 아닌 거래에 Webhook 수신 | processId={}, status={}",
                 provider.getProvider().name, existingProcess.id, existingProcess.status)
-            return null  // 이미 처리됨 or 잘못된 상태
+            return  // 이미 처리됨 or 잘못된 상태
         }
 
-        // PENDING → SUCCESS/FAILED로 CAS 업데이트
-        return handleInternalWebhook(existingProcess, response, rawPayload)
+        // PENDING → SUCCESS/FAILED로 CAS 업데이트 (이벤트 발행)
+        handleInternalWebhook(existingProcess, response, rawPayload)
 
         /*
             // [외부 거래] gatewayReferenceId 없음 + tid 있음 = 외부에서 발생한 거래
@@ -308,12 +304,16 @@ abstract class PaymentGatewayClientProtocolCore(
      * - 이미 PaymentProcess가 존재 (우리가 PG 요청한 거래)
      * - PENDING → SUCCESS/FAILED 로 CAS 업데이트
      * - handleWebhook(MANDATORY)의 트랜잭션 내에서 실행됨
+     *
+     * ## 변경 사항
+     * - 기존: Payment 반환
+     * - 변경: Unit (이벤트 발행으로 처리)
      */
     private fun handleInternalWebhook(
         existingProcess: PaymentProcess,
         response: PaymentResponse,
         rawPayload: String
-    ): Payment? {
+    ) {
         log.info("[{}] 내부 요청 Webhook 처리 시작 | processId={}, 기존 status={}",
             provider.getProvider().name, existingProcess.id, existingProcess.status)
 
@@ -324,21 +324,24 @@ abstract class PaymentGatewayClientProtocolCore(
         existingProcess.message = response.getMessage()
         existingProcess.responsePayload = rawPayload
 
-        return if (provider.isSuccess(response)) {
-            // 성공 → Payment 생성
+        if (provider.isSuccess(response)) {
+            // 성공 → 이벤트 발행
             paymentGatewayCoreService.handleResponseSuccess(existingProcess)
         } else {
-            // 실패 → PaymentAttempt만 업데이트
+            // 실패 → PaymentProcess만 업데이트 + 이벤트 발행
             paymentGatewayCoreService.handleResponseFailure(existingProcess)
-            null
         }
     }
 
     /**
      * 외부 거래 Webhook 처리
      * - PaymentAttempt가 없음 (외부에서 발생한 거래)
-     * - PaymentAttempt + Payment 신규 생성
+     * - PaymentProcess 신규 생성 + 이벤트 발행
      * - handleWebhook(MANDATORY)의 트랜잭션 내에서 실행됨
+     *
+     * ## 변경 사항
+     * - 기존: Payment 생성 및 반환
+     * - 변경: 이벤트 발행으로 처리
      *
      * @param response 파싱된 PG 응답
      * @param rawPayload 원본 Webhook payload
@@ -350,7 +353,7 @@ abstract class PaymentGatewayClientProtocolCore(
         rawPayload: String,
         tid: String,
         mid: String
-    ): Payment? {
+    ) {
         log.info("[{}] 외부 거래 Webhook | tid={}, mid={}",
             provider.getProvider().name, tid, mid)
 
@@ -367,7 +370,7 @@ abstract class PaymentGatewayClientProtocolCore(
                 java.math.BigDecimal.ZERO
             }
 
-        // 외부 거래 PaymentAttempt 생성 (성공/실패 모두 기록)
+        // 외부 거래 PaymentProcess 생성 (성공/실패 모두 기록)
         val providerEnum = provider.getProvider()
         val externalAttempt = PaymentProcess(
             orderPublicId = null,  // 외부 거래는 orderPublicId 없음
@@ -390,17 +393,16 @@ abstract class PaymentGatewayClientProtocolCore(
             responsePayload = rawPayload
         )
 
-        // PaymentAttempt 기록 (성공/실패 모두)
+        // PaymentProcess 기록 (성공/실패 모두)
         paymentGatewayCoreService.handleRequest(externalAttempt)
 
-        // 성공 건만 Payment 생성
-        return if (response.isSuccess()) {
+        // 성공 건만 이벤트 발행
+        if (response.isSuccess()) {
             paymentGatewayCoreService.handleResponseSuccess(externalAttempt)
         } else {
             log.info("[{}] 외부 거래 실패 기록 완료 | tid={}, status={}, code={}",
                 provider.getProvider().name, response.getPgTransaction(),
                 externalAttempt.status, response.getCode())
-            null
         }
     }
 }

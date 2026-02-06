@@ -3,8 +3,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Navigable } from '@/components/navigation/Navigable'
 import { useListSearch } from '@/hooks/useListSearch'
-// import { fetchProcessList } from '@/api/gatewayService' // TODO: 백엔드 Admin API 구현 후 주석 해제
-import { mockProcesses } from './mockData'
+import { fetchProcessList } from '@/api/gatewayService'
 import type { PaymentProcess, PaymentProcessStatus } from '@/types/gateway'
 
 const getStatusColor = (status: PaymentProcessStatus) => {
@@ -49,26 +48,22 @@ const getElapsedTime = (createdAt: string): string => {
 
 export function ProcessTracker() {
   const [filter, setFilter] = useState<'all' | PaymentProcessStatus>('all')
-  const [processes, setProcesses] = useState<PaymentProcess[]>(mockProcesses)
-  const [isLoading, setIsLoading] = useState(false)
+  const [processes, setProcesses] = useState<PaymentProcess[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // TODO: 백엔드 Admin API 구현되면 실제 API 호출로 교체
   useEffect(() => {
-    // const loadProcesses = async () => {
-    //   try {
-    //     setIsLoading(true)
-    //     const data = await fetchProcessList()
-    //     setProcesses(data)
-    //   } catch (error) {
-    //     console.error('Failed to load processes:', error)
-    //   } finally {
-    //     setIsLoading(false)
-    //   }
-    // }
-    // loadProcesses()
-
-    // Mock (임시)
-    setProcesses(mockProcesses)
+    const loadProcesses = async () => {
+      try {
+        setIsLoading(true)
+        const data = await fetchProcessList()
+        setProcesses(data)
+      } catch (error) {
+        console.error('Failed to load processes:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadProcesses()
   }, [])
 
   // URL 파라미터 검색 + 하이라이트 (Hook으로 추상화)
@@ -112,8 +107,8 @@ export function ProcessTracker() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-hamster-brown mb-2">🔍 결제 프로세스 추적</h2>
-        <p className="text-gray-600">PaymentProcess 실시간 모니터링 및 추적 (Public ID 기반)</p>
+        <h2 className="text-3xl font-bold text-hamster-brown mb-2">🔄 통신 프로세스</h2>
+        <p className="text-gray-600">Cash Gateway - PG 통신 상태 모니터링 (Communication Truth)</p>
       </div>
 
       {/* Stats */}
@@ -247,10 +242,10 @@ export function ProcessTracker() {
                         </div>
                       </div>
 
-                      {process.failureReason && (
+                      {process.message && process.status === 'FAILED' && (
                         <div className="mt-2 text-sm">
                           <span className="text-red-600 font-medium">
-                            ⚠️ 실패 사유: {process.failureReason}
+                            ⚠️ 실패 사유: {process.message}
                           </span>
                         </div>
                       )}

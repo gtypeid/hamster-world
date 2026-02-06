@@ -4,25 +4,35 @@
 export type PaymentProcessStatus = 'UNKNOWN' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
 export type PaymentStatus = 'APPROVED' | 'CANCELLED' | 'REFUNDED'
 
-// PaymentProcess (상태 관리)
+// PaymentProcess (상태 관리) - 백엔드 PaymentProcessResponse와 일치
 export interface PaymentProcess {
   // === Public IDs (Backend Response) ===
-  publicId: string // PaymentProcess의 Public ID (Snowflake Base62) - API에서는 attemptPublicId로 노출
+  publicId: string // PaymentProcess의 Public ID (Snowflake Base62)
   orderPublicId: string | null // Ecommerce Order Public ID (cross-service reference)
   userPublicId: string | null // Ecommerce User Public ID (cross-service reference)
+  originProcessPublicId: string | null // 원본 Process Public ID (취소 프로세스인 경우)
 
   // === Process Info ===
-  gatewayReferenceId: string // Gateway Reference ID (CGW_YYYYMMDD_XXX)
-  orderNumber: string // Order number from ecommerce
-  provider: string // PG provider (e.g., 'HAMSTER_PG')
+  orderNumber: string | null // Order number from ecommerce
+  provider: string | null // PG provider (e.g., 'HAMSTER_PG')
   mid: string // Merchant ID
   amount: number
   status: PaymentProcessStatus
+  gatewayReferenceId: string // Gateway Reference ID (CGW_YYYYMMDD_XXX)
 
-  // === PG Info ===
+  // === PG Response Info ===
+  code: string | null // PG 응답 코드
+  message: string | null // PG 응답 메시지
   pgTransaction: string | null // PG transaction ID
   pgApprovalNo: string | null // PG approval number
-  failureReason: string | null // Failure reason if status is FAILED
+  lastPgResponseCode: string | null // 마지막 PG 응답 코드
+
+  // === Source Info ===
+  originSource: string | null // 요청 출처 (ECOMMERCE, EXTERNAL 등)
+
+  // === Payload (Optional) ===
+  requestPayload: string | null // PG 요청 페이로드 (JSON)
+  responsePayload: string | null // PG 응답 페이로드 (JSON)
 
   // === PG Request Tracking ===
   requestedAt: string | null // PG 요청 시작 시각

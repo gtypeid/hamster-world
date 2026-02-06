@@ -4,6 +4,7 @@ import type { ResourceDetail } from '@/types/payment'
 import { fetchProductDetail } from '@/api/productService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
+import { FieldRenderer } from '../FieldRenderer'
 
 /**
  * ProductDetailViewer
@@ -186,24 +187,8 @@ export function ProductDetailViewer({ id, data: initialData }: ViewerProps) {
         </div>
       </section>
 
-      {/* Related IDs */}
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
-
-        <div className="space-y-2 text-sm font-mono">
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">Product ID (Payment):</span>
-            <Navigable id={product.publicId} type="product-id" />
-          </div>
-
-          {product.ecommerceProductId && (
-            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-              <span className="text-gray-500 flex-shrink-0">Product ID (Ecommerce):</span>
-              <Navigable id={product.ecommerceProductId} type="ecommerce-product-id" />
-            </div>
-          )}
-        </div>
-      </section>
+      {/* Related IDs - Using FieldRenderer */}
+      <FieldRenderer viewerType="product-detail" data={product} />
 
       {/* Event Sourcing History */}
       <section className="bg-white rounded-lg border-2 border-gray-200 p-6">

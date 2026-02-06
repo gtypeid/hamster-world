@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.convertValue
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.ParsedEvent
+import com.hamsterworld.ecommerce.domain.order.constant.OrderStatus
 import com.hamsterworld.ecommerce.domain.order.repository.OrderRepository
 import com.hamsterworld.ecommerce.domain.product.service.ProductService
 import org.springframework.beans.factory.annotation.Value
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional
  * Payment Service 이벤트 Consumer
  *
  * Payment Service에서 발행하는 다음 이벤트를 수신:
+ * - PaymentConfirmedEvent: Payment Service 결제 확정 → Order 상태 PAID로 변경
  * - ProductStockSynchronizedEvent: 재고 변경 → E-commerce Service Product 동기화
  * - OrderStockValidationFailedEvent: 재고 검증 실패 → Order 상태 FAILED로 변경
  *
@@ -27,6 +29,10 @@ import org.springframework.transaction.annotation.Transactional
  * ## 최종 일관성 (Eventual Consistency)
  * - E-commerce Product는 Payment Service의 재고를 동기화받는 Read Model
  * - 이벤트 소싱 불필요 (진실의 원천은 Payment Service)
+ *
+ * ## 설계 철학
+ * - Ecommerce는 Payment Service의 Business Truth만 신뢰
+ * - Cash Gateway Communication Truth는 직접 의존하지 않음
  *
  * @see BaseKafkaConsumer
  */
@@ -52,9 +58,126 @@ class PaymentEventConsumer(
     @Transactional(propagation = Propagation.MANDATORY)
     override fun handleEvent(parsedEvent: ParsedEvent) {
         when (parsedEvent.eventType) {
+            "PaymentConfirmedEvent" -> handlePaymentConfirmed(parsedEvent)
+            "PaymentProcessFailedEvent" -> handlePaymentProcessFailed(parsedEvent)
+            "PaymentCancelConfirmedEvent" -> handlePaymentCancelConfirmed(parsedEvent)
             "ProductStockSynchronizedEvent" -> handleProductStockSynchronized(parsedEvent)
             "OrderStockValidationFailedEvent" -> handleOrderStockValidationFailed(parsedEvent)
             else -> logger.debug("Ignoring event: {}", parsedEvent.eventType)
+        }
+    }
+
+    /**
+     * PaymentConfirmedEvent 처리 (Payment Service Business Truth 확정)
+     *
+     * ## 멱등성 보장
+     * - eventId 체크 (BaseKafkaConsumer, 자동)
+     *
+     * ## 처리 내용
+     * - Order 상태 → PAID
+     * - Payment Service가 Payment + Stock + OrderSnapshot 트랜잭션 확정 완료
+     *
+     * ## 설계 철학
+     * - Ecommerce는 Payment Service의 확정 이벤트만 신뢰
+     * - Cash Gateway Communication Truth는 직접 의존하지 않음
+     */
+    private fun handlePaymentConfirmed(parsedEvent: ParsedEvent) {
+        val event = objectMapper.convertValue<PaymentConfirmedEventDto>(parsedEvent.payload)
+
+        // Order 조회 (Public ID 사용)
+        val order = orderRepository.findByPublicId(event.orderPublicId)
+
+        // gatewayPaymentPublicId 업데이트
+        order.gatewayPaymentPublicId = event.gatewayPaymentPublicId
+
+        // Order 상태 변경 (CAS)
+        val updated = orderRepository.casUpdateStatus(order, OrderStatus.PAYMENT_APPROVED)
+
+        if (updated) {
+            logger.info(
+                "[결제 확정 완료] Payment Service Business Truth 확정 | orderPublicId={} | paymentPublicId={} | gatewayPaymentPublicId={} | amount={} | status={} | traceId={}",
+                event.orderPublicId, event.paymentPublicId, event.gatewayPaymentPublicId, event.amount, event.status,
+                parsedEvent.traceId ?: "N/A"
+            )
+        } else {
+            logger.warn(
+                "[결제 확정 처리 실패] CAS 업데이트 실패 | orderPublicId={} | currentStatus={} | traceId={}",
+                event.orderPublicId, order.status, parsedEvent.traceId ?: "N/A"
+            )
+        }
+    }
+
+    /**
+     * PaymentProcessFailedEvent 처리 (Payment Service 실패 확정)
+     *
+     * ## 멱등성 보장
+     * - eventId 체크 (BaseKafkaConsumer, 자동)
+     *
+     * ## 처리 내용
+     * - Order 상태 → PAYMENT_FAILED
+     * - Payment Service가 재고 복원 완료한 상태
+     *
+     * ## 설계 철학
+     * - Ecommerce는 Payment Service의 확정 이벤트만 신뢰
+     * - Cash Gateway Communication Truth는 직접 의존하지 않음
+     */
+    private fun handlePaymentProcessFailed(parsedEvent: ParsedEvent) {
+        val event = objectMapper.convertValue<PaymentProcessFailedEventDto>(parsedEvent.payload)
+
+        // Order 조회 (Public ID 사용)
+        val order = orderRepository.findByPublicId(event.orderPublicId)
+
+        // Order 상태 변경 (CAS)
+        val updated = orderRepository.casUpdateStatus(order, OrderStatus.PAYMENT_FAILED)
+
+        if (updated) {
+            logger.warn(
+                "[결제 실패 확정] Payment Service Business Truth 확정 (재고 복원 완료) | orderPublicId={} | processPublicId={} | amount={} | reason={} | traceId={}",
+                event.orderPublicId, event.processPublicId, event.amount, event.reason,
+                parsedEvent.traceId ?: "N/A"
+            )
+        } else {
+            logger.warn(
+                "[결제 실패 처리 실패] CAS 업데이트 실패 | orderPublicId={} | currentStatus={} | traceId={}",
+                event.orderPublicId, order.status, parsedEvent.traceId ?: "N/A"
+            )
+        }
+    }
+
+    /**
+     * PaymentCancelConfirmedEvent 처리 (Payment Service 취소 확정)
+     *
+     * ## 멱등성 보장
+     * - eventId 체크 (BaseKafkaConsumer, 자동)
+     *
+     * ## 처리 내용
+     * - Order 상태 → CANCELED
+     * - Payment Service가 Payment 생성 + 재고 복원 완료한 상태
+     *
+     * ## 설계 철학
+     * - Ecommerce는 Payment Service의 확정 이벤트만 신뢰
+     * - Cash Gateway Communication Truth는 직접 의존하지 않음
+     */
+    private fun handlePaymentCancelConfirmed(parsedEvent: ParsedEvent) {
+        val event = objectMapper.convertValue<PaymentCancelConfirmedEventDto>(parsedEvent.payload)
+
+        // Order 조회 (Public ID 사용)
+        val order = orderRepository.findByPublicId(event.orderPublicId)
+
+        // Order 상태 변경 (CAS)
+        val updated = orderRepository.casUpdateStatus(order, OrderStatus.CANCELED)
+
+        if (updated) {
+            logger.info(
+                "[결제 취소 확정] Payment Service Business Truth 확정 (Payment 생성 + 재고 복원 완료) | orderPublicId={} | paymentPublicId={} | originPaymentPublicId={} | amount={} | traceId={}",
+                event.orderPublicId, event.paymentPublicId, event.originPaymentPublicId, event.amount,
+                parsedEvent.traceId ?: "N/A"
+            )
+        } else {
+            logger.warn(
+                "[결제 취소 처리 실패] CAS 업데이트 실패 | orderPublicId={} | currentStatus={} | traceId={}",
+                event.orderPublicId, order.status, parsedEvent.traceId ?: "N/A"
+            )
         }
     }
 

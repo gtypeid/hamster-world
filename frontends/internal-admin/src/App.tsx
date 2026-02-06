@@ -7,6 +7,7 @@ import { ProcessTracker } from '@/features/gateway/ProcessTracker'
 import { PaymentList } from '@/features/gateway/PaymentList'
 import { EventMonitor } from '@/features/gateway/EventMonitor'
 import { ResourceTracker } from '@/features/payment/ResourceTracker'
+import { TransactionHistory } from '@/features/payment/TransactionHistory'
 import { SettlementManagement } from '@/features/payment/SettlementManagement'
 import { OrderList } from '@/features/ecommerce/OrderList'
 
@@ -65,6 +66,7 @@ function AppContent() {
 
                     {/* Payment Service */}
                     <Route path="/payment/resource" element={<ResourceTracker />} />
+                    <Route path="/payment/transactions" element={<TransactionHistory />} />
                     <Route path="/payment/settlement" element={<SettlementManagement />} />
                   </Routes>
                 }

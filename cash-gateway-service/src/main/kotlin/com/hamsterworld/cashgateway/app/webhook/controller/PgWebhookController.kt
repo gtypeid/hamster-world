@@ -68,25 +68,16 @@ class PgWebhookController(
             )
         }
 
-        val payment = pgWebhookService.handleWebhook(providerEnum, rawPayload)
+        // Webhook 처리 (이벤트 발행)
+        pgWebhookService.handleWebhook(providerEnum, rawPayload)
 
-        return if (payment != null) {
-            ResponseEntity.ok(
-                PgWebhookResponse(
-                    success = true,
-                    message = "Payment processed successfully",
-                    paymentId = payment.id
-                )
+        // 성공 응답 (이벤트 기반이므로 Payment ID 없음)
+        return ResponseEntity.ok(
+            PgWebhookResponse(
+                success = true,
+                message = "Webhook processed successfully"
             )
-        } else {
-            // 실패/취소 건 또는 중복 요청
-            ResponseEntity.ok(
-                PgWebhookResponse(
-                    success = true,
-                    message = "Webhook processed (no payment created)"
-                )
-            )
-        }
+        )
     }
 
     /**

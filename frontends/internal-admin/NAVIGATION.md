@@ -1,37 +1,25 @@
 # Navigation System Architecture
 
-> **목적**: 다음 Claude 세션이 Navigation System을 즉시 이해하고 확장/수정할 수 있도록 작성된 기술 문서
+> **목적**: 다음 Claude가 Navigation System을 이해하고 작업할 수 있도록 작성된 문서
 
-## 📋 목차
+## 📋 현재 상태 요약 (2026-02-06)
 
-1. [개요](#개요)
-2. [핵심 개념](#핵심-개념)
-3. [아키텍처 구조](#아키텍처-구조)
-4. [API 중심 설계](#api-중심-설계)
-5. [상태 관리](#상태-관리)
-6. [주요 기능](#주요-기능)
-7. [확장 가이드](#확장-가이드)
-8. [디버깅 및 최적화](#디버깅-및-최적화)
+**✅ 완료된 작업:**
+- Field Registry 패턴 적용 (Kafka Event Registry 방식)
+- 모든 Viewer 컴포넌트 마이그레이션 완료 (7개)
+- Navigable.tsx 리팩토링 (switch 문 제거)
+- 150+ 라인의 중복 코드 제거
+
+**🎯 핵심 개선:**
+- 설정 기반 필드 관리로 변경
+- 새 ID 타입 추가 시 1개 파일만 수정 (기존 5+ 파일 → 1 파일)
+- 일관된 라벨 보장 (FieldRegistry가 단일 진실 공급원)
 
 ---
 
-## 개요
+## 🏗️ 아키텍처 개요
 
-**Navigation System**은 **MainPane (리스트) + TracerPane (상세 뷰어)** 구조의 Two-Pane Architecture입니다.
-
-### 왜 만들었나?
-
-**문제:** Expandable Card 패턴은 리스트가 길어질수록 스크롤 지옥 발생
-**해결:** ID 클릭 → 오른쪽 TracerPane에 상세 정보 표시 → 리스트는 그대로 유지
-
-### 핵심 목표
-
-1. **스크롤 독립성**: MainPane과 TracerPane이 각각 독립적으로 스크롤
-2. **히스토리 스택**: 뒤로/앞으로 가기 지원 (브라우저처럼)
-3. **Cross-service 추적**: Ecommerce Order → Payment Process → Product 모두 추적 가능
-4. **페이지 리로드 없음**: "내 아이템 가기" 버튼으로 MainPane 전환 시에도 TracerPane 상태 유지
-
-### 레이아웃
+### Two-Pane 구조
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -45,7 +33,7 @@
 │ │                 │ │ │ Order 상세                         │ │
 │ │ [Order #1] ←────┼─┼→│ Order ID: xxx                     │ │
 │ │ [Order #2]      │ │ │ User ID: yyy (클릭 가능)           │ │
-│ │ [Order #3]      │ │ │ Process ID: zzz (클릭 가능)        │ │
+│ │ [Order #3]      │ │ │ Gateway Payment ID: zzz           │ │
 │ │ ...             │ │ │                                   │ │
 │ └─────────────────┘ │ │ ← 뒤로 │ 앞으로 → │ 📍 내 아이템 가기│ │
 │                     │ │                                   │ │
@@ -54,819 +42,512 @@
 └─────────────────────┴───────────────────────────────────────┘
 ```
 
+**핵심 원칙:**
+- MainPane과 TracerPane은 **독립적으로 스크롤**
+- ID 클릭 → TracerPane에 상세 표시
+- 뒤로/앞으로 가기 히스토리 스택 지원
+- Cross-service 추적 가능 (Order → Process → Payment → Product)
+
 ---
 
-## 핵심 개념
+## 🎯 Field Registry 패턴 (핵심!)
 
-### 1. NavigationItem
+### 왜 만들었나?
 
-모든 네비게이션은 `NavigationItem` 형태로 관리됩니다.
+**❌ 기존 문제:**
+```tsx
+// ProcessDetailViewer.tsx
+<div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+  <span className="text-gray-500 flex-shrink-0">Process ID:</span>
+  <Navigable id={process.publicId} type="process-id" />
+</div>
+
+// OrderDetailViewer.tsx
+<div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+  <span className="text-gray-500 flex-shrink-0">Order ID:</span>
+  <Navigable id={order.orderPublicId} type="order-id" />
+</div>
+
+// ... 7개 Viewer에서 150+ 라인 중복
+```
+
+**문제점:**
+1. 같은 코드 7개 파일에 반복
+2. 라벨 불일치 ("Process ID" vs "Process ID (Gateway)")
+3. 새 ID 타입 추가 시 5개 이상 파일 수정 필요
+4. Navigable.tsx에 switch 문 난리
+
+**✅ 해결: Field Registry 패턴**
+
+백엔드의 Kafka Event Registry처럼 **설정 파일에 모든 필드 정의**:
 
 ```typescript
-interface NavigationItem {
-  id: string           // ID 값 (예: "KRmMnVjtY0")
-  type: IdType         // ID 타입 (예: "order-id")
-  viewerType: ViewerType  // 어떤 뷰어로 표시할지 (예: "order-detail")
-  label: string        // 표시할 라벨 (예: "Order KRmMnVjtY0")
-  data?: any           // 뷰어에 전달할 추가 데이터 (선택)
+// /src/config/navigation-field-registry.config.ts
+export const FIELD_REGISTRY_CONFIG: FieldRegistryConfig = {
+  fields: [
+    {
+      idType: 'process-id',
+      fieldName: 'publicId',
+      label: 'Process ID',              // 단일 진실 공급원
+      viewerType: 'process-detail',
+      service: 'gateway',
+      optional: false,
+      displayOrder: 100,
+      format: 'nanoid',
+    },
+    {
+      idType: 'order-id',
+      fieldName: 'orderPublicId',
+      label: 'Order ID',
+      viewerType: 'order-detail',
+      service: 'ecommerce',
+      optional: false,
+      displayOrder: 300,
+      format: 'nanoid',
+    },
+    // ... 9개 필드 정의
+  ],
+
+  viewerMappings: [
+    {
+      viewerType: 'process-detail',
+      fields: ['publicId', 'orderPublicId', 'userPublicId'],
+    },
+    {
+      viewerType: 'order-detail',
+      fields: ['orderPublicId', 'userPublicId', 'gatewayPaymentPublicId'],
+    },
+    // ... 7개 뷰어 매핑
+  ],
 }
 ```
 
-### 2. IdType (ID 타입 시스템)
+**✅ 이제 Viewer는 1줄:**
 
-```typescript
-export type IdType =
-  // Cash Gateway Service
-  | 'process-id'
-  | 'payment-id'
-  | 'event-id'
-  | 'trace-id'
+```tsx
+// ProcessDetailViewer.tsx
+<FieldRenderer viewerType="process-detail" data={process} />
 
-  // Payment Service
-  | 'product-id'
-  | 'product-record-id'
+// OrderDetailViewer.tsx
+<FieldRenderer viewerType="order-detail" data={order} />
 
-  // Ecommerce Service
-  | 'order-id'
-  | 'user-id'
-  | 'ecommerce-product-id'
-```
-
-**색상 규칙** (`Navigable.tsx: getColorForIdType()`):
-- **파란색**: 현재 서비스 ID (process-id, product-id 등)
-- **초록색**: Ecommerce cross-reference (order-id, ecommerce-product-id)
-- **보라색**: User reference (user-id)
-- **회색**: Trace ID
-
-### 3. ViewerType
-
-```typescript
-export type ViewerType =
-  | 'process-detail'
-  | 'payment-detail'
-  | 'event-timeline'
-  | 'trace-timeline'
-  | 'product-detail'
-  | 'ecommerce-product-detail'
-  | 'order-detail'
-  | 'user-detail'
+// 끝! 24줄 → 1줄
 ```
 
 ---
 
-## 아키텍처 구조
-
-### 디렉토리 구조
+## 📂 디렉토리 구조
 
 ```
 src/
+├── config/                           # ⭐ 설정 파일 (Field Registry)
+│   ├── navigation-field-registry.ts         # 타입 정의
+│   └── navigation-field-registry.config.ts  # 필드 설정 (단일 진실 공급원)
+│
 ├── types/
-│   └── navigation.ts          # NavigationItem, ViewerType, IdType 등
-
+│   └── navigation.ts                 # IdType, ViewerType, NavigationItem
+│
 ├── components/
 │   ├── layout/
-│   │   └── AppLayout.tsx      # 전체 레이아웃 (h-screen, overflow 관리)
+│   │   └── AppLayout.tsx            # h-screen, overflow 관리
 │   │
-│   └── navigation/            # === Navigation System ===
-│       ├── NavigationContext.tsx    # 상태 관리 Context + Reducer
-│       ├── SplitLayout.tsx          # Two-Pane 레이아웃 + Resize
-│       ├── TracerPane.tsx           # 우측 팬 (상세 뷰어 렌더링)
-│       ├── Navigable.tsx            # 클릭 가능한 ID 래퍼
+│   └── navigation/                  # === Navigation System ===
+│       ├── NavigationContext.tsx    # 상태 관리 (Reducer)
+│       ├── SplitLayout.tsx          # Two-Pane + Resize
+│       ├── TracerPane.tsx           # 우측 팬
+│       ├── Navigable.tsx            # 클릭 가능한 ID 래퍼 (Registry 기반)
+│       ├── FieldRenderer.tsx        # ⭐ 범용 필드 렌더러
 │       │
 │       ├── registry/
-│       │   ├── ViewerRegistry.ts        # ViewerType → Component + API 매핑
-│       │   ├── ServiceRegistry.ts       # 서비스별 설정 (아이콘, 색상, 경로)
-│       │   ├── RelationRegistry.ts      # ID 간 관계 정의
-│       │   └── initializeRegistry.ts    # 앱 시작 시 등록
+│       │   ├── FieldRegistry.ts     # ⭐ 필드 레지스트리 (싱글톤)
+│       │   ├── ViewerRegistry.ts    # ViewerType → Component + API
+│       │   ├── ServiceRegistry.ts   # 서비스 설정 (아이콘, 색상)
+│       │   ├── RelationRegistry.ts  # ID 간 관계
+│       │   └── initializeRegistry.ts # 앱 시작 시 등록
 │       │
 │       └── viewers/
-│           ├── GenericDataViewer.tsx      # 데이터 로드 + Viewer 렌더링
+│           ├── GenericDataViewer.tsx    # 데이터 로드 + Viewer 렌더링
+│           ├── ProcessDetailViewer.tsx
+│           ├── GatewayPaymentDetailViewer.tsx
+│           ├── PaymentDetailViewer.tsx
 │           ├── OrderDetailViewer.tsx
 │           ├── UserDetailViewer.tsx
 │           ├── ProductDetailViewer.tsx
-│           ├── EcommerceProductDetailViewer.tsx
-│           └── ProcessDetailViewer.tsx
-
-├── api/                       # API Services
-│   ├── client.ts              # Axios 클라이언트
-│   ├── orderService.ts
-│   ├── userService.ts
+│           └── EcommerceProductDetailViewer.tsx
+│
+├── api/                             # API 서비스
+│   ├── gatewayService.ts
 │   ├── productService.ts
-│   └── ecommerceProductService.ts
-
-└── features/
-    ├── ecommerce/
-    │   └── OrderList.tsx      # MainPane: URL 파라미터 검색 지원
-    ├── gateway/
-    │   └── ProcessTracker.tsx # MainPane: Process 목록
-    └── payment/
-        └── ResourceTracker.tsx # MainPane: Product 목록
-```
-
-### 컴포넌트 계층
-
-```typescript
-// App.tsx
-<QueryClientProvider>
-  <NavigationProvider>  // Context Provider
-    <BrowserRouter>
-      <AppContent>
-        <AppLayout>
-          <SplitLayout
-            mainPane={<Routes>...</Routes>}
-            tracerPane={<TracerPane />}
-          />
-        </AppLayout>
-      </AppContent>
-    </BrowserRouter>
-  </NavigationProvider>
-</QueryClientProvider>
-
-// 초기화 (AppContent)
-useEffect(() => {
-  initializeRegistry()  // ViewerRegistry, ServiceRegistry 등록
-}, [])
+│   ├── orderService.ts
+│   └── userService.ts
+│
+└── features/                        # MainPane 페이지
+    ├── ecommerce/OrderList.tsx
+    ├── gateway/ProcessTracker.tsx
+    └── payment/ResourceTracker.tsx
 ```
 
 ---
 
-## API 중심 설계
+## 🔧 핵심 컴포넌트
 
-### 개요
+### 1. FieldRegistry (싱글톤)
 
-**기존 문제**: 각 Viewer 컴포넌트가 개별적으로 API를 호출 → 코드 중복, 로딩/에러 처리 중복
-
-**해결**: ViewerRegistry에 API fetcher를 등록하고, GenericDataViewer가 자동으로 데이터 로드
-
-### ViewerConfig 구조
+**역할**: 필드 메타데이터 관리
 
 ```typescript
-export interface ViewerConfig {
-  type: ViewerType
-  title: string
-  component: React.ComponentType<ViewerProps>
+class FieldRegistryClass {
+  private fields = new Map<string, FieldConfig>()
+  private idTypeToField = new Map<IdType, FieldConfig>()
+  private viewerMappings = new Map<ViewerType, ViewerFieldMapping>()
 
-  // 서비스 정보
-  service: 'payment' | 'gateway' | 'ecommerce'
+  // 뷰어에 표시할 필드 목록 반환 (정렬 + 필터링)
+  getFieldsForViewer(viewerType: ViewerType, data: any): FieldConfig[] {
+    const mapping = this.viewerMappings.get(viewerType)
+    if (!mapping) return []
 
-  // API 설정
-  fetcher?: ApiFetcher              // ID로 데이터 조회하는 함수
-  isEmbeddedOnly?: boolean          // 단독 조회 불가 플래그 (Record ID 등)
-
-  // "내 아이템 가기" 설정
-  myItem?: MyItemConfig | false
-}
-
-export type ApiFetcher<T = any> = (id: string) => Promise<T>
-
-export interface MyItemConfig {
-  searchBy: (id: string) => { field: string; value: string }
-  listRoute?: string  // 커스텀 리스트 경로 (없으면 ServiceRegistry의 listRoute 사용)
-}
-```
-
-### ViewerRegistry 등록 예시
-
-```typescript
-// registry/initializeRegistry.ts
-import { fetchProductDetail } from '@/api/productService'
-import { fetchEcommerceProductDetail } from '@/api/ecommerceProductService'
-import { fetchOrderDetail } from '@/api/orderService'
-import { fetchUserDetail } from '@/api/userService'
-
-// ✅ Product Detail (Payment Service)
-ViewerRegistry.register({
-  type: 'product-detail',
-  title: 'Product 상세',
-  component: ProductDetailViewer,
-  service: 'payment',
-  fetcher: fetchProductDetail,  // ⭐ API 함수 등록
-  myItem: {
-    searchBy: (id) => ({ field: 'publicId', value: id }),
-    listRoute: '/payment/resource'
-  }
-})
-
-// ✅ Ecommerce Product Detail
-ViewerRegistry.register({
-  type: 'ecommerce-product-detail',
-  title: 'Ecommerce Product 상세',
-  component: EcommerceProductDetailViewer,
-  service: 'ecommerce',
-  fetcher: fetchEcommerceProductDetail,
-  myItem: {
-    searchBy: (id) => ({ field: 'ecommerceProductId', value: id }),
-    listRoute: '/payment/resource'  // Cross-service! Payment 페이지로 이동
-  }
-})
-
-// ✅ Order Detail
-ViewerRegistry.register({
-  type: 'order-detail',
-  title: 'Order 상세',
-  component: OrderDetailViewer,
-  service: 'ecommerce',
-  fetcher: fetchOrderDetail,
-  myItem: {
-    searchBy: (id) => ({ field: 'orderPublicId', value: id }),
-    listRoute: '/ecommerce/orders'
-  }
-})
-
-// ✅ User Detail
-ViewerRegistry.register({
-  type: 'user-detail',
-  title: 'User 상세',
-  component: UserDetailViewer,
-  service: 'ecommerce',
-  fetcher: fetchUserDetail,
-  myItem: {
-    searchBy: (id) => ({ field: 'publicId', value: id }),
-    // listRoute 없음 → ServiceRegistry의 기본값 사용 (/ecommerce/orders)
-  }
-})
-
-// ✅ Product Record - 단독 조회 불가
-ViewerRegistry.register({
-  type: 'product-record-detail',
-  title: 'Product Record',
-  component: ProductRecordDetailViewer,
-  service: 'payment',
-  isEmbeddedOnly: true,  // ⭐ fetcher 없음 + 단독 조회 불가
-  myItem: false
-})
-```
-
-### ServiceRegistry 설정
-
-```typescript
-// registry/ServiceRegistry.ts
-const services = {
-  payment: {
-    name: 'PAYMENT',
-    icon: '💳',
-    color: 'bg-purple-500',
-    listRoute: '/payment/resource'
-  },
-  gateway: {
-    name: 'GATEWAY',
-    icon: '🚪',
-    color: 'bg-blue-500',
-    listRoute: '/gateway/processes'
-  },
-  ecommerce: {
-    name: 'ECOMMERCE',
-    icon: '🛒',
-    color: 'bg-green-500',
-    listRoute: '/ecommerce/orders'
-  }
-}
-```
-
-### 데이터 흐름
-
-```
-사용자가 Product ID 클릭
-  ↓
-Navigable → navigate({ id, type: 'product-id', viewerType: 'product-detail' })
-  ↓
-NavigationContext → 스택에 추가
-  ↓
-TracerPane → GenericDataViewer 렌더링
-  ↓
-GenericDataViewer
-  ├─ ViewerRegistry.get('product-detail')
-  ├─ viewerConfig.fetcher 확인
-  ├─ fetchProductDetail(id) 호출  ⭐ Registry에서 가져온 fetcher
-  └─ ProductDetailViewer에 data 전달
-  ↓
-ProductDetailViewer → 데이터 렌더링 (API 호출 불필요)
-```
-
-### GenericDataViewer 구현
-
-```typescript
-// viewers/GenericDataViewer.tsx
-export function GenericDataViewer({ id, type, data }: GenericDataViewerProps) {
-  const viewerConfig = ViewerRegistry.get(type)
-  const [viewerData, setViewerData] = useState(data)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // 이미 data가 있으면 API 호출 안함
-    if (data) {
-      setViewerData(data)
-      return
+    const fields: FieldConfig[] = []
+    for (const fieldName of mapping.fields) {
+      const config = this.fields.get(fieldName)
+      if (!config) continue
+      if (config.optional && !data[fieldName]) continue  // 옵셔널 필드 스킵
+      fields.push(config)
     }
 
-    // fetcher가 없으면 단독 조회 불가
-    if (!viewerConfig.fetcher) {
-      if (viewerConfig.isEmbeddedOnly) {
-        setError('이 ID는 단독 조회가 불가능합니다. 부모 데이터에 포함되어 있습니다.')
-      }
-      return
+    return fields.sort((a, b) => a.displayOrder - b.displayOrder)
+  }
+
+  // IdType → ViewerType 추론 (Navigable.tsx에서 사용)
+  inferViewerType(idType: IdType): ViewerType | undefined {
+    return this.idTypeToField.get(idType)?.viewerType
+  }
+
+  // IdType → Service 매핑 (색상 결정)
+  getServiceForIdType(idType: IdType): 'payment' | 'gateway' | 'ecommerce' | undefined {
+    return this.idTypeToField.get(idType)?.service
+  }
+
+  // IdType → 일관된 라벨 (단일 진실 공급원)
+  getLabelForIdType(idType: IdType): string {
+    return this.idTypeToField.get(idType)?.label || idType
+  }
+}
+
+export const FieldRegistry = new FieldRegistryClass()
+```
+
+**초기화** (`initializeRegistry.ts`):
+
+```typescript
+FIELD_REGISTRY_CONFIG.fields.forEach((field) => {
+  FieldRegistry.registerField(field)
+})
+
+FIELD_REGISTRY_CONFIG.viewerMappings.forEach((mapping) => {
+  FieldRegistry.registerViewerMapping(mapping)
+})
+```
+
+### 2. FieldRenderer
+
+**역할**: 범용 필드 렌더러 (모든 Viewer에서 사용)
+
+```tsx
+export function FieldRenderer({ viewerType, data }: FieldRendererProps) {
+  const fields = FieldRegistry.getFieldsForViewer(viewerType, data)
+
+  if (fields.length === 0) return null
+
+  return (
+    <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
+      <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
+      <div className="space-y-2 text-sm font-mono">
+        {fields.map((field) => {
+          const value = data[field.fieldName]
+          if (!value) return null
+
+          return (
+            <div key={field.fieldName} className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+              <span className="text-gray-500 flex-shrink-0">{field.label}:</span>
+              <Navigable id={value} type={field.idType} viewerType={field.viewerType} />
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+```
+
+**사용법:**
+
+```tsx
+// ProcessDetailViewer.tsx
+<FieldRenderer viewerType="process-detail" data={process} />
+
+// OrderDetailViewer.tsx
+<FieldRenderer viewerType="order-detail" data={order} />
+
+// 끝!
+```
+
+### 3. Navigable (Registry 기반)
+
+**역할**: 클릭 가능한 ID 래퍼
+
+**✅ 리팩토링 완료 - switch 문 제거:**
+
+```typescript
+// ❌ 기존: 하드코딩된 switch 문
+function inferViewerType(idType: IdType): ViewerType {
+  switch (idType) {
+    case 'process-id': return 'process-detail'
+    case 'order-id': return 'order-detail'
+    // ... 30줄
+  }
+}
+
+// ✅ 현재: FieldRegistry 사용
+function inferViewerType(idType: IdType): ViewerType {
+  const viewerType = FieldRegistry.inferViewerType(idType)
+  if (viewerType) return viewerType
+
+  // Fallback for event-id, trace-id (아직 Field Registry에 없음)
+  switch (idType) {
+    case 'event-id': return 'event-timeline'
+    case 'trace-id': return 'trace-timeline'
+    default: return 'process-detail'
+  }
+}
+```
+
+**색상도 Registry 기반:**
+
+```typescript
+function getColorForIdType(type: IdType): string {
+  const service = FieldRegistry.getServiceForIdType(type)
+
+  if (service) {
+    const serviceConfig = ServiceRegistry.get(service)
+    const colorMap = {
+      'bg-purple-500': 'text-purple-600 hover:text-purple-700',
+      'bg-blue-500': 'text-blue-600 hover:text-blue-700',
+      'bg-green-500': 'text-green-600 hover:text-green-700',
     }
+    return colorMap[serviceConfig.color] || 'text-blue-600 hover:text-blue-700'
+  }
 
-    // ⭐ Registry의 fetcher로 자동 API 호출
-    setIsLoading(true)
-    viewerConfig.fetcher(id)
-      .then(setViewerData)
-      .catch((err) => setError(err.message))
-      .finally(() => setIsLoading(false))
-  }, [id, type, data])
-
-  if (isLoading) return <LoadingSpinner />
-  if (error) return <ErrorMessage error={error} />
-
-  const ViewerComponent = viewerConfig.component
-  return <ViewerComponent id={id} type={type} data={viewerData} />
+  return 'text-blue-600 hover:text-blue-700'
 }
 ```
 
 ---
 
-## 상태 관리
+## 🚀 다음 Claude를 위한 작업 가이드
 
-### NavigationContext (Reducer 패턴)
+### 새 ID 타입 추가하기
 
-**상태 구조:**
+**단 1개 파일만 수정하면 됨!**
+
+```typescript
+// /src/config/navigation-field-registry.config.ts
+
+export const FIELD_REGISTRY_CONFIG: FieldRegistryConfig = {
+  fields: [
+    // ... 기존 필드들
+
+    // ✅ 새 필드 추가
+    {
+      idType: 'settlement-id',          // 1. types/navigation.ts에 IdType 추가 필요
+      fieldName: 'settlementPublicId',
+      label: 'Settlement ID',
+      viewerType: 'settlement-detail',  // 2. ViewerType도 추가 필요
+      service: 'payment',
+      optional: true,
+      displayOrder: 250,
+      format: 'nanoid',
+    },
+  ],
+
+  viewerMappings: [
+    // ... 기존 매핑들
+
+    // ✅ 새 뷰어 매핑 추가
+    {
+      viewerType: 'settlement-detail',
+      fields: ['settlementPublicId', 'paymentPublicId', 'orderPublicId'],
+    },
+  ],
+}
+```
+
+**추가 작업:**
+
+1. `types/navigation.ts`에 `IdType`, `ViewerType` 추가
+2. Viewer 컴포넌트 작성 (`SettlementDetailViewer.tsx`)
+3. `ViewerRegistry`에 등록 (`initializeRegistry.ts`)
+
+**끝!** Navigable.tsx, 기타 Viewer 수정 불필요.
+
+### 기존 필드 라벨 변경하기
+
+```typescript
+// ❌ 과거: 7개 파일 수정 필요
+// ProcessDetailViewer.tsx: "Process ID:"
+// OrderDetailViewer.tsx: "Process ID (Gateway):"
+// ... 5개 더
+
+// ✅ 현재: 1개 파일만 수정
+// /src/config/navigation-field-registry.config.ts
+{
+  idType: 'process-id',
+  label: 'Process ID (Gateway)',  // 여기만 바꾸면 모든 곳에 적용
+  // ...
+}
+```
+
+### Viewer에 특수한 필드 추가하기
+
+FieldRenderer는 **공통 필드만** 렌더링합니다.
+특수한 필드(예: 취소/환불 관련)는 별도 섹션으로:
+
+```tsx
+// GatewayPaymentDetailViewer.tsx
+export function GatewayPaymentDetailViewer({ id, data }: ViewerProps) {
+  return (
+    <div className="space-y-6">
+      {/* 공통 필드 */}
+      <FieldRenderer viewerType="gateway-payment-detail" data={payment} />
+
+      {/* 특수 필드: 원본 거래 (취소/환불인 경우) */}
+      {payment.originPaymentPublicId && (
+        <section className="bg-orange-50 rounded-lg border-2 border-orange-200 p-6">
+          <h4 className="text-lg font-bold text-hamster-brown mb-4">🔄 원본 거래</h4>
+          <div className="space-y-3 text-sm font-mono">
+            <div className="flex items-center gap-3 bg-white p-3 rounded border border-orange-300">
+              <span className="text-orange-600 flex-shrink-0 font-bold">Origin Payment:</span>
+              <Navigable id={payment.originPaymentPublicId} type="gateway-payment-id" />
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+```
+
+### 새 Viewer 추가하기
+
+1. **API Service 작성** (`api/settlementService.ts`)
+2. **Viewer 컴포넌트** (`viewers/SettlementDetailViewer.tsx`)
+3. **ViewerRegistry 등록** (`initializeRegistry.ts`):
+
+```typescript
+ViewerRegistry.register({
+  type: 'settlement-detail',
+  title: 'Settlement 상세',
+  component: SettlementDetailViewer,
+  service: 'payment',
+  fetcher: fetchSettlementDetail,
+  myItem: {
+    searchBy: (id) => ({ field: 'settlementPublicId', value: id }),
+    listRoute: '/payment/settlement',
+  },
+})
+```
+
+4. **Field Registry에 필드 추가** (위 참고)
+
+---
+
+## 📊 현재 등록된 ID 타입 (2026-02-06)
+
+### Gateway Service
+- `process-id` → `process-detail`
+- `gateway-payment-id` → `gateway-payment-detail`
+- `event-id` → `event-timeline` (Field Registry 미적용)
+- `trace-id` → `trace-timeline` (Field Registry 미적용)
+
+### Payment Service
+- `payment-id` → `payment-detail`
+- `product-id` → `product-detail`
+
+### Ecommerce Service
+- `order-id` → `order-detail`
+- `user-id` → `user-detail`
+- `ecommerce-product-id` → `ecommerce-product-detail`
+
+**TODO**: `event-id`, `trace-id`도 Field Registry에 추가하기
+
+---
+
+## 🎨 상태 관리 (NavigationContext)
+
+### NavigationItem 구조
+
+```typescript
+interface NavigationItem {
+  id: string           // 예: "KRmMnVjtY0"
+  type: IdType         // 예: "order-id"
+  viewerType: ViewerType  // 예: "order-detail"
+  label: string        // 예: "Order: KRmMnVjtY0"
+  data?: any           // 선택: 뷰어에 전달할 데이터
+}
+```
+
+### 스택 관리 (핵심!)
+
 ```typescript
 interface NavigationState {
   stack: {
     items: NavigationItem[]
     currentIndex: number
   }
-  isLoading: boolean
-  error: string | null
 }
 ```
 
-**액션:**
-```typescript
-type NavigationAction =
-  | { type: 'NAVIGATE'; item: NavigationItem }
-  | { type: 'GO_BACK' }
-  | { type: 'GO_FORWARD' }
-  | { type: 'CLEAR' }
-  | { type: 'SET_LOADING'; isLoading: boolean }
-  | { type: 'SET_ERROR'; error: string | null }
+**동작 방식:**
+
+```
+1. Process A 클릭   → [Process A], currentIndex = 0
+2. Order X 클릭     → [Process A, Order X], currentIndex = 1
+3. User Y 클릭      → [Process A, Order X, User Y], currentIndex = 2
+4. 뒤로 가기         → currentIndex = 1 (Order X 표시)
+5. Process A 클릭   → [Process A], currentIndex = 0 (Order X, User Y 제거)
 ```
 
-### 스택 관리 로직 (핵심!)
-
-**`NAVIGATE` 액션 처리** (`NavigationContext.tsx: navigationReducer()`):
-
-```typescript
-case 'NAVIGATE': {
-  // 1. 현재 표시 중인 항목과 동일한 ID면 무시
-  const currentItem = state.stack.items[state.stack.currentIndex]
-  if (currentItem?.id === action.item.id && currentItem?.type === action.item.type) {
-    return state  // 변경 없음
-  }
-
-  // 2. 스택에서 동일한 ID 찾기
-  const existingIndex = state.stack.items.findIndex(
-    (item) => item.id === action.item.id && item.type === action.item.type
-  )
-
-  // 3. 이미 스택에 있으면 그 위치로 "돌아가기" (이후 항목들 제거)
-  if (existingIndex !== -1) {
-    return {
-      ...state,
-      stack: {
-        items: state.stack.items.slice(0, existingIndex + 1),
-        currentIndex: existingIndex,
-      },
-    }
-  }
-
-  // 4. 새로운 ID면 현재 위치 이후의 히스토리 제거하고 추가
-  const newItems = [
-    ...state.stack.items.slice(0, state.stack.currentIndex + 1),
-    action.item,
-  ]
-  return {
-    ...state,
-    stack: {
-      items: newItems,
-      currentIndex: newItems.length - 1,
-    },
-  }
-}
-```
-
-**스택 동작 예시:**
-```
-1. Process A 클릭   → [Process A]
-2. Order X 클릭     → [Process A, Order X]
-3. User Y 클릭      → [Process A, Order X, User Y]
-4. Process A 클릭   → [Process A]  // Order X, User Y 제거 (뒤로 돌아감)
-5. Order X 클릭     → [Process A, Order X]
-6. Order X 다시 클릭 → 무시  // 이미 표시 중
-```
-
-**뒤로/앞으로 가기:**
-- `GO_BACK`: `currentIndex--` (0 이하면 무시)
-- `GO_FORWARD`: `currentIndex++` (items.length-1 이상이면 무시)
+**중복 방지**: 같은 ID 클릭 시 스택에서 해당 위치로 돌아가고 이후 항목 제거
 
 ---
 
-## 주요 기능
+## 🔍 디버깅 팁
 
-### 1. Navigable Component (ID 클릭 가능하게 만들기)
-
-**사용법:**
-```tsx
-// OrderList.tsx
-<Navigable id={order.orderPublicId} type="order-id">
-  {order.orderPublicId}
-</Navigable>
-
-// 또는 자동 라벨
-<Navigable id={order.orderPublicId} type="order-id" />
-// → "Order KRmMnVjtY0" 자동 생성
-```
-
-**Props:**
-```typescript
-interface NavigableProps {
-  id: string
-  type: IdType
-  viewerType?: ViewerType  // 없으면 inferViewerType()로 자동 추론
-  label?: string           // 없으면 formatLabel()로 자동 생성
-  className?: string
-  children?: ReactNode     // 커스텀 렌더링
-  data?: any               // 뷰어에 전달할 추가 데이터
-}
-```
-
-**자동 추론:**
-```typescript
-function inferViewerType(idType: IdType): ViewerType {
-  switch (idType) {
-    case 'process-id': return 'process-detail'
-    case 'product-id': return 'product-detail'
-    case 'order-id': return 'order-detail'
-    case 'user-id': return 'user-detail'
-    case 'ecommerce-product-id': return 'ecommerce-product-detail'
-    // ...
-  }
-}
-```
-
-### 2. TracerPane (상세 뷰어)
-
-**렌더링 로직:**
-```typescript
-const { state, goBack, goForward, clear } = useNavigation()
-const currentItem = state.stack.items[state.stack.currentIndex]
-
-// 1. currentItem 없으면 EmptyState
-// 2. isLoading이면 LoadingSpinner
-// 3. error 있으면 에러 메시지
-// 4. ViewerRegistry에서 뷰어 찾기
-const viewerConfig = ViewerRegistry.get(currentItem.viewerType)
-
-// 5. GenericDataViewer로 자동 데이터 로드 + 뷰어 렌더링
-return <GenericDataViewer id={currentItem.id} type={currentItem.viewerType} data={currentItem.data} />
-```
-
-**헤더:**
-- 서비스 배지 + 뷰어 타이틀 (예: "🛒 ECOMMERCE Order 상세")
-- ID 라벨 표시 (예: "Order KRmMnVjtY0")
-- 네비게이션 버튼: `[← 뒤로] [앞으로 →] [2 / 5] [✕ 닫기]`
-- "📍 내 아이템 가기" 버튼 (myItem 설정 있을 때만)
-
-### 3. "내 아이템 가기" 기능
-
-TracerPane에서 버튼 클릭 시 **페이지 리로드 없이** MainPane을 해당 아이템의 리스트 페이지로 이동시킵니다.
-
-**플로우:**
-```
-1. 주문 리스트에서 "User ID: ABC123" 클릭
-   ↓
-2. TracerPane에 User 상세 뷰 표시
-   ↓
-3. "📍 내 아이템 가기" 버튼 클릭
-   ↓
-4. MainPane이 User 리스트 페이지로 이동 (리로드 없음)
-   ↓
-5. User ID "ABC123"으로 자동 스크롤 + 파란 링 하이라이트 (3초)
-   ↓
-6. TracerPane은 User 상세 뷰 그대로 유지
-```
-
-**구현 (TracerPane.tsx):**
-```typescript
-const handleGoToMyItem = () => {
-  const viewerConfig = ViewerRegistry.get(currentItem.viewerType)
-  if (!viewerConfig?.myItem || viewerConfig.myItem === false) return
-
-  // 커스텀 listRoute가 있으면 사용, 없으면 ServiceRegistry에서 가져오기
-  const route = viewerConfig.myItem.listRoute
-    ? viewerConfig.myItem.listRoute
-    : ServiceRegistry.get(viewerConfig.service).listRoute
-
-  const searchCondition = viewerConfig.myItem.searchBy(currentItem.id)
-
-  const params = new URLSearchParams()
-  params.set('searchBy', searchCondition.field)
-  params.set('searchValue', searchCondition.value)
-
-  // window.history.pushState로 URL만 변경 (리로드 없음)
-  const newUrl = `${route}?${params.toString()}`
-  window.history.pushState({}, '', newUrl)
-
-  // popstate 이벤트 발생시켜서 React Router가 감지하도록
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
-```
-
-**장점:**
-- 페이지 리로드 없음 → TracerPane 상태 유지
-- React Router가 자동으로 감지하여 MainPane 컴포넌트 전환
-- 사용자 경험 향상 (빠르고 부드러운 네비게이션)
-
-### 4. URL 파라미터 기반 검색 + 하이라이트
-
-리스트 페이지는 URL 파라미터를 통해 특정 아이템을 검색하고 하이라이트합니다.
-
-**구현 (OrderList.tsx 예시):**
-```typescript
-const [searchParams, setSearchParams] = useSearchParams()
-const [highlightedId, setHighlightedId] = useState<string | null>(null)
-const orderRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
-
-useEffect(() => {
-  const searchByField = searchParams.get('searchBy')
-  const searchValue = searchParams.get('searchValue')
-
-  if (!searchByField || !searchValue || isLoading || orders.length === 0) return
-
-  // 검색 조건에 맞는 아이템 찾기
-  let targetOrder: OrderListItem | undefined
-  if (searchByField === 'orderPublicId') {
-    targetOrder = orders.find((o) => o.orderPublicId === searchValue)
-  } else if (searchByField === 'publicId') {
-    // User ID로 검색 (미래 기능)
-    targetOrder = orders.find((o) => o.userPublicId === searchValue)
-  }
-
-  if (!targetOrder) {
-    console.warn(`Order not found: ${searchByField}=${searchValue}`)
-    setSearchParams({})
-    return
-  }
-
-  setHighlightedId(targetOrder.orderPublicId)
-
-  // 스크롤 (헤더 영역 고려)
-  setTimeout(() => {
-    const element = orderRefs.current[targetOrder.orderPublicId]
-    if (element) {
-      const headerOffset = 200
-      const elementPosition = element.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth',
-      })
-    }
-  }, 100)
-
-  // 3초 후 하이라이트 제거 & URL 파라미터 제거
-  const timer = setTimeout(() => {
-    setHighlightedId(null)
-    setSearchParams({})
-  }, 3000)
-
-  return () => clearTimeout(timer)
-}, [searchParams, isLoading, orders, setSearchParams])
-
-// 렌더링
-{filteredOrders.map((order) => {
-  const isHighlighted = highlightedId === order.orderPublicId
-  return (
-    <div
-      key={order.orderPublicId}
-      ref={(el) => (orderRefs.current[order.orderPublicId] = el)}
-      className={`transition-all duration-500 ${
-        isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2 rounded-lg' : ''
-      }`}
-    >
-      <OrderCard order={order} />
-    </div>
-  )
-})}
-```
-
-**핵심 포인트:**
-1. `useSearchParams`로 URL 파라미터 읽기
-2. `useRef`로 각 아이템의 DOM 요소 추적
-3. `headerOffset`으로 페이지 헤더 영역 고려한 스크롤
-4. `ring-4 ring-blue-500`로 3초간 파란 링 하이라이트
-5. 자동으로 URL 파라미터 정리
-
-### 5. SplitLayout (Two-Pane + Resize)
-
-**Props:**
-```typescript
-interface SplitLayoutProps {
-  mainPane: ReactNode
-  tracerPane: ReactNode
-  defaultWidth?: number   // TracerPane 기본 너비 (%)
-  minWidth?: number       // 최소 너비 (%)
-  maxWidth?: number       // 최대 너비 (%)
-}
-```
-
-**Resize 로직:**
-- `onMouseDown` (Resize Handle) → `setIsResizing(true)`
-- `onMouseMove` (Container) → 마우스 X 좌표로 너비 계산
-- `onMouseUp` / `onMouseLeave` → `setIsResizing(false)`
-
-**스크롤 독립성:**
-```tsx
-<div className="flex h-full w-full overflow-hidden">
-  <div className="h-full overflow-y-auto overflow-x-hidden" style={{width: ...}}>
-    {mainPane}
-  </div>
-
-  <div className="w-1 bg-gray-300 hover:bg-hamster-orange cursor-col-resize" />
-
-  <div className="h-full overflow-y-auto overflow-x-hidden" style={{width: ...}}>
-    {tracerPane}
-  </div>
-</div>
-```
-
----
-
-## 확장 가이드
-
-### 새 Viewer 추가
-
-**1. ViewerType 추가** (`types/navigation.ts`):
-```typescript
-export type ViewerType =
-  | 'process-detail'
-  | 'settlement-detail'  // 새로 추가
-```
-
-**2. API Service 작성** (`api/settlementService.ts`):
-```typescript
-export async function fetchSettlementDetail(id: string): Promise<Settlement> {
-  const response = await paymentClient.get(`/api/settlements/${id}`)
-  return response.data
-}
-```
-
-**3. Viewer 컴포넌트 작성** (`viewers/SettlementDetailViewer.tsx`):
-```typescript
-import type { ViewerProps } from '@/types/navigation'
-
-export function SettlementDetailViewer({ id, data }: ViewerProps) {
-  const [settlement, setSettlement] = useState(data)
-
-  useEffect(() => {
-    if (data) {
-      setSettlement(data)
-      return
-    }
-    // Fallback: data 없으면 직접 API 호출 (하위 호환성)
-    fetchSettlementDetail(id).then(setSettlement)
-  }, [id, data])
-
-  return (
-    <div className="space-y-6">
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">
-          정산 정보
-        </h4>
-        {/* 렌더링 */}
-      </section>
-    </div>
-  )
-}
-```
-
-**4. ViewerRegistry 등록** (`registry/initializeRegistry.ts`):
-```typescript
-import { fetchSettlementDetail } from '@/api/settlementService'
-
-ViewerRegistry.register({
-  type: 'settlement-detail',
-  title: 'Settlement 상세',
-  component: SettlementDetailViewer,
-  service: 'payment',
-  fetcher: fetchSettlementDetail,  // ⭐ API 함수 등록
-  myItem: {
-    searchBy: (id) => ({ field: 'settlementPublicId', value: id }),
-    listRoute: '/payment/settlement'
-  }
-})
-```
-
-**5. ID 자동 추론 업데이트** (`Navigable.tsx`):
-```typescript
-function inferViewerType(idType: IdType): ViewerType {
-  switch (idType) {
-    case 'settlement-id': return 'settlement-detail'  // 추가
-    // ...
-  }
-}
-```
-
-**끝! 이제 `<Navigable id={xxx} type="settlement-id" />`만 사용하면 자동으로 동작합니다.**
-
-### 새 ID 타입 추가
-
-**1. IdType 추가** (`types/navigation.ts`):
-```typescript
-export type IdType =
-  | 'settlement-id'  // 새로 추가
-```
-
-**2. 색상 규칙 추가** (`Navigable.tsx`):
-```typescript
-function getColorForIdType(type: IdType): string {
-  switch (type) {
-    case 'settlement-id': return 'text-purple-600 hover:text-purple-700'
-    // ...
-  }
-}
-```
-
-**3. 라벨 포맷 추가** (`Navigable.tsx`):
-```typescript
-const typeLabels: Record<IdType, string> = {
-  'settlement-id': 'Settlement',
-  // ...
-}
-```
-
-### Cross-Service Reference 추가
-
-**예시: Ecommerce Product는 Ecommerce 소속이지만 Payment 페이지에서 참조**
+### FieldRenderer가 필드를 안보여줄 때
 
 ```typescript
-ViewerRegistry.register({
-  type: 'ecommerce-product-detail',
-  title: 'Ecommerce Product 상세',
-  component: EcommerceProductDetailViewer,
-  service: 'ecommerce',        // 소속: Ecommerce (초록색 배지)
-  fetcher: fetchEcommerceProductDetail,
-  myItem: {
-    searchBy: (id) => ({ field: 'ecommerceProductId', value: id }),
-    listRoute: '/payment/resource'  // 하지만 Payment 페이지로 이동!
-  }
-})
+// FieldRenderer.tsx에 로깅 추가
+const fields = FieldRegistry.getFieldsForViewer(viewerType, data)
+console.log('[FieldRenderer]', viewerType, fields)
 ```
 
-**결과:**
-- TracerPane 배지는 초록색 (Ecommerce 서비스)
-- "내 아이템 가기"는 `/payment/resource`로 이동
-- Payment 자원 관리 페이지에서 `ecommerceProductId`로 검색
+**확인사항:**
+1. `navigation-field-registry.config.ts`에 해당 viewerType 매핑 있는지
+2. data 객체에 fieldName 필드가 실제로 있는지
+3. optional 필드인데 값이 없는지
 
-### 단독 조회 불가 ID 처리
-
-**예시: Record ID는 Product 상세 조회 시 함께 오는 데이터**
+### Navigable 클릭이 안될 때
 
 ```typescript
-ViewerRegistry.register({
-  type: 'product-record-detail',
-  title: 'Product Record',
-  component: ProductRecordDetailViewer,
-  service: 'payment',
-  isEmbeddedOnly: true,  // ⭐ fetcher 없음 + 단독 조회 불가
-  myItem: false
-})
+// Navigable.tsx에 로깅
+const inferredViewerType = viewerType || inferViewerType(type)
+console.log('[Navigable]', { id, type, inferredViewerType })
 ```
 
-**결과:**
-- Record ID 클릭 시 "이 ID는 단독 조회가 불가능합니다. 부모 데이터에 포함되어 있습니다." 메시지 표시
-- 불필요한 API 호출 방지
+**확인사항:**
+1. IdType이 Field Registry에 등록되어 있는지
+2. inferViewerType fallback 로직 확인
 
----
-
-## 디버깅 및 최적화
-
-### 디버깅 팁
-
-#### 스택이 제대로 쌓이지 않을 때
-
-```typescript
-// NavigationContext.tsx: navigationReducer()에 로깅 추가
-case 'NAVIGATE':
-  console.log('[NAVIGATE]', action.item.id, action.item.type)
-  console.log('[STACK BEFORE]', state.stack.items.map(i => `${i.type}:${i.id}`))
-  // ... reducer 로직
-  console.log('[STACK AFTER]', newState.stack.items.map(i => `${i.type}:${i.id}`))
-```
-
-#### 뷰어가 표시되지 않을 때
+### 뷰어가 표시 안될 때
 
 ```typescript
 // TracerPane.tsx
@@ -874,175 +555,70 @@ console.log('[CURRENT ITEM]', currentItem)
 console.log('[VIEWER CONFIG]', ViewerRegistry.get(currentItem?.viewerType))
 ```
 
-#### API 호출이 안될 때
-
-```typescript
-// GenericDataViewer.tsx
-console.log('[FETCHER]', viewerConfig.fetcher)
-console.log('[IS EMBEDDED ONLY]', viewerConfig.isEmbeddedOnly)
-```
-
-#### Resize가 작동하지 않을 때
-
-- `onMouseMove`가 부모 컨테이너에 있는지 확인
-- `isResizing` 상태가 제대로 업데이트되는지 확인
-- `overflow-hidden`이 부모에 있는지 확인
-
-### 성능 최적화
-
-#### 1. useMemo로 필터링 최적화
-
-```typescript
-const filteredProcesses = useMemo(
-  () => filter === 'all' ? mockProcesses : mockProcesses.filter(p => p.status === filter),
-  [filter]
-)
-```
-
-#### 2. 뷰어 컴포넌트 lazy loading
-
-```typescript
-const ProcessDetailViewer = lazy(() => import('./viewers/ProcessDetailViewer'))
-```
-
-#### 3. 스택 크기 제한 (옵션)
-
-```typescript
-const MAX_STACK_SIZE = 20
-
-if (newItems.length > MAX_STACK_SIZE) {
-  newItems.shift()  // 가장 오래된 항목 제거
-}
-```
-
-### 스타일링 패턴
-
-#### ID 표시 (MainPane & TracerPane 공통)
-
-```tsx
-<div className="space-y-2 text-xs font-mono">
-  <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-    <span className="text-gray-500 flex-shrink-0">Process ID:</span>
-    <Navigable id={process.publicId} type="process-id" />
-  </div>
-</div>
-```
-
-**핵심:**
-- `space-y-2`: 각 ID 행 간격
-- `gap-3`: 라벨과 ID 간격 (justify-between 대신 gap 사용)
-- `flex-shrink-0`: 라벨이 줄어들지 않도록
-- `font-mono`: ID는 고정폭 폰트
-
-#### 섹션 (TracerPane 내부)
-
-```tsx
-<section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-  <h4 className="text-lg font-bold text-hamster-brown mb-4 flex items-center gap-2">
-    <span>🔗</span>
-    <span>관련 ID</span>
-  </h4>
-  {/* 내용 */}
-</section>
-```
-
 ---
 
-## 주의사항
+## ⚠️ 주의사항
 
-### 1. AppLayout 높이 관리
+### 1. FieldRegistry는 필수 필드만
 
-반드시 `h-screen` + `flex-col` + `overflow-hidden` 구조 유지:
+FieldRenderer는 **필수적이고 공통적인 ID 필드**만 렌더링합니다.
+
+**✅ FieldRegistry에 넣을 것:**
+- 다른 뷰어로 이동 가능한 ID (Navigable)
+- 여러 뷰어에서 공통으로 표시되는 ID
+
+**❌ FieldRegistry에 넣지 말 것:**
+- 특수한 비즈니스 로직이 있는 필드 (취소/환불 표시 등)
+- Non-navigable 시스템 ID (Keycloak User ID, Internal ID)
+- 뷰어별 고유한 필드
+
+### 2. displayOrder 규칙
+
+```
+Gateway Service: 100-199
+Payment Service: 200-299
+Ecommerce Service: 300-399
+```
+
+같은 서비스 내에서는 10 단위로 증가.
+
+### 3. AppLayout 높이 관리 필수
 
 ```tsx
+// AppLayout.tsx - 반드시 이 구조 유지!
 <div className="h-screen flex flex-col bg-gray-50">
   <Header />
   <div className="flex flex-1 overflow-hidden">
     <Sidebar />
     <main className="flex-1 overflow-hidden">
-      {children}
+      {children}  {/* SplitLayout이 들어감 */}
     </main>
   </div>
 </div>
 ```
 
-### 2. 페이지 컴포넌트 padding
-
-MainPane에 표시되는 페이지는 자체적으로 `p-8` 추가 필요:
-
-```tsx
-export function ProcessTracker() {
-  return (
-    <div className="p-8">  // 필수!
-      {/* 내용 */}
-    </div>
-  )
-}
-```
-
-### 3. Navigable 중첩 클릭 방지
-
-```tsx
-const handleClick = (e: React.MouseEvent) => {
-  e.preventDefault()
-  e.stopPropagation()  // 중요! 부모 클릭 이벤트 방지
-  navigate(...)
-}
-```
-
-### 4. useState import 필수
-
-Navigable을 사용하는 모든 컴포넌트는 `useState`가 필요합니다 (filter 상태 등).
-
-```typescript
-import { useState } from 'react'  // 필수!
-```
+`h-screen` + `overflow-hidden` 없으면 스크롤 독립성 깨짐.
 
 ---
 
-## 미구현 기능 (TODO)
+## 📝 TODO
 
-### 1. 추가 뷰어
-- [ ] ProcessDetailViewer (Gateway)
-- [ ] PaymentDetailViewer (Gateway)
-- [ ] EventTimelineViewer
-- [ ] TraceTimelineViewer (분산 트랜잭션 전체 추적)
+### High Priority
+- [ ] `event-id`, `trace-id`도 Field Registry에 추가
+- [ ] Gateway Payment ID가 실제 백엔드 API 연동되면 테스트
 
-### 2. Backend API 연동
-- [ ] 현재 Mock 데이터 사용
-- [ ] `/api/admin/...` 엔드포인트 구현 필요
+### Medium Priority
+- [ ] RelationRegistry 활용 (현재 미사용)
+- [ ] FieldRenderer 커스터마이징 옵션 (섹션 제목, 스타일 등)
 
-### 3. RelationRegistry 활용
-- [ ] 현재 field 기반만 동작
-- [ ] fetch 함수로 백엔드 호출 추가 필요
-- [ ] Related IDs 자동 표시
-
-### 4. TracerPane 추가 기능
-- [ ] Breadcrumb UI (스택 히스토리 시각화)
-- [ ] Export 기능 (JSON, CSV)
-- [ ] 멀티 탭 지원
-
-### 5. Real-time 업데이트
-- [ ] WebSocket or SSE
-- [ ] UNKNOWN 프로세스 자동 갱신
+### Low Priority
+- [ ] TracerPane 멀티 탭 지원
+- [ ] 스택 크기 제한 (20개 이상 시 자동 제거)
 
 ---
 
-## 참고 파일
-
-- **핵심 로직**: `src/components/navigation/NavigationContext.tsx`
-- **레이아웃**: `src/components/navigation/SplitLayout.tsx`, `src/components/layout/AppLayout.tsx`
-- **ID 래퍼**: `src/components/navigation/Navigable.tsx`
-- **데이터 로더**: `src/components/navigation/viewers/GenericDataViewer.tsx`
-- **뷰어 예시**: `src/components/navigation/viewers/ProductDetailViewer.tsx`, `OrderDetailViewer.tsx`
-- **초기화**: `src/components/navigation/registry/initializeRegistry.ts`
-- **타입 정의**: `src/types/navigation.ts`
-- **API 서비스**: `src/api/productService.ts`, `orderService.ts`, 등
-
----
-
-**작성일**: 2026-02-05
-**버전**: 2.0.0 (통합본)
-**이전 버전**: NAVIGATION.md + NAVIGATION_SYSTEM.md 통합
+**작성일**: 2026-02-06
+**작성자**: Claude (Field Registry 마이그레이션 완료 직후)
+**버전**: 3.0.0 (Field Registry 패턴 적용)
 
 Made with 🐹 by Hamster Team

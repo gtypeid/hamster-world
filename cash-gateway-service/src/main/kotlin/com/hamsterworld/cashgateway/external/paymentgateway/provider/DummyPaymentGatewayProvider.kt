@@ -5,6 +5,7 @@ import com.hamsterworld.cashgateway.domain.payment.constant.PaymentStatus
 import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayProvider
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.AcknowledgementResponse
+import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.CancelPaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentCancelRequest
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentRequest
@@ -47,11 +48,12 @@ class DummyPaymentGatewayProvider(
                 )
             )
         } else {
+            val cancelCtx = paymentCtx as CancelPaymentCtx
             DummyPaymentCancelRequest(
                 userPublicId = paymentCtx.userPublicId,
                 orderId = paymentCtx.orderNumber,
-                amount = paymentCtx.payment!!.amount!!,
-                tid = paymentCtx.payment.pgTransaction!!,
+                amount = paymentCtx.amount,
+                tid = cancelCtx.originTid,
                 cancel = "CANCEL",
                 echo = mapOf(
                     "mid" to paymentCtx.mid,

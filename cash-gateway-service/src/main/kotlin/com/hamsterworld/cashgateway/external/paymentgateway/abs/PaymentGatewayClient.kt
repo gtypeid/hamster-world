@@ -1,6 +1,5 @@
 package com.hamsterworld.cashgateway.external.paymentgateway.abs
 
-import com.hamsterworld.cashgateway.domain.payment.model.Payment
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.ApprovePaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.CancelPaymentCtx
@@ -33,16 +32,16 @@ class PaymentGatewayClient(
         private val delegate: PaymentGatewayClientProtocol
     ) : PaymentGatewayClientProtocol {
 
-        override fun payment(paymentCtx: ApprovePaymentCtx): Payment? {
-            return delegate.payment(paymentCtx)
+        override fun payment(paymentCtx: ApprovePaymentCtx) {
+            delegate.payment(paymentCtx)
         }
 
-        override fun cancel(paymentCtx: CancelPaymentCtx): Payment {
-            return delegate.cancel(paymentCtx)
+        override fun cancel(paymentCtx: CancelPaymentCtx) {
+            delegate.cancel(paymentCtx)
         }
 
-        override fun handleWebhook(rawPayload: String): Payment? {
-            return delegate.handleWebhook(rawPayload)
+        override fun handleWebhook(rawPayload: String) {
+            delegate.handleWebhook(rawPayload)
         }
 
         override fun getProvider(): Provider {

@@ -4,6 +4,7 @@ import type { User } from '@/types/user'
 import { fetchUserDetail } from '@/api/userService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
+import { FieldRenderer } from '../FieldRenderer'
 
 /**
  * UserDetailViewer
@@ -117,22 +118,18 @@ export function UserDetailViewer({ id, data: initialData }: ViewerProps) {
         </div>
       </section>
 
-      {/* Related IDs */}
-      <section className="bg-white rounded-lg border-2 border-gray-200 p-6">
-        <h4 className="text-lg font-bold text-hamster-brown mb-4">🔗 관련 ID</h4>
+      {/* Related IDs - Using FieldRenderer */}
+      <FieldRenderer viewerType="user-detail" data={user} />
 
+      {/* Additional System IDs (non-navigable) */}
+      <section className="bg-gray-50 rounded-lg border border-gray-300 p-6">
+        <h4 className="text-lg font-bold text-gray-700 mb-4">🔧 시스템 ID</h4>
         <div className="space-y-2 text-sm font-mono">
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
-            <span className="text-gray-500 flex-shrink-0">User Public ID:</span>
-            <Navigable id={user.publicId} type="user-id" />
-          </div>
-
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+          <div className="flex items-center gap-3 bg-white p-2 rounded">
             <span className="text-gray-500 flex-shrink-0">Keycloak User ID:</span>
             <span className="text-gray-600">{user.keycloakUserId}</span>
           </div>
-
-          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+          <div className="flex items-center gap-3 bg-white p-2 rounded">
             <span className="text-gray-500 flex-shrink-0">Internal ID:</span>
             <span className="text-gray-600">{user.id}</span>
           </div>

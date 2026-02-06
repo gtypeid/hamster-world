@@ -1,5 +1,7 @@
-// Payment Service 타입 - 자원(Resource) 관점
-// Backend: payment-service/domain/product
+// Payment Service 타입
+// Backend: payment-service/domain
+
+// ===== Resource (자원 관리) =====
 
 export type ProductCategory = 'ELECTRONICS' | 'FASHION' | 'FOOD' | 'BOOK' | 'ETC'
 
@@ -61,4 +63,33 @@ export interface SettlementRecord {
   balance: number
   reason: string
   createdAt: string
+}
+
+// ===== Transaction (거래 내역) =====
+
+export type PaymentStatus = 'APPROVED' | 'CANCELLED'
+
+export interface Payment {
+  // === Public IDs (Backend Response) ===
+  paymentPublicId: string // Payment Public ID (Snowflake Base62)
+  processPublicId: string // Cash Gateway PaymentProcess Public ID
+  gatewayPaymentPublicId: string // Gateway Payment Public ID
+  orderPublicId: string // Ecommerce Order Public ID
+  originPaymentPublicId: string | null // 원본 Payment Public ID (취소건인 경우)
+
+  // === Payment Info ===
+  gatewayMid: string // Gateway Merchant ID
+  amount: number
+  status: PaymentStatus // APPROVED, CANCELLED
+  pgTransaction: string | null // PG Transaction ID
+  pgApprovalNo: string | null // PG Approval Number
+
+  // === Timestamps ===
+  createdAt: string
+  modifiedAt: string | null
+}
+
+export interface PaymentDetail extends Payment {
+  // TODO: OrderSnapshot 정보 추가 예정
+  // orderSnapshot?: OrderSnapshot
 }
