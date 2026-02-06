@@ -1,0 +1,27 @@
+DROP TABLE IF EXISTS `payments`;
+CREATE TABLE `payments` (
+    `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT 'Internal PK (Auto-increment)',
+    `public_id` VARCHAR(20) NOT NULL COMMENT 'Public ID (Snowflake ID - Base62)',
+    `tid` VARCHAR(50) NOT NULL COMMENT 'Payment 트랜잭션 고유 ID (== public_id)',
+    `mid_id` VARCHAR(100) NOT NULL COMMENT '가맹점 ID',
+    `order_public_id` VARCHAR(20) NOT NULL COMMENT 'E-commerce Service의 Order Public ID (Snowflake Base62)',
+    `amount` DECIMAL(19, 2) NOT NULL COMMENT '결제 금액',
+    `callback_url` VARCHAR(500) NOT NULL COMMENT 'Webhook 콜백 URL',
+    `echo` TEXT NULL COMMENT 'Echo 데이터 (JSON)',
+    `status` VARCHAR(20) NOT NULL COMMENT '결제 상태 (PENDING, COMPLETED, FAILED, CANCEL_PENDING, CANCELLED)',
+    `approval_no` VARCHAR(50) NULL COMMENT '승인 번호',
+    `notification_status` VARCHAR(20) NOT NULL COMMENT '알림 상태 (NOT_SENT, SENT, FAILED)',
+    `notification_attempt_count` INT NOT NULL DEFAULT 0 COMMENT '알림 시도 횟수',
+    `last_notification_at` DATETIME NULL COMMENT '마지막 알림 시각',
+    `notification_error_message` TEXT NULL COMMENT '알림 에러 메시지',
+    `failure_reason` VARCHAR(100) NULL COMMENT '결제 실패 사유',
+    `processed_at` DATETIME NULL COMMENT '처리 완료 시각',
+    `created_at` DATETIME NOT NULL COMMENT '생성 일시',
+    `modified_at` DATETIME NULL COMMENT '수정 일시',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE KEY `idx_payments_public_id` (`public_id`) USING BTREE,
+    UNIQUE KEY `idx_payments_tid` (`tid`) USING BTREE,
+    KEY `idx_payments_status_created_at` (`status`, `created_at`),
+    KEY `idx_payments_status_notification` (`status`, `notification_status`),
+    KEY `idx_payments_mid_id` (`mid_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

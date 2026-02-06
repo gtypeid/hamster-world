@@ -1,0 +1,28 @@
+# OAuth2 Resource Server 공통 설정
+# 모든 서비스에서 spring.config.import로 포함하여 사용
+#
+# 사용법:
+# application.yml에 다음 추가:
+# spring:
+#   config:
+#     import:
+#       - classpath:application-kafka.yml
+#       - classpath:application-oauth2.yml
+
+spring:
+  # Keycloak OAuth2 Resource Server 설정
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8090/realms/hamster-world
+          # Public Key 자동 다운로드: http://localhost:8090/realms/hamster-world/protocol/openid-connect/certs
+
+# Keycloak Admin API 설정 (필요한 서비스만 사용)
+keycloak:
+  server-url: http://localhost:8090
+  realm: hamster-world
+  admin:
+    username: admin
+    password: admin
+    client-id: admin-cli

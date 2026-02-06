@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # Ecommerce Service DB
+  ecommerce-db:
+    image: mysql:8.0
+    container_name: hamster-ecommerce-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: ecommerce_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./.local/mysql/ecommerce-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Cash Gateway Service DB
+  cash-gateway-db:
+    image: mysql:8.0
+    container_name: hamster-cash-gateway-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: cash_gateway_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./.local/mysql/cash-gateway-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Payment Service DB
+  payment-db:
+    image: mysql:8.0
+    container_name: hamster-payment-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: payment_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./.local/mysql/payment-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Hamster PG Service DB (외부 PG 시뮬레이터)
+  hamster-pg-db:
+    image: mysql:8.0
+    container_name: hamster-pg-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: hamster_pg_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3309:3306"
+    volumes:
+      - ./.local/mysql/hamster-pg-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Kafka (KRaft 모드 - Zookeeper 불필요)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: hamster-kafka
+    ports:
+      - "9092:9092"  # Docker 내부 통신용 (Kafka UI)
+      - "9093:9093"  # 로컬 호스트 통신용 (Spring Boot)
+    environment:
+      # KRaft 설정
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Listener 설정 (3개: PLAINTEXT, PLAINTEXT_HOST, CONTROLLER)
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://0.0.0.0:9093,CONTROLLER://kafka:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # 클러스터 설정
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      # 로그 디렉토리
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - ./.local/kafka:/var/lib/kafka/data
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Kafka UI (Web UI for Kafka)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: hamster-kafka-ui
+    ports:
+      - "8989:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: hamster-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    depends_on:
+      - kafka
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Keycloak (인증 서버)
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: hamster-keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://keycloak-db:3306/keycloak_db
+      KC_DB_USERNAME: root
+      KC_DB_PASSWORD: 12555!@
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8090:8080"
+    depends_on:
+      - keycloak-db
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Keycloak DB
+  keycloak-db:
+    image: mysql:8.0
+    container_name: hamster-keycloak-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: keycloak_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3310:3306"
+    volumes:
+      - ./.local/mysql/keycloak-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+networks:
+  hamster-network:
+    driver: bridge

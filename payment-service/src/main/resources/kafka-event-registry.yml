@@ -1,0 +1,26 @@
+# Payment Service - Kafka Event Registry
+#
+# 이 서비스가 구독/발행하는 모든 이벤트를 명시적으로 정의합니다.
+# 설정과 실제 구현이 일치하지 않으면 애플리케이션 시작 시 종료됩니다.
+#
+# 서비스명은 spring.application.name에서 자동으로 가져옵니다.
+
+event:
+  # 구독하는 이벤트 (Consume)
+  subscribes:
+    - topic: ${kafka.topics.ecommerce-events}
+      events:
+        - ProductCreatedEvent           # 상품 생성 → Product + ProductRecord 생성
+        - StockAdjustmentRequestedEvent # 재고 조정 요청 → ProductRecord 추가
+        - OrderCreatedEvent             # 주문 생성 → 재고 검증 및 차감
+
+    - topic: ${kafka.topics.cash-gateway-events}
+      events:
+        - PaymentCancelledEvent  # 결제 취소 → 재고 복원
+
+  # 발행하는 이벤트 (Publish)
+  publishes:
+    - topic: ${kafka.service.payment-service.topic}
+      events:
+        - OrderStockReservedEvent       # 재고 확보 완료 → Cash Gateway가 PG 요청
+        - ProductStockSynchronizedEvent # 재고 변경 → Ecommerce 동기화

@@ -1,0 +1,69 @@
+package com.hamsterworld.common.web.kafka
+
+import java.time.LocalDateTime
+import java.util.UUID
+
+/**
+ * 모든 도메인 이벤트의 기본 인터페이스
+ *
+ * 각 서비스는 이 인터페이스를 구현하여 자신만의 도메인 이벤트를 정의합니다.
+ * Common 모듈에는 구체적인 이벤트 클래스를 정의하지 않습니다.
+ *
+ * 예시:
+ * ```kotlin
+ * // ecommerce-service/domain/product/event/ProductEvents.kt
+ * data class ProductCreatedEvent(...) : EcommerceDomainEvent(aggregateId = product.publicId)  // ← Public ID 사용
+ *
+ * // payment-service/domain/product/event/ProductEvents.kt
+ * data class ProductStockChangedEvent(...) : PaymentDomainEvent(aggregateId = product.publicId)  // ← Public ID 사용
+ * ```
+ */
+interface DomainEvent {
+    /**
+     * 이벤트 고유 ID
+     */
+    val eventId: String
+
+    /**
+     * 이벤트가 발생한 Aggregate의 Public ID (NOT Internal ID)
+     * - Public ID (Snowflake Base62)를 사용해야 함
+     * - Internal ID (Long)를 절대 사용하지 말 것
+     * - 이벤트 순서 보장 및 파티셔닝에 사용
+     */
+    val aggregateId: String
+
+    /**
+     * 분산 추적 ID (Trace ID)
+     * 여러 서비스를 거치는 이벤트 체인을 추적하기 위한 ID
+     * 첫 이벤트에서 생성되고, 후속 이벤트에 전파됨
+     *
+     * WARNING: null이면 안 됨! DomainEventPublisher에서 자동 생성하지만,
+     * 명시적으로 AuditContextHolder에서 가져오는 것을 권장
+     */
+    val traceId: String?
+
+    /**
+     * 이벤트 발생 시각
+     */
+    val occurredAt: LocalDateTime
+}
+
+/**
+ * 도메인 이벤트 기본 구현
+ *
+ * 각 서비스에서 이 클래스를 상속받아 구체적인 이벤트를 정의할 수 있습니다.
+ * 일반적으로는 서비스별 Base 클래스(EcommerceDomainEvent, PaymentDomainEvent 등)를 사용하는 것을 권장합니다.
+ *
+ * @param aggregateId 이벤트가 발생한 Aggregate의 Public ID (필수, NOT Internal ID)
+ * @param eventId 이벤트 고유 ID (자동 생성)
+ * @param traceId 분산 추적 ID (선택, 첫 이벤트에서 생성되고 후속 이벤트에 전파)
+ * @param occurredAt 이벤트 발생 시각 (자동 생성)
+ * @param topic Kafka 토픽 이름 (필수)
+ */
+abstract class BaseDomainEvent(
+    override val aggregateId: String,
+    override val eventId: String = UUID.randomUUID().toString(),
+    override val traceId: String? = null,
+    override val occurredAt: LocalDateTime = LocalDateTime.now(),
+    open val topic: String
+) : DomainEvent

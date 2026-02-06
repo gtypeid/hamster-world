@@ -1,0 +1,7 @@
+rootProject.name = 'hamster-world'
+
+include 'common'
+include 'ecommerce-service'
+include 'cash-gateway-service'
+include 'payment-service'
+include 'hamster-pg-service'

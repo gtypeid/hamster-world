@@ -1,0 +1,28 @@
+# Ecommerce Service - Kafka Event Registry
+#
+# 이 서비스가 구독/발행하는 모든 이벤트를 명시적으로 정의합니다.
+# 설정과 실제 구현이 일치하지 않으면 애플리케이션 시작 시 종료됩니다.
+#
+# 서비스명은 spring.application.name에서 자동으로 가져옵니다.
+
+event:
+  # 구독하는 이벤트 (Consume)
+  subscribes:
+    - topic: ${kafka.topics.cash-gateway-events}
+      events:
+        - PaymentApprovedEvent   # 결제 승인 → Order 상태 PAYMENT_APPROVED
+        - PaymentFailedEvent     # 결제 실패 → Order 상태 PAYMENT_FAILED
+        - PaymentCancelledEvent  # 결제 취소 → Order 상태 CANCELED
+
+    - topic: ${kafka.topics.payment-events}
+      events:
+        - ProductStockSynchronizedEvent   # 재고 동기화 → Product.stock 업데이트
+        - OrderStockValidationFailedEvent # 재고 검증 실패 → Order 상태 FAILED
+
+  # 발행하는 이벤트 (Publish)
+  publishes:
+    - topic: ${kafka.service.ecommerce-service.topic}
+      events:
+        - ProductCreatedEvent           # 상품 생성
+        - StockAdjustmentRequestedEvent # 재고 조정 요청
+        - OrderCreatedEvent             # 주문 생성

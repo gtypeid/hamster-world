@@ -1,0 +1,1377 @@
+# Hamster World - MSA E-commerce + Payment System
+
+> **🚀 새 세션 시작 시 필독!**
+> 1. 이 README.md 읽기 (전체 아키텍처 파악)
+> 2. 작업할 서비스의 README.md 읽기 (상세 구현사항)
+> 3. `## 다음 세션 작업 인수인계` 섹션 확인
+
+---
+
+## 프로젝트 개요
+
+**Hamster World = 결제 중개 플랫폼 (Payment Gateway Platform)**
+
+토스페이먼츠, 이니시스와 같은 **결제 대행 서비스 (PG Aggregator)** 아키텍처로,
+벤더(쇼핑몰 사업자)들에게 **결제/정산/재고 관리 SaaS**를 제공합니다.
+
+### 비즈니스 모델
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Hamster World (결제 중개 플랫폼)                        │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
+│  ├─ Ecommerce Service (벤더용 SaaS 쇼핑몰)              │
+│  ├─ Cash Gateway Service (결제 방화벽/중개)             │
+│  └─ Payment Service (정산/재고/권한 - 내부 전용)        │
+└────────────────────────────────────────────────────────┘
+              ↓ 제공 (2가지 결제 경로)
+┌────────────────────────────────────────────────────────┐
+│  Vendor A (쇼핑몰 사업자)                               │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
+│  선택 1: 직접 PG 계약 (낮은 수수료, 경로 A)             │
+│          └─ Ecommerce → 외부 PG → Cash Gateway (노티)  │
+│                                                         │
+│  선택 2: Hamster 중개 (높은 수수료, 경로 B)             │
+│          └─ Ecommerce → Cash Gateway → 외부 PG         │
+└────────────────────────────────────────────────────────┘
+              ↓ 모든 결제 이벤트 집합
+┌────────────────────────────────────────────────────────┐
+│  외부 PG (Hamster PG 시뮬레이터)                        │
+│  - 실제 서비스에선 토스/이니시스/NHN KCP 등              │
+│  - 이 프로젝트에선 시뮬레이터로 외부 PG 역할             │
+└────────────────────────────────────────────────────────┘
+```
+
+### 아키텍처 다이어그램
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              External Client (Vendor/Customer)               │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTP
+                         ↓
+              ┌──────────────────────┐
+              │  ecommerce-service   │  ← 벤더용 SaaS 쇼핑몰
+              │  (PORT: 8081)        │     Product Catalog (Read)
+              │  [PUBLIC]            │     Cart, Order (전표)
+              └──────┬───────────────┘     User (CUSTOMER/VENDOR)
+                     │
+          ┌──────────┼──────────┐
+          │ 경로 A    │ 경로 B   │
+          │ (직접)   │ (중개)   │
+          ↓          ↓          │
+    ┌─────────┐  ┌──────────────┴───────┐
+    │ 외부 PG │  │ cash-gateway-service │  ← 결제 방화벽/중개
+    │ (직접)  │  │  (PORT: 8082)        │     PaymentAttempt (Source of Truth)
+    └────┬────┘  │  [INTERNAL ADMIN]    │     복잡한 결제 로직/검증
+         │       └──────┬───────────────┘     정산 수수료 계산
+         │ Webhook     │
+         └─────────────┤
+                       │ HTTP (PG 통신)
+                       ↓
+              ┌─────────────────┐
+              │  hamster-pg      │  ← 외부 PG 시뮬레이터
+              │  (PORT: 8083)    │     (실제론 Hamster 소유 아님)
+              │  [EXTERNAL]      │     토스/이니시스 등 역할
+              └─────────────────┘
+                       │ Webhook
+                       ↓
+              ┌──────────────────────┐
+              │ cash-gateway-service │
+              │   (결과 수신)         │
+              └──────┬───────────────┘
+                     │ Kafka Events
+                     ↓
+              ┌─────────────────────┐
+              │ payment-service     │  ← 정산/재고/권한 (내부 전용)
+              │  (PORT: 8084)       │     Stock Management (Write)
+              │  [INTERNAL ONLY]    │     Event Sourcing (ProductRecord)
+              │  REACTIVE ONLY      │     Pessimistic Lock
+              └──────┬──────────────┘
+                     │ Kafka Events
+                     ↓
+              ┌──────────────────────┐
+              │  ecommerce-service   │  ← Consumer (재고 싱크)
+              └──────────────────────┘
+```
+
+### 서비스 역할
+
+| 서비스 | 노출 대상 | 역할 | 비고 |
+|--------|----------|------|------|
+| **ecommerce-service** | 🌐 외부 (벤더/고객) | 벤더용 SaaS 쇼핑몰 | Product Catalog, Cart, Order |
+| **cash-gateway-service** | 🔒 내부 (운영진) | 결제 방화벽/중개 | PaymentAttempt (Source of Truth) |
+| **payment-service** | 🔒 내부 (운영진) | 정산/재고/권한 | Event Sourcing, Kafka Only |
+| **hamster-pg** | 🌐 외부 (제3자 PG) | 외부 PG 시뮬레이터 | 실제론 토스/이니시스 등 |
+
+### 핵심 특징
+- ✅ **결제 중개 플랫폼**: 벤더들이 직접 PG 계약 또는 Hamster 중개 선택 가능
+- ✅ **DDD (Domain-Driven Design)**: Aggregate Root + Domain Events
+- ✅ **Event Sourcing**: ProductRecord 기반 재고 이력 추적
+- ✅ **CQRS**: Ecommerce (Read) vs Payment (Write) 분리
+- ✅ **Eventual Consistency**: Kafka 기반 재고 동기화
+- ✅ **Reactive Architecture**: Payment Service는 Kafka만 구독 (HTTP 노출 안 함)
+
+---
+
+## 🎯 핵심 아키텍처 결정사항
+
+---
+
+## ⚠️ **CRITICAL: Public ID 정책 (절대 압축/스킵 금지!)** ⚠️
+
+> **🚨 다음 Claude 세션에게:**
+>
+> **이 섹션은 절대로 요약하거나 압축하거나 스킵하지 마세요!**
+>
+> 이 정책을 위반하면 클라이언트에 Internal PK가 노출되어 보안 문제가 발생합니다.
+> 모든 Response DTO 작성 시 반드시 이 규칙을 따라야 합니다.
+
+### 📋 규칙: 서버 → 클라이언트 응답 시 Long ID 노출 금지
+
+**절대 원칙:**
+```
+✅ 서버 → 클라이언트: Public ID (Snowflake Base62)만 반환
+❌ 서버 → 클라이언트: Long Internal PK 노출 금지
+```
+
+**적용 범위:**
+- 모든 HTTP Response DTO
+- 모든 Kafka Event Payload (외부 시스템 전달용)
+- 모든 클라이언트가 볼 수 있는 데이터
+
+**예외 (Long ID 허용):**
+- 서버 내부 도메인 모델
+- Repository 레이어
+- Service 레이어 (도메인 모델 간 통신)
+- Database 스키마
+
+### 🔍 잘못된 예시 vs 올바른 예시
+
+#### ❌ 잘못된 Response DTO
+```kotlin
+// BAD: Internal PK 노출
+data class OrderResponse(
+    val id: Long,              // ❌ Internal PK 노출
+    val userId: Long,          // ❌ Foreign Key 노출
+    val orderNumber: String,
+    val totalPrice: BigDecimal
+)
+```
+
+#### ✅ 올바른 Response DTO
+```kotlin
+// GOOD: Public ID만 노출
+data class OrderResponse(
+    val orderPublicId: String,     // ✅ Public ID (Snowflake Base62)
+    val userPublicId: String,      // ✅ User의 Public ID
+    val orderNumber: String,
+    val totalPrice: BigDecimal
+) {
+    companion object {
+        fun from(order: Order, user: User): OrderResponse {
+            return OrderResponse(
+                orderPublicId = order.publicId,
+                userPublicId = user.publicId,  // User 조회 필요
+                orderNumber = order.orderNumber,
+                totalPrice = order.totalPrice
+            )
+        }
+    }
+}
+```
+
+### 🛠️ Response DTO 작성 가이드
+
+#### 1. Long FK를 Public ID로 변환하는 패턴
+
+**Service 레이어에서 Batch 조회:**
+```kotlin
+@Service
+class BoardService(...) {
+
+    @Transactional(readOnly = true)
+    fun searchPage(request: BoardSearchRequest): Page<BoardWithPublicIds> {
+        val boardsPage = boardRepository.searchPage(request)
+
+        // Batch 조회로 N+1 방지
+        val productIds = boardsPage.content.map { it.productId }.distinct()
+        val authorIds = boardsPage.content.map { it.authorId }.distinct()
+
+        val products = productRepository.findByIds(productIds).associateBy { it.id!! }
+        val users = userRepository.findByIds(authorIds).associateBy { it.id!! }
+
+        return boardsPage.map { board ->
+            BoardWithPublicIds(
+                board = board,
+                productPublicId = products[board.productId]!!.publicId,
+                authorPublicId = users[board.authorId]!!.publicId
+            )
+        }
+    }
+
+    data class BoardWithPublicIds(
+        val board: Board,
+        val productPublicId: String,
+        val authorPublicId: String
+    )
+}
+```
+
+**Controller에서 Response 생성:**
+```kotlin
+@RestController
+class BoardController(...) {
+
+    @GetMapping("/page")
+    fun searchBoardsPage(request: BoardSearchRequest): ResponseEntity<Page<BoardResponse>> {
+        val boards = boardService.searchPage(request)
+
+        val responses = boards.map {
+            BoardResponse.from(
+                it.board,
+                it.productPublicId,
+                it.authorPublicId
+            )
+        }
+
+        return ResponseEntity.ok(responses)
+    }
+}
+```
+
+#### 2. Repository에 findByIds() 메서드 필수
+
+**모든 Repository에 Batch 조회 메서드 추가:**
+```kotlin
+@Repository
+class UserRepository(...) {
+
+    fun findByIds(ids: List<Long>): List<User> {
+        if (ids.isEmpty()) return emptyList()
+        return jpaQueryFactory
+            .selectFrom(user)
+            .where(user.id.`in`(ids))
+            .fetch()
+    }
+}
+```
+
+### 📝 체크리스트 (Response DTO 작성 시)
+
+**새로운 Response DTO 작성 전 확인:**
+- [ ] Long 타입 ID 필드가 있는가? → 제거 또는 Public ID로 변경
+- [ ] Long 타입 FK 필드가 있는가? → 해당 엔티티의 Public ID로 변경
+- [ ] `from()` 팩토리 메서드에서 필요한 엔티티를 모두 받는가?
+- [ ] Service에서 Batch 조회로 N+1을 방지하는가?
+- [ ] Repository에 `findByIds()` 메서드가 있는가?
+
+**기존 Response DTO 수정 시 확인:**
+- [ ] 기존 Long ID 필드를 Public ID로 변경했는가?
+- [ ] 클라이언트 코드가 영향받지 않도록 필드명을 적절히 변경했는가?
+- [ ] API 문서를 업데이트했는가?
+
+### 🔧 Migration 예시 (Board/Comment)
+
+**Before (잘못된 구현):**
+```kotlin
+// ❌ Long ID 노출
+data class BoardResponse(
+    val publicId: String,
+    val productPublicId: String,
+    val authorPublicId: String,
+    // ...
+) {
+    companion object {
+        fun from(board: Board): BoardResponse {
+            return BoardResponse(
+                publicId = board.publicId,
+                productPublicId = board.productId.toString(),  // ❌ Long → String 단순 변환
+                authorPublicId = board.authorId.toString(),    // ❌ Long → String 단순 변환
+                // ...
+            )
+        }
+    }
+}
+```
+
+**After (올바른 구현):**
+```kotlin
+// ✅ Public ID만 노출
+data class BoardResponse(
+    val publicId: String,
+    val productPublicId: String,
+    val authorPublicId: String,
+    val commentCount: Int,
+    // ...
+) {
+    companion object {
+        fun from(
+            board: Board,
+            productPublicId: String,  // ✅ 이미 변환된 Public ID
+            authorPublicId: String,   // ✅ 이미 변환된 Public ID
+            commentCount: Int
+        ): BoardResponse {
+            return BoardResponse(
+                publicId = board.publicId,
+                productPublicId = productPublicId,
+                authorPublicId = authorPublicId,
+                commentCount = commentCount,
+                // ...
+            )
+        }
+    }
+}
+
+// Service에서 Public ID 변환
+@Service
+class BoardService(...) {
+    fun searchPage(request: BoardSearchRequest): Page<BoardWithPublicIds> {
+        val boards = boardRepository.searchPage(request)
+
+        val productIds = boards.content.map { it.productId }.distinct()
+        val authorIds = boards.content.map { it.authorId }.distinct()
+
+        val products = productRepository.findByIds(productIds).associateBy { it.id!! }
+        val users = userRepository.findByIds(authorIds).associateBy { it.id!! }
+
+        return boards.map { board ->
+            BoardWithPublicIds(
+                board = board,
+                productPublicId = products[board.productId]!!.publicId,
+                authorPublicId = users[board.authorId]!!.publicId,
+                commentCount = commentRepository.countByBoardId(board.id!!)
+            )
+        }
+    }
+}
+```
+
+### 🚨 위반 시 문제점
+
+1. **보안 문제**: Internal PK 노출로 DB 구조 추측 가능
+2. **Migration 불가**: Auto-increment PK는 변경 불가 (vs Public ID는 변경 가능)
+3. **스케일링 제약**: Sharding 시 PK 충돌 가능성
+4. **클라이언트 의존성**: DB PK 변경 시 클라이언트 코드 영향
+
+### 📚 참고 파일
+
+**Public ID 올바르게 적용된 예시:**
+- `/Users/mac/IdeaProjects/hamster-world/ecommerce-service/src/main/kotlin/com/hamsterworld/ecommerce/app/board/response/BoardResponse.kt`
+- `/Users/mac/IdeaProjects/hamster-world/ecommerce-service/src/main/kotlin/com/hamsterworld/ecommerce/app/comment/response/CommentResponse.kt`
+- `/Users/mac/IdeaProjects/hamster-world/ecommerce-service/src/main/kotlin/com/hamsterworld/ecommerce/domain/board/service/BoardService.kt`
+- `/Users/mac/IdeaProjects/hamster-world/ecommerce-service/src/main/kotlin/com/hamsterworld/ecommerce/domain/comment/service/CommentService.kt`
+
+---
+
+### 1. **Product + Stock은 분리 불가**
+```
+✅ Product.stock은 Product의 일부
+✅ 같은 트랜잭션에서 재고 차감 (원자성)
+❌ 분리 시 Race Condition → 초과 판매 발생
+```
+
+**근거:**
+```kotlin
+@Transactional
+fun reserveStock(productId: Long, quantity: Int) {
+    val product = productRepository.findByIdForUpdate(productId)  // Pessimistic Lock
+    if (product.stock < quantity) throw InsufficientStockException()
+    product.stock -= quantity  // 같은 트랜잭션!
+}
+```
+
+### 2. **Order vs PaymentAttempt (Source of Truth)**
+
+| 도메인 | 역할 | 중요도 |
+|--------|------|--------|
+| **Order** (ecommerce) | 사용자 전표/영수증 | UI용 데이터 |
+| **PaymentAttempt** (cash-gateway) | 실제 거래 기록 | Source of Truth ⭐ |
+
+**핵심:**
+- Order = 사용자가 "내 주문 내역" 볼 때만 사용
+- PaymentAttempt = PG 요청/응답 추적, 재고 차감의 트리거
+- **Payment Service는 Order를 전혀 모름!**
+
+### 3. **Payment Service는 리액티브 전용**
+```
+✅ Kafka 이벤트 구독만 허용
+❌ HTTP API 호출 금지
+❌ Order 직접 참조 금지
+```
+
+**의존 관계:**
+```
+Payment Service가 아는 것:
+  ✅ paymentAttemptId
+  ✅ productId, quantity (이벤트로 전달받음)
+  ✅ Product, Stock
+
+Payment Service가 모르는 것:
+  ❌ Order
+  ❌ User
+  ❌ Cart
+```
+
+### 4. **재고 선차감 전략 (Pre-deduction)**
+
+```
+선차감 시점: PaymentAttempt 생성 시 (PG 요청 전)
+복구 시점: PG 실패 또는 취소 시
+```
+
+**플로우:**
+```
+1. PaymentAttempt 생성
+   ↓ Kafka: StockReservationRequestedEvent
+2. Payment Service: 재고 차감 (선차감)
+   ↓ Kafka: StockReservedEvent
+3. Cash Gateway: PG 요청
+   ↓
+4-a. PG 성공 → 재고 확정 (로그만, 이미 차감됨)
+4-b. PG 실패 → 재고 복구 (+)
+4-c. PG 취소 → 재고 복구 (+)
+```
+
+**멱등성 보장:**
+```kotlin
+// ProductRecord reason에 attemptId 포함
+"[선차감] attemptId=${paymentAttemptId}"
+"[복구] attemptId=${paymentAttemptId}"
+
+// 중복 처리 방지
+if (existsByReason("[선차감] attemptId=$attemptId")) {
+    log.warn("Already processed")
+    return
+}
+```
+
+---
+
+## 서비스 구성
+
+### 1. **ecommerce-service** (PORT: 8081) 🌐 PUBLIC
+**역할:** 벤더용 SaaS 쇼핑몰 (외부 노출)
+- 장바구니 (Cart, CartItem)
+- **주문 관리 (Order, OrderItem)** ← 전표/영수증 용도
+- 사용자 인증 (User)
+  - `role: CUSTOMER` (일반 구매자)
+  - `role: VENDOR` (쇼핑몰 사업자)
+
+**특징:**
+- 🌐 **PUBLIC 서비스** (벤더/고객 모두 접근)
+- 2가지 결제 경로 제공:
+  - **경로 A (직접 PG)**: 벤더가 PG 직접 계약 (낮은 수수료)
+  - **경로 B (Hamster 중개)**: Cash Gateway 경유 (높은 수수료)
+- 재고는 읽기 전용 캐시 (Payment Service로부터 동기화)
+- Order는 단순 전표/영수증 용도
+
+**📖 상세 문서:** [ecommerce-service/README.md](./ecommerce-service/README.md)
+
+**Order의 역할:**
+```
+✅ 사용자가 주문 내역 조회
+✅ Cash Gateway에 전달되는 메타데이터
+❌ 재고 차감 기준 (X) ← Payment Service 담당
+❌ 거래의 Source of Truth (X) ← Cash Gateway 담당
+```
+
+**Frontend:**
+```
+Vendor Admin Portal
+├─ 상품 관리 (VENDOR)
+├─ 주문 내역 조회
+├─ 정산 내역 조회 (읽기 전용)
+└─ 결제 경로 설정 (직접/중개)
+```
+
+---
+
+### 2. **cash-gateway-service** (PORT: 8082) 🔒 INTERNAL ADMIN
+**역할:** 결제 방화벽 + 중개 플랫폼 (Source of Truth ⭐)
+- **PaymentAttempt** - PG 통신 이력 (Mutable, 1:1)
+- **Payment** - 불변 거래 기록 (Immutable)
+- **PgMerchantMapping** - MID와 거래 출처 매핑
+- PG사 연동 (동기/비동기 지원)
+- 외부 파트너 정산 기록
+- MID 기반 거래 출처 자동 판별
+- 복잡한 결제 로직/검증 처리
+- 정산 수수료 계산
+
+**특징:**
+- 🔒 **INTERNAL ADMIN** (Hamster World 운영진만 접근)
+- 모든 결제 이벤트의 집합점 (경로 A/B 모두)
+- Payment Service에 Kafka 이벤트 발행
+- 사용자는 직접 접근 불가 (Ecommerce를 통해서만)
+
+**📖 상세 문서:** [cash-gateway-service/README.md](./cash-gateway-service/README.md)
+
+**3가지 운영 모드:**
+```
+1. Active Mode (PG 대행 - 경로 B)
+   Ecommerce → Cash Gateway → PG → Webhook → Payment
+
+2. Webhook Mode (외부 거래 - 경로 A)
+   외부 PG → Webhook → Cash Gateway → Payment
+
+3. Passive Mode (정산 기록)
+   Partner Service → /record API → Cash Gateway → Payment
+```
+
+**아키텍처 원칙:**
+```
+✅ PaymentAttempt: 모든 Payment는 Attempt 필수 (1:1)
+✅ PaymentAttempt: Mutable (UNKNOWN → SUCCESS via CAS)
+✅ Payment: Immutable (취소도 새 레코드, originPaymentId)
+✅ 멱등성: pgTransaction (UNIQUE 제약)
+❌ Event Sourcing 아님 (Payment가 독립 거래)
+```
+
+**PaymentAttempt 구조:**
+```kotlin
+PaymentAttempt(
+    id: Long,
+    orderId: Long?,  // nullable (외부 거래)
+    userId: Long?,
+    provider: Provider?,
+    mid: String,  // MID (Merchant ID)
+    amount: BigDecimal,
+    status: PaymentAttemptStatus,  // UNKNOWN, SUCCESS, FAILED, CANCELLED
+    pgTransaction: String?,  // 멱등성 키 (tid or externalTxnId)
+    isExternal: Boolean,  // Webhook/Passive 구분
+    originSource: String?,  // null = 내부, "partner-a" = 외부
+    originAttemptId: Long?  // 취소 시 원본 Attempt
+)
+```
+
+**Payment 구조 (불변):**
+```kotlin
+Payment(
+    id: Long,
+    attemptId: Long,  // PaymentAttempt FK (1:1)
+    mid: String?,  // MID (Merchant ID)
+    amount: BigDecimal,  // 양수(승인) or 음수(취소)
+    status: PaymentStatus,  // APPROVED, CANCELLED
+    originPaymentId: Long?,  // 취소건이면 원본 Payment
+    isExternal: Boolean,
+    originSource: String?  // null = 내부, "partner-a" = 외부
+)
+
+// 현재 잔액 = SUM(amount) WHERE id = 1 OR originPaymentId = 1
+```
+
+**Frontend:**
+```
+Internal Admin Portal (Cash Gateway 섹션)
+├─ 💳 결제 모니터링 (실시간)
+├─ 🔧 PG 설정 관리
+├─ 📊 정산 처리
+├─ 🔍 Webhook 로그 조회
+└─ 🏪 가맹점(MID) 관리
+```
+
+---
+
+### 3. **payment-service** (PORT: 8084) 🔒 INTERNAL ONLY
+**역할:** 정산/재고/권한 관리 (완전 내부 전용)
+- **Product** - 상품 마스터 (stock 포함)
+- **ProductRecord** - 재고 변동 이력 (이벤트 소싱 - Delta 방식)
+- **OrderSnapshot** - 주문 스냅샷 (결제 취소 시 재고 복원용)
+- 재고 트랜잭션 추적 (멱등성)
+- 정산 계산 로직
+- 권한 관리
+
+**특징:**
+- 🔒 **INTERNAL ONLY** (HTTP API 노출 안 함!)
+- **리액티브 전용** - Kafka 이벤트만 구독
+- Order 직접 참조 금지
+- Two-Phase Locking (Deadlock 방지)
+- Event Sourcing (ProductRecord - Delta 방식)
+- **사용자는 존재조차 모르는 서비스** (Ecommerce를 통해 간접 사용)
+
+**📖 상세 문서:** [payment-service/README.md](./payment-service/README.md)
+
+**구독 이벤트:**
+```kotlin
+@KafkaListener("ecommerce-events")
+fun handleOrderCreated(event: OrderCreatedEvent) {
+    // 재고 검증 + 선차감 (Two-Phase Locking)
+    // → OrderSnapshot 저장
+    // → OrderStockReservedEvent 발행
+}
+
+@KafkaListener("cash-gateway-events")
+fun handlePaymentCancelled(event: PaymentCancelledEvent) {
+    // OrderSnapshot 조회
+    // → 재고 복원 (+)
+}
+```
+
+**이벤트 소싱 (Delta 방식):**
+```sql
+-- ProductRecord (변화량 저장)
+INSERT INTO product_records (product_id, stock, reason)
+VALUES (1, +100, '초기 재고 설정');
+
+INSERT INTO product_records (product_id, stock, reason)
+VALUES (1, -5, '[주문 차감] orderId=123');
+
+INSERT INTO product_records (product_id, stock, reason)
+VALUES (1, +5, '[결제 취소 복원] orderId=123');
+
+-- Product.stock = SUM(ProductRecord.stock)
+-- 재집계: 100 - 5 + 5 = 100
+```
+
+**OrderSnapshot 구조:**
+```
+product_order_snapshots (부모)
+  - order_id, order_number, user_id, total_price
+
+product_order_snapshot_items (자식, FK 없음)
+  - snapshot_id, product_id, quantity, price
+```
+
+**Frontend:**
+```
+Internal Admin Portal (Payment 섹션)
+├─ 📦 재고 관리 (전체 재고 현황)
+├─ 📝 재고 조정 이력 (Event Sourcing)
+├─ 💰 정산 계산 관리
+└─ 🔐 권한 설정
+```
+
+---
+
+### 4. **hamster-pg-service** (PORT: 8083) 🌐 EXTERNAL (시뮬레이터)
+**역할:** 외부 PG 시뮬레이터 (실제론 Hamster 소유 아님)
+- 가맹점 관리 (PgMid)
+- 결제 처리 (Payment)
+- Webhook 전송
+
+**특징:**
+- 🌐 **EXTERNAL** (제3자 PG 역할)
+- 실제 서비스에선 **토스페이먼츠, 이니시스, NHN KCP** 등
+- 이 프로젝트에선 시뮬레이터로 외부 PG 역할 수행
+- 비동기 처리 (Scheduler 기반, 1초 폴링)
+- HMAC-SHA256 인증
+- Hamster World와 **독립된 서비스**로 간주
+
+**📖 상세 문서:** [hamster-pg-service/README.md](./hamster-pg-service/README.md)
+
+**API 엔드포인트:**
+```
+POST   /api/payment       결제 생성/취소
+GET    /api/payment/list  결제 내역 조회
+POST   /api/mid           가맹점 생성
+GET    /api/mid/list      가맹점 목록
+```
+
+**주의:**
+- 이 서비스는 Hamster World의 일부가 **아님**
+- 실제 환경에선 토스/이니시스 등 외부 PG사 API
+- 학습/테스트 목적으로만 프로젝트에 포함
+
+---
+
+## 핵심 아키텍처 원칙
+
+### 1. 이벤트 기반 통신
+```
+동기 (HTTP):
+  - ecommerce → cash-gateway
+  - cash-gateway → hamster-pg
+
+비동기 (Kafka):
+  - cash-gateway → payment-service (리액티브 전용!)
+```
+
+### 2. 멱등성 보장
+```
+키: paymentAttemptId
+
+방법:
+  - ProductRecord.reason에 attemptId 포함
+  - 중복 처리 시 WARN 로그 후 스킵
+  - 이벤트 소싱으로 재집계 가능
+```
+
+### 3. 바운드 컨텍스트 분리
+
+| 도메인 | 소유 서비스 | 역할 | 접근 방법 |
+|--------|------------|------|----------|
+| **Order** | ecommerce-service | 전표/영수증 | 이벤트로만 전달 |
+| **PaymentAttempt** | cash-gateway-service | Source of Truth | 이벤트 발행 |
+| **Product + Stock** | payment-service | 재고 관리 | 이벤트로만 반응 |
+| **Payment** | hamster-pg-service | PG 처리 | Webhook |
+
+### 4. 진실의 원천 (Source of Truth)
+```
+PaymentAttempt (cash-gateway) ⭐
+    ↓ Kafka Events
+Payment Service (재고 차감/복구)
+    ↓
+Product + Stock (실제 재고)
+```
+
+---
+
+## 전체 플로우 상세
+
+### 재고 선차감 + 결제 성공 케이스
+```
+1. [사용자] → ecommerce: 주문 생성
+   - Order 생성 (DB 저장, 전표용)
+
+2. [ecommerce] → cash-gateway: 결제 요청 (HTTP)
+   - orderId, items: [{productId, quantity, price}], totalAmount
+
+3. [cash-gateway] PaymentAttempt 생성
+   - status: STOCK_RESERVATION_PENDING
+   - Kafka 발행: StockReservationRequestedEvent
+     {
+       paymentAttemptId: 123,
+       items: [{productId: 1, quantity: 5}]
+     }
+
+4. [payment-service] 재고 선차감 (Kafka 구독)
+   - Product.stock -= 5
+   - ProductRecord INSERT: (product_id=1, stock=-5, reason="[선차감] attemptId=123")
+   - Kafka 발행: StockReservedEvent(attemptId=123)
+
+5. [cash-gateway] 재고 예약 성공 (Kafka 구독)
+   - PaymentAttempt.status = STOCK_RESERVED
+   - hamster-pg 요청 (HTTP)
+
+6. [hamster-pg] → 202 Accepted (PENDING)
+   - Scheduler 1초 후 처리 → COMPLETED (80% 확률)
+   - Webhook 전송: cash-gateway
+
+7. [cash-gateway] Webhook 수신
+   - Payment 생성 (status: APPROVED)
+   - Kafka 발행: PaymentCompletedEvent(attemptId=123)
+
+8. [payment-service] 재고 확정 (Kafka 구독)
+   - 로그만: "Payment completed: attemptId=123, 재고 확정"
+   - 이미 선차감했으므로 추가 작업 없음
+```
+
+### 재고 선차감 + 결제 실패 케이스
+```
+1~4. (위와 동일) 재고 선차감 완료
+
+5. [cash-gateway] → hamster-pg 요청
+
+6. [hamster-pg] → FAILED (20% 확률)
+   - Webhook 전송: cash-gateway
+
+7. [cash-gateway] Webhook 수신
+   - PaymentAttempt.status = FAILED
+   - Kafka 발행: PaymentFailedEvent(attemptId=123)
+
+8. [payment-service] 재고 복구 (Kafka 구독)
+   - ProductRecord에서 "[선차감] attemptId=123" 조회
+   - Product.stock += 5 (복구)
+   - ProductRecord INSERT: (product_id=1, stock=+5, reason="[복구] attemptId=123")
+```
+
+### 결제 취소 케이스
+```
+1. [사용자] → ecommerce: 취소 요청
+
+2. [ecommerce] → cash-gateway: 취소 요청
+
+3. [cash-gateway] → hamster-pg: PG 취소 요청
+
+4. [hamster-pg] → 202 Accepted (CANCEL_PENDING)
+   - Scheduler 처리 → CANCELLED
+   - Webhook 전송
+
+5. [cash-gateway] Webhook 수신
+   - Payment 생성 (status: CANCELLED)
+   - Kafka 발행: PaymentCancelledEvent(attemptId=123)
+
+6. [payment-service] 재고 복구 (Kafka 구독)
+   - ProductRecord 조회: "[선차감] attemptId=123"
+   - Product.stock += 5
+   - ProductRecord INSERT: "[복구] attemptId=123"
+```
+
+---
+
+## 기술 스택
+
+### Backend
+- **언어:** Kotlin
+- **프레임워크:** Spring Boot 3.x
+- **빌드:** Gradle (Multi-module)
+
+### Database
+- **MySQL** (각 서비스별 독립 DB)
+  - ecommerce_db (PORT: 3306)
+  - cash_gateway_db (PORT: 3307)
+  - payment_db (PORT: 3308)
+  - hamster_pg_db (PORT: 3309)
+
+### Messaging
+- **Kafka** (KRaft mode, Zookeeper 불필요)
+  - PORT: 9092
+  - Topics:
+    - `stock-reservation-requests`
+    - `stock-reserved`
+    - `stock-reservation-failed`
+    - `payment-completed`
+    - `payment-failed`
+    - `payment-cancelled`
+
+### Common
+- JPA/Hibernate
+- QueryDSL
+- Jackson (JSON)
+- WebClient (비동기 HTTP)
+
+---
+
+## 개발 환경 설정
+
+### 1. 필수 요구사항
+```bash
+- JDK 21
+- Docker & Docker Compose
+- Gradle 8.x
+```
+
+### 2. Docker 인프라 실행
+```bash
+# 모든 인프라 시작 (DB + Kafka)
+docker-compose up -d
+
+# 상태 확인
+docker-compose ps
+```
+
+### 3. 데이터베이스 초기화
+```bash
+# 각 서비스 db/ 디렉토리의 SQL 실행
+mysql -h 127.0.0.1 -P 3309 -u root -p'12555!@' hamster_pg_db < hamster-pg-service/db/pg_mids.sql
+mysql -h 127.0.0.1 -P 3309 -u root -p'12555!@' hamster_pg_db < hamster-pg-service/db/payments.sql
+```
+
+### 4. 애플리케이션 실행
+```bash
+# 각 서비스 개별 실행
+./gradlew :hamster-pg-service:bootRun
+./gradlew :ecommerce-service:bootRun
+./gradlew :cash-gateway-service:bootRun
+./gradlew :payment-service:bootRun
+```
+
+---
+
+## 프로젝트 구조
+
+```
+hamster-world/
+├── common/                      # 공통 모듈
+│   └── src/main/kotlin/
+│       └── com/hamsterworld/common/
+│           ├── domain/abs/      # AbsDomain, AbsDomainRoot
+│           ├── app/             # AppSearchQuery, AppPagedSearchQuery
+│           └── web/             # Exception, Resolver, QuerydslExtension
+│
+├── ecommerce-service/
+│   └── src/main/kotlin/.../ecommerce/
+│       ├── domain/
+│       │   ├── cart/           # Cart, CartItem
+│       │   ├── order/          # Order, OrderItem (전표용)
+│       │   └── user/           # User, Auth
+│       └── app/
+│
+├── cash-gateway-service/       ⭐ Source of Truth
+│   └── src/main/kotlin/.../cashgateway/
+│       ├── domain/
+│       │   ├── payment/        # Payment (최종 승인/취소)
+│       │   └── paymentattempt/ # PaymentAttempt (PG 요청/응답)
+│       └── app/
+│
+├── payment-service/            ⭐ 재고 관리 (리액티브)
+│   ├── README.md               ← 상세 문서
+│   └── src/main/kotlin/.../payment/
+│       ├── domain/
+│       │   ├── product/        # Product (stock 포함)
+│       │   ├── productrecord/  # ProductRecord (이벤트 소싱)
+│       │   └── ordersnapshot/  # OrderSnapshot (결제 취소용)
+│       └── consumer/           # Kafka Consumers
+│
+└── hamster-pg-service/         ⭐ PG 시뮬레이터
+    ├── README.md               ← 상세 문서
+    ├── db/
+    │   ├── pg_mids.sql
+    │   └── payments.sql
+    └── src/main/kotlin/.../hamsterpg/
+        ├── domain/
+        │   ├── payment/        # Payment 도메인
+        │   ├── pgmid/          # PgMid 도메인
+        │   └── notification/   # Webhook 전송
+        ├── infra/
+        └── app/
+```
+
+---
+
+## 🔥 다음 세션 작업 인수인계
+
+### ✅ 완료된 작업 (2026-02-02 세션 - 최신)
+
+#### **Public ID 마이그레이션 + QueryDSL Repository 패턴 통일** ✅
+
+**1. Public ID 마이그레이션 (Response DTO 정리)**
+- ✅ **모든 Response DTO에서 Internal PK 제거**
+  - Long Internal PK → String Public ID로 변경
+  - 클라이언트 API에서 Internal PK 노출 방지
+
+**변경된 파일:**
+```
+cash-gateway-service:
+  - CashGatewayResponse.kt: attemptId (Long) → attemptPublicId (String)
+  - PaymentResponse.kt: paymentId, attemptId, originPaymentId (Long) → Public IDs
+  - PaymentController.kt: Public ID 조회 로직 추가
+
+ecommerce-service:
+  - MerchantResponse.kt: merchantId, userId (Long) → Public IDs
+  - MerchantController.kt: user.publicId 전달
+  - OrderSearchRequest.kt: AppPagedSearchQuery 상속으로 리팩토링
+  - OrderController.kt: /list, /page 엔드포인트 분리
+  - OrderService.kt: LocalDate → LocalDateTime 변환 제거 (QuerydslExtension.between 활용)
+  - OrderRepository.kt: baseQuery 패턴 적용
+```
+
+**2. QueryDSL Repository 패턴 통일 (전체 서비스)**
+
+**핵심 패턴:**
+```kotlin
+// baseQuery() 패턴
+private fun baseQuery(request: SearchRequest): JPAQuery<Entity> {
+    return jpaQueryFactory
+        .selectFrom(qEntity)
+        .where(*searchConditions(request).toTypedArray())
+}
+
+// searchConditions() 분리
+private fun searchConditions(request: SearchRequest): List<BooleanExpression> {
+    return listOfNotNull(
+        QuerydslExtension.eqOrNull(qEntity.field, request.field),
+        QuerydslExtension.between(qEntity.createdAt, request.from, request.to),
+        QuerydslExtension.inOrNullSafe(qEntity.publicId, request.publicIds),
+        QuerydslExtension.match(qEntity.name, request.name, request.match)
+    )
+}
+
+// List 조회
+fun searchList(request: SearchRequest): List<Entity> {
+    val query = baseQuery(request)
+    return QuerydslExtension.applySorts(query, qEntity.createdAt, request.sort)
+        .fetch()
+}
+
+// Page 조회
+fun searchPage(request: SearchRequest): Page<Entity> {
+    val baseQuery = baseQuery(request)
+
+    // Count query (deprecated fetchCount() 제거)
+    val total = jpaQueryFactory
+        .select(qEntity.count())
+        .from(qEntity)
+        .where(*searchConditions(request).toTypedArray())
+        .fetchOne() ?: 0L
+
+    val pagedQuery = baseQuery
+        .offset((request.page * request.size).toLong())
+        .limit(request.size.toLong())
+
+    val entities = QuerydslExtension.applySorts(pagedQuery, qEntity.createdAt, request.sort)
+        .fetch()
+
+    return PageImpl(entities, PageRequest.of(request.page, request.size), total)
+}
+```
+
+**리팩토링된 Repository 목록:**
+
+1. **OrderRepository (ecommerce-service)** ✅
+   - `baseUserOrderQuery()`, `baseVendorOrderQuery()` 추가
+   - deprecated `fetchCount()` 제거 → `select(count())` / `select(countDistinct())` 사용
+   - `searchUserOrderConditions()`, `searchVendorOrderConditions()` private 메서드 분리
+
+2. **ProductRepository (ecommerce-service)** ✅
+   - `baseQuery()` 패턴 적용
+   - 비효율적인 `.fetch().size` → `select(count())` 개선
+   - `searchListConditions()` 이미 분리되어 있었음
+
+3. **ProductRepository (payment-service)** ✅
+   - deprecated `fetchCount()` 제거 → `select(count())` 사용
+   - `baseQuery()` 패턴 이미 적용되어 있었음
+
+4. **CartRepository (ecommerce-service)** ✅
+   - deprecated `fetchCount()` 2곳 제거
+   - `baseQuery()` 패턴 이미 적용되어 있었음
+
+5. **BoardRepository (ecommerce-service)** ✅
+   - `baseQuery()` 패턴 적용
+   - 비효율적인 `.fetch().size` → `select(count())` 개선
+
+6. **UserRepository (ecommerce-service)** ✅
+   - `baseQuery()`, `searchConditions()` 패턴 적용
+   - 중복된 조건 코드 제거
+   - 비효율적인 `.fetch().size` → `select(count())` 개선
+
+7. **PaymentRepository (hamster-pg-service)** ✅
+   - **메모리 필터링 → QueryDSL 쿼리로 완전히 재작성** 🔥
+   - `baseQuery()`, `searchConditions()` 패턴 적용
+   - JPAQueryFactory 의존성 추가
+   - 기존: `jpaRepository.findAll()` 후 `filter { matchesSearchCriteria(it, request) }`
+   - 개선: QueryDSL로 DB에서 직접 필터링
+
+8. **PgMidRepository (hamster-pg-service)** ✅
+   - **메모리 필터링 → QueryDSL 쿼리로 완전히 재작성** 🔥
+   - `baseQuery()`, `searchConditions()` 패턴 적용
+   - JPAQueryFactory 의존성 추가
+
+9. **CommentRepository (ecommerce-service)** ✅
+   - 리팩토링 불필요 (페이징 없음, 간단한 쿼리)
+
+10. **PaymentRepository (cash-gateway-service)** ✅
+    - 리팩토링 불필요 (간단한 CRUD만)
+
+**주요 개선 사항:**
+
+✅ **Deprecated 메서드 제거**: `fetchCount()` → `select(count())` 또는 `select(countDistinct())`
+✅ **baseQuery() 패턴 통일**: 모든 검색 Repository에서 일관된 패턴 적용
+✅ **searchConditions() 분리**: 검색 조건을 private 메서드로 분리하여 재사용성 향상
+✅ **메모리 필터링 제거**: hamster-pg-service의 2개 Repository에서 비효율적인 메모리 필터링을 QueryDSL 쿼리로 개선 🔥
+✅ **QuerydslExtension 활용**: `between()`, `eqOrNull()`, `match()`, `applySorts()` 등 공통 유틸리티 메서드 활용
+✅ **Count 쿼리 최적화**: 불필요한 `.fetch().size` 대신 `select(count())` 사용
+✅ **AppPagedSearchQuery 상속**: 모든 SearchRequest가 표준 페이징/정렬 파라미터 상속
+
+**패턴 참고 소스:**
+- `/Users/mac/IdeaProjects/payment-system/src/main/kotlin/com/payment/system/infra/cart/repository/CartRepository.kt`
+- 모든 Repository가 위 CartRepository의 `baseQuery()` + `searchListConditions()` 패턴을 따름
+
+**빌드 결과:**
+```bash
+./gradlew clean build -x test
+# BUILD SUCCESSFUL - 모든 서비스 컴파일 성공
+```
+
+**다음 작업:**
+- N+1 방지 패턴 통일 (Service 레이어에서 Batch 조회 활용)
+- API 응답 DTO에서 누락된 Public ID 필드 추가 검증
+
+---
+
+### ✅ 완료된 작업 (2026-02-01 세션 - 최신 2)
+
+#### **전체 플로우 완성: Order → Stock → Payment → Webhook → Order Update** ✅
+
+**핵심 완성 사항:**
+1. ✅ **orderNumber → gatewayReferenceId 리네이밍 (업계 표준 용어)**
+   - Cash Gateway 고유 거래 식별자로 명확화
+   - Order.orderNumber (고객용) ≠ gatewayReferenceId (PG 매칭용)
+
+2. ✅ **Order 도메인 확장**
+   - `orderNumber`: 고객용 주문번호 (자동 생성: `ORD_20260201_A1B2C3D4`)
+   - `gatewayReferenceId`: Payment 매칭용 (Payment 승인 후 채워짐)
+
+3. ✅ **Ecommerce Consumer 완성**
+   - `CashGatewayEventConsumer.kt` 구현
+   - PaymentApprovedEvent → Order.status = PAYMENT_APPROVED + gatewayReferenceId 저장
+   - PaymentFailedEvent → Order.status = PAYMENT_FAILED
+   - PaymentCancelledEvent → Order.status = CANCELED
+
+**전체 플로우 (완성):**
+```
+[1] Cart → Order 생성
+    - orderNumber 자동 생성: "ORD_20260201123045_A1B2C3D4"
+    - status: CREATED
+    ↓ OrderCreatedEvent
+
+[2] Payment Service: 재고 검증
+    - 성공: OrderStockReservedEvent
+    - 실패: OrderStockValidationFailedEvent → Order.status = PAYMENT_FAILED
+    ↓
+
+[3] Cash Gateway: PG 요청
+    - DomainConverter: OrderStockReservedEventDto → PaymentApproveRequest
+    - PaymentService.approve() 호출
+    - PaymentAttempt 생성 (UNKNOWN)
+    - gatewayReferenceId 자동 생성: "CGW_DUMMY_MID_001_20260201..."
+    - PG HTTP 요청
+    ↓
+
+[4] Webhook 수신
+    - gatewayReferenceId로 PaymentAttempt 찾기
+    - UNKNOWN → SUCCESS/FAILED CAS 업데이트
+    - Payment 생성 (성공 시)
+    ↓ PaymentApprovedEvent / PaymentFailedEvent / PaymentCancelledEvent
+
+[5] Ecommerce Consumer
+    - PaymentApprovedEvent:
+      * order.status = PAYMENT_APPROVED
+      * order.gatewayReferenceId = event.gatewayReferenceId  // ← Payment 매칭
+    - PaymentFailedEvent:
+      * order.status = PAYMENT_FAILED
+    - PaymentCancelledEvent:
+      * order.status = CANCELED
+```
+
+**ID 체계:**
+```
+Order (Ecommerce)
+├─ orderNumber: "ORD_20260201123045_A1B2C3D4"  // 고객용
+├─ gatewayReferenceId: "CGW_DUMMY_MID_001_..."  // Payment 매칭
+└─ status: PAYMENT_APPROVED
+
+PaymentAttempt (Cash Gateway)
+├─ gatewayReferenceId: "CGW_DUMMY_MID_001_..."  // Webhook 매칭용
+├─ pgTransaction (tid): "PG12345678"
+└─ status: SUCCESS
+
+Payment (Cash Gateway)
+├─ gatewayReferenceId: "CGW_DUMMY_MID_001_..."  // Order 매칭
+├─ pgTransaction: "PG12345678"
+└─ pgApprovalNo: "AUTH789"
+
+// 매칭: Order.gatewayReferenceId = Payment.gatewayReferenceId
+```
+
+**트랜잭션 전파 정책 (EDA 최적화):**
+```kotlin
+// Kafka Consumer 진입점
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+BaseKafkaConsumer.consumeEvent()
+
+// 이후 모든 비즈니스 로직
+@Transactional(propagation = Propagation.MANDATORY)
+- Consumer.handleEvent()
+- Service.approve()
+- Protocol.payment()
+- CoreService.handleRequest()
+
+// 장점: PG 실패 시 전체 롤백 → Kafka 재시도 → 멱등성 보장
+```
+
+**구현 파일 (최종):**
+```
+ecommerce-service/
+├── domain/order/
+│   ├── model/Order.kt                    # orderNumber, gatewayReferenceId 추가
+│   └── repository/OrderRepository.kt     # generateOrderNumber()
+├── consumer/
+│   ├── CashGatewayEventConsumer.kt       # 🆕 Cash Gateway 이벤트 처리
+│   └── CashGatewayEventDtos.kt           # 🆕 DTO (3종)
+└── db/orders.sql                          # order_number, gateway_reference_id 컬럼
+
+cash-gateway-service/
+├── domain/
+│   ├── paymentattempt/model/PaymentAttempt.kt  # gatewayReferenceId
+│   ├── payment/model/Payment.kt                # gatewayReferenceId (NOT NULL)
+│   └── payment/event/
+│       ├── PaymentApprovedEvent.kt       # gatewayReferenceId 필드
+│       ├── PaymentFailedEvent.kt
+│       └── PaymentCancelledEvent.kt
+├── external/paymentgateway/abs/
+│   ├── PaymentGatewayProvider.kt         # extractGatewayReferenceId()
+│   └── PaymentGatewayCoreService.kt      # generateGatewayReferenceId()
+└── db/
+    ├── payment_attempts.sql              # gateway_reference_id 컬럼
+    └── payments.sql                      # gateway_reference_id 컬럼
+```
+
+**다음 작업:**
+1. Payment Service Consumer (재고 복원 on PaymentCancelledEvent)
+2. Kafka Producer 설정
+3. 통합 테스트 (전체 플로우)
+
+---
+
+### ✅ 완료된 작업 (2026-02-01 세션 - 최신 1)
+
+#### **Cash Gateway: Domain Event Pattern + Webhook 전용 정책 완료** ✅
+
+**핵심 아키텍처 결정:**
+1. ✅ **Payment는 성공/취소만 기록, 실패는 PaymentAttempt만**
+   - Payment = 성공한 거래만 (APPROVED, CANCELLED)
+   - PaymentAttempt = 모든 시도 기록 (UNKNOWN, SUCCESS, FAILED, CANCELLED)
+   - 실패 시 Payment 생성 안 함 ❌
+
+2. ✅ **Domain Event Pattern 적용**
+   - Payment 엔티티가 자신의 이벤트 관리 (`onCreate()`, `onCancel()`)
+   - CoreService는 실패만 직접 이벤트 발행
+   - Spring Data의 `AbstractAggregateRoot` 활용
+
+3. ✅ **Webhook 전용 정책**
+   - PG 응답 성공해도 Payment 생성 안 함 (null 반환)
+   - 모든 Payment는 Webhook에서만 생성
+   - 동기/비동기 관계없이 일관된 플로우
+
+**구현 완료:**
+1. ✅ **CashGatewayDomainEvent 기본 클래스**
+   - `BaseDomainEvent` 상속
+   - Kafka 토픽: `cash-gateway-events`
+   ```kotlin
+   abstract class CashGatewayDomainEvent(
+       aggregateId: String,
+       eventId: String = UUID.randomUUID().toString(),
+       traceId: String? = null,
+       occurredAt: LocalDateTime = LocalDateTime.now()
+   ) : BaseDomainEvent(topic = "cash-gateway-events")
+   ```
+
+2. ✅ **Payment 이벤트 재설계**
+   - `PaymentApprovedEvent`: Payment 필드 포함 (paymentId, orderId, amount, ...)
+   - `PaymentCancelledEvent`: originPaymentId 포함
+   - `PaymentFailedEvent`: PaymentAttempt 필드만 (Payment 없음!)
+   - `companion object fun from()` 팩토리 메서드
+
+3. ✅ **Payment 엔티티 이벤트 등록**
+   ```kotlin
+   fun onCreate(): Payment {
+       registerEvent(PaymentApprovedEvent.from(this))
+       return this
+   }
+
+   fun onCancel(originPaymentId: Long): Payment {
+       registerEvent(PaymentCancelledEvent.from(this, originPaymentId))
+       return this
+   }
+   ```
+
+4. ✅ **PaymentGatewayCoreService 수정**
+   ```kotlin
+   // 승인
+   private fun createApprovePayment(...): Payment {
+       val payment = Payment(...).onCreate()  // 이벤트 등록
+       return paymentRepository.save(payment)  // save 시 자동 발행
+   }
+
+   // 취소
+   private fun createCancelPayment(...): Payment {
+       val payment = Payment(...).onCancel(originId)
+       return paymentRepository.save(payment)
+   }
+
+   // 실패 (Payment 없음)
+   fun handleResponseFailure(event: PaymentAttempt) {
+       // ...
+       eventPublisher.publishEvent(PaymentFailedEvent.from(event, reason))
+   }
+   ```
+
+5. ✅ **Webhook 전용 정책 적용**
+   ```kotlin
+   // PaymentGatewayClientProtocolCore.payment()
+   override fun payment(paymentCtx: ApprovePaymentCtx): Payment? {
+       // PG 요청
+       val response = pgRestTemplate.exchange(...)
+
+       if (!provider.isSuccess(response)) {
+           throw CustomRuntimeException(...)
+       }
+
+       // 성공해도 Payment 생성 안 함!
+       return null  // Webhook에서만 생성
+   }
+   ```
+
+6. ✅ **orderNumber 자동 생성**
+   ```kotlin
+   // PaymentGatewayCoreService.handleRequest()
+   if (attempt.orderNumber == null) {
+       attempt.orderNumber = generateOrderNumber(
+           provider, mid, LocalDateTime.now()
+       )
+   }
+   // 형식: CGW_{PROVIDER}_{MID}_{TIMESTAMP}_{RANDOM}
+   // 예: CGW_DUMMY_CGW_MID_001_20260201123045_a1b2c3d4
+   ```
+
+7. ✅ **Webhook 내부/외부 거래 구분**
+   ```kotlin
+   override fun handleWebhook(rawPayload: String): Payment? {
+       val orderNumber = provider.extractOrderNumber(response)
+       val mid = provider.extractMid(response) ?: provider.getMid()
+
+       if (orderNumber != null) {
+           // [내부 거래] orderNumber 존재
+           val attempt = findByProviderAndOrderNumberAndMid(
+               provider, orderNumber, mid
+           ) ?: throw CustomRuntimeException(...)
+           return handleInternalWebhook(attempt, response, rawPayload)
+       } else {
+           // [외부 거래] orderNumber 없음 + tid 있음
+           val tid = response.getPgTransaction()
+           val duplicateCheck = findAttemptByTid(tid)
+           if (duplicateCheck != null) return null
+           return handleExternalWebhook(response, rawPayload, tid, mid)
+       }
+   }
+   ```
+
+8. ✅ **DB 스키마 업데이트**
+   ```sql
+   -- payment_attempts
+   is_external BOOLEAN GENERATED ALWAYS AS (order_id IS NULL) STORED,
+   origin_source VARCHAR(100) NOT NULL,
+
+   -- payments
+   mid VARCHAR(100) NOT NULL,
+   origin_source VARCHAR(100) NOT NULL
+   ```
+
+**이벤트 발행 흐름:**
+```
+[성공 케이스]
+PaymentAttempt (SUCCESS)
+  → createApprovePayment()
+    → Payment(...).onCreate()  // 이벤트 등록
+      → paymentRepository.save()
+        → @AfterDomainEventPublication
+          → Kafka: cash-gateway-events
+            → PaymentApprovedEvent
+
+[취소 케이스]
+PaymentAttempt (CANCELLED)
+  → createCancelPayment()
+    → Payment(...).onCancel(originId)
+      → paymentRepository.save()
+        → Kafka: PaymentCancelledEvent
+
+[실패 케이스]
+PaymentAttempt (FAILED)
+  → handleResponseFailure()
+    → eventPublisher.publishEvent(PaymentFailedEvent)
+      → Kafka: PaymentFailedEvent
+```
+
+**다음 단계:**
+1. Kafka Producer 설정
+2. Ecommerce-Service Consumer 구현 (Order 상태 변경)
+3. Payment-Service Consumer 구현 (재고 복원)
+
+---
+
+## 참고 문서
+
+- **Ecommerce Service 상세:** [ecommerce-service/README.md](./ecommerce-service/README.md)
+- **Cash Gateway Service 상세:** [cash-gateway-service/README.md](./cash-gateway-service/README.md)
+- **Payment Service 상세:** [payment-service/README.md](./payment-service/README.md)
+- **Hamster PG Service 상세:** [hamster-pg-service/README.md](./hamster-pg-service/README.md)
+- **Docker Compose:** `docker-compose.yml`
+- **데이터베이스 스키마:** 각 서비스의 `db/` 디렉토리
+- **원본 프로젝트 (참고용):** `/Users/mac/IdeaProjects/payment-system`
+
+---
+
+## 문의
+
+프로젝트 관련 문의사항은 이슈로 등록해주세요.

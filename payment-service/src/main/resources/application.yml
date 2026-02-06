@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: payment-service
+
+  # 공통 설정 Import
+  config:
+    import:
+      - classpath:application-kafka.yml
+      - classpath:application-oauth2.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://localhost:3308/payment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 12555!@
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+server:
+  port: 8084
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.payment: DEBUG
+    org.hibernate.SQL: info
+    org.hibernate.type.descriptor.sql.BasicBinder: info
+    org.springframework.security: DEBUG  # Spring Security 디버그 로그
+
+# Outbox Pattern 설정
+outbox:
+  processor:
+    enabled: true  # OutboxEventProcessor 활성화

@@ -1,0 +1,98 @@
+# Kafka 공통 설정
+# 모든 서비스에서 spring.config.import로 포함하여 사용
+#
+# 사용법:
+# application.yml에 다음 추가:
+# spring:
+#   config:
+#     import: classpath:application-kafka.yml
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9093
+
+    producer:
+      # ========================================
+      # 신뢰성 설정 (at-least-once 보장)
+      # ========================================
+
+      # 모든 replica에 쓰기 완료까지 대기 (가장 안전)
+      acks: all
+
+      # 거의 무한 재시도
+      retries: 2147483647
+
+      # 재시도 간격 (100ms)
+      retry-backoff-ms: 100
+
+      # 멱등성 프로듀서 (중복 제거)
+      enable-idempotence: true
+
+      # 순서 보장 (멱등성 활성화 시 최대 5)
+      max-in-flight-requests-per-connection: 5
+
+      # 타임아웃 설정
+      request-timeout-ms: 30000
+      delivery-timeout-ms: 120000
+
+      # ========================================
+      # 성능 설정
+      # ========================================
+
+      # 배치 크기 (성능 향상)
+      batch-size: 16384
+
+      # 배치 대기 시간
+      linger-ms: 10
+
+      # 압축
+      compression-type: snappy
+
+      # 버퍼 크기
+      buffer-memory: 33554432
+
+      # Serializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # ========================================
+      # 추가 설정
+      # ========================================
+
+      properties:
+        # 메타데이터 최대 age
+        metadata.max.age.ms: 300000
+
+        # 재연결 백오프
+        reconnect.backoff.ms: 50
+        reconnect.backoff.max.ms: 1000
+
+    consumer:
+      # Consumer Group ID (서비스명 자동 사용)
+      # ${spring.application.name}으로 각 서비스의 group-id가 자동 설정됨
+      group-id: ${spring.application.name}
+
+      # 자동 오프셋 커밋 비활성화 (수동 관리)
+      enable-auto-commit: false
+
+      # 오프셋 리셋 정책
+      auto-offset-reset: earliest
+
+      # Deserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+      # Poll 설정
+      max-poll-records: 500
+      max-poll-interval-ms: 300000
+
+      # Fetch 설정
+      fetch-min-size: 1
+      fetch-max-wait-ms: 500
+
+      properties:
+        # Session timeout
+        session.timeout.ms: 30000
+
+        # Heartbeat
+        heartbeat.interval.ms: 3000
