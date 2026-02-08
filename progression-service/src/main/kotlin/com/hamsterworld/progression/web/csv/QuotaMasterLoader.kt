@@ -1,6 +1,7 @@
 package com.hamsterworld.progression.web.csv
 
 import com.hamsterworld.progression.domain.constant.RewardType
+import com.hamsterworld.progression.domain.constant.MissionConditionEmitter
 import com.hamsterworld.progression.domain.mission.constant.MissionType
 import com.hamsterworld.progression.domain.mission.model.MissionCondition
 import com.hamsterworld.progression.domain.quota.constant.CycleType
@@ -59,11 +60,11 @@ class QuotaMasterLoader {
                     quotaType = quotaType,
                     maxLimit = record.get("max_limit").toInt(),
                     condition = condition,
-                    rewardType = if (quotaType == QuotaType.ACTION_REWARD) {
-                        RewardType.valueOf(record.get("reward_type"))
-                    } else null,
-                    rewardAmount = if (quotaType == QuotaType.ACTION_REWARD) {
-                        record.get("reward_amount").toInt()
+                    emitter = if (quotaType == QuotaType.ACTION_REWARD) {
+                        MissionConditionEmitter(
+                            rewardType = RewardType.valueOf(record.get("reward_type")),
+                            rewardAmount = record.get("reward_amount").toInt()
+                        )
                     } else null,
                     sortOrder = record.get("sort_order").toInt()
                 )

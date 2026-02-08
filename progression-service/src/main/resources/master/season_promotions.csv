@@ -1,0 +1,3 @@
+promotion_id,title,description,target_role,start_at,end_at,max_step,condition_type,condition_filters,requirement,sort_order
+SPRING_2025,봄맞이 프로모션,구매할수록 더 많은 포인트!,CUSTOMER,2025-03-01T00:00:00,2025-03-31T23:59:59,20,CREATE_ORDER,{},1,100
+RIDER_PREMIUM_JAN,라이더 프리미엄 이벤트,배달 완료시 추가 리워드,RIDER,2025-01-01T00:00:00,2025-01-31T23:59:59,15,COMPLETE_DELIVERY,{},1,200

@@ -11,6 +11,7 @@ const menuItems = [
   { path: '/merchant', label: '대시보드', icon: '📊' },
   { path: '/merchant/products', label: '상품 관리', icon: '📦' },
   { path: '/merchant/orders', label: '주문 관리', icon: '🛒' },
+  { path: '/merchant/coupons', label: '쿠폰 관리', icon: '🎟️' },
   { path: '/merchant/settlement', label: '정산 관리', icon: '💰' },
   { path: '/merchant/settings', label: '스토어 설정', icon: '⚙️' },
 ]

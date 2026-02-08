@@ -24,3 +24,6 @@ event:
 
         # Quota 이벤트 (Kafka 전송)
         - QuotaClaimedEvent     # Quota 보상 클레임 → Payment Service 소비
+
+        # Season Promotion 이벤트 (Kafka 전송)
+        - SeasonPromotionRewardClaimedEvent   # Season Promotion 보상 클레임 → Payment Service 소비

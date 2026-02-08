@@ -2,6 +2,7 @@ package com.hamsterworld.progression.domain.archive.model
 
 import com.hamsterworld.progression.domain.archive.constant.ArchiveType
 import com.hamsterworld.progression.domain.constant.RewardType
+import com.hamsterworld.progression.domain.constant.MissionConditionEmitter
 import com.hamsterworld.progression.domain.mission.model.MissionCondition
 import com.hamsterworld.progression.domain.mission.constant.ProgressType
 
@@ -43,10 +44,12 @@ data class ArchiveMaster(
     // STAT_BASED용 (통계 키)
     val statKey: String? = null,
 
-    // 보상
-    val rewardType: RewardType,
-    val rewardAmount: Int
+    // 보상 (Emitter 패턴)
+    val emitter: MissionConditionEmitter
 ) {
+    // 하위 호환성을 위한 computed properties
+    val rewardType: RewardType get() = emitter.rewardType
+    val rewardAmount: Int get() = emitter.rewardAmount
     /**
      * 통계 기반 업적인지 확인
      */

@@ -1,6 +1,7 @@
 package com.hamsterworld.progression.domain.quota.model
 
 import com.hamsterworld.progression.domain.constant.RewardType
+import com.hamsterworld.progression.domain.constant.MissionConditionEmitter
 import com.hamsterworld.progression.domain.mission.model.MissionCondition
 import com.hamsterworld.progression.domain.quota.constant.CycleType
 import com.hamsterworld.progression.domain.quota.constant.QuotaType
@@ -33,10 +34,12 @@ data class QuotaMaster(
     val quotaType: QuotaType,
     val maxLimit: Int,
     val condition: MissionCondition,  // 항상 필요
-    val rewardType: RewardType?,      // ACTION_CONSTRAINT는 null
-    val rewardAmount: Int?,           // ACTION_CONSTRAINT는 null
+    val emitter: MissionConditionEmitter?,  // ACTION_CONSTRAINT는 null
     val sortOrder: Int = 0
 ) {
+    // 하위 호환성을 위한 computed properties
+    val rewardType: RewardType? get() = emitter?.rewardType
+    val rewardAmount: Int? get() = emitter?.rewardAmount
     /**
      * 이벤트 매칭 체크
      */

@@ -191,8 +191,13 @@ class CommentService(...) {
 - ✅ **주문(Order) 생성 및 상태 관리** (2026-02-01 세션 추가)
 - ✅ **Cart 관리** (CartItem 추가/삭제, 주문 생성)
 - ✅ **Cash Gateway 결제 이벤트 수신** (결제 승인/실패/취소)
+- ✅ **쿠폰(Coupon) 발행 및 사용 관리** (2026-02-08 세션 추가)
+  - 쿠폰 정책 관리 (관리자/판매자)
+  - 쿠폰 사용 기록 (1유저 1쿠폰 1회)
+  - 주문 시 할인 계산
 - ❌ 실제 재고 관리 (Payment Service 담당)
 - ❌ 결제 처리 (Cash Gateway Service 담당)
+- ❌ 포인트 관리 (Payment Service 담당)
 
 ### 아키텍처 위치
 ```

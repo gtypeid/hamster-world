@@ -15,6 +15,7 @@ import { VendorDashboardPage } from './pages/vendor/VendorDashboardPage'
 import { VendorProductsPage } from './pages/vendor/VendorProductsPage'
 import { VendorProductDetailPage } from './pages/vendor/VendorProductDetailPage'
 import { VendorOrdersPage } from './pages/vendor/VendorOrdersPage'
+import { VendorCouponsPage } from './pages/vendor/VendorCouponsPage'
 import { VendorSettlementPage } from './pages/vendor/VendorSettlementPage'
 import { VendorSettingsPage } from './pages/vendor/VendorSettingsPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
@@ -91,6 +92,7 @@ function App() {
         <Route path="/merchant/products" element={<VendorProductsPage />} />
         <Route path="/merchant/products/:id" element={<VendorProductDetailPage />} />
         <Route path="/merchant/orders" element={<VendorOrdersPage />} />
+        <Route path="/merchant/coupons" element={<VendorCouponsPage />} />
         <Route path="/merchant/settlement" element={<VendorSettlementPage />} />
         <Route path="/merchant/settings" element={<VendorSettingsPage />} />
 

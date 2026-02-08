@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.hamsterworld.progression.domain.archive.constant.ArchiveType
 import com.hamsterworld.progression.domain.archive.model.ArchiveMaster
 import com.hamsterworld.progression.domain.constant.RewardType
+import com.hamsterworld.progression.domain.constant.MissionConditionEmitter
 import com.hamsterworld.progression.domain.mission.constant.MissionType
 import com.hamsterworld.progression.domain.mission.constant.ProgressType
 import com.hamsterworld.progression.domain.mission.model.MissionCondition
@@ -66,8 +67,10 @@ class ArchiveMasterLoader {
                     sortOrder = record.get("sort_order").toInt(),
                     condition = condition,
                     statKey = if (progressType == ProgressType.STAT_BASED) record.get("condition_type") else null,
-                    rewardType = RewardType.valueOf(record.get("reward_type")),
-                    rewardAmount = record.get("reward_amount").toInt()
+                    emitter = MissionConditionEmitter(
+                        rewardType = RewardType.valueOf(record.get("reward_type")),
+                        rewardAmount = record.get("reward_amount").toInt()
+                    )
                 )
 
                 archiveMasterMap[archiveId] = archiveMaster
