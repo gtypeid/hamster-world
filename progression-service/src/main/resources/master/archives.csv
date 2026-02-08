@@ -1,0 +1,6 @@
+archive_id,archive_code,name,description,archive_type,progress_type,condition_type,condition_filters,requirement,reward_type,reward_amount,sort_order
+1,FIRST_ORDER,첫 구매 완료,첫 주문을 완료했습니다,ORDER,EVENT_BASED,CREATE_ORDER,{},1,POINT,100,100
+2,HIGH_ORDER,고액 주문,10만원 이상 주문,ORDER,EVENT_BASED,CREATE_ORDER,"{""minAmount"":""100000""}",1,POINT,200,110
+3,TEN_ORDERS,단골 고객,10번의 주문 완료,ORDER,EVENT_BASED,CREATE_ORDER,{},10,POINT,500,120
+4,FIRST_PRODUCT,첫 상품 등록,첫 상품을 등록했습니다,MERCHANT,EVENT_BASED,CREATE_PRODUCT,{},1,POINT,300,200
+5,TEN_PRODUCTS,활발한 판매자,10개 상품 등록,MERCHANT,EVENT_BASED,CREATE_PRODUCT,{},10,POINT,1000,210

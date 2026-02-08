@@ -1,0 +1,26 @@
+# Progression Service - Kafka Event Registry
+#
+# 이 서비스가 구독/발행하는 모든 이벤트를 명시적으로 정의합니다.
+# 설정과 실제 구현이 일치하지 않으면 애플리케이션 시작 시 종료됩니다.
+#
+# 서비스명은 spring.application.name에서 자동으로 가져옵니다.
+
+event:
+  # 구독하는 이벤트 (Consume)
+  subscribes:
+    - topic: ${kafka.topics.ecommerce-events}
+      events:
+        - OrderCreatedEvent    # 주문 생성 → Archive/Quota 체크
+        - ProductCreatedEvent  # 상품 생성 → Archive/Quota 체크
+        # 미래: ReviewCreatedEvent, UserLoginEvent
+
+  # 발행하는 이벤트 (Publish)
+  # Internal 이벤트는 Kafka로 발행되지 않으므로 registry에 포함하지 않음
+  publishes:
+    - topic: ${kafka.service.progression-service.topic}
+      events:
+        # Archive 이벤트 (Kafka 전송)
+        - ArchiveClaimedEvent   # Archive 보상 클레임 → Payment Service 소비
+
+        # Quota 이벤트 (Kafka 전송)
+        - QuotaClaimedEvent     # Quota 보상 클레임 → Payment Service 소비

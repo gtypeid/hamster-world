@@ -1,0 +1,4 @@
+quota_id,quota_key,name,description,cycle_type,quota_type,max_limit,condition_type,condition_filters,requirement,reward_type,reward_amount,sort_order
+1,WEEKLY_SHOPPER,주간 쇼핑왕,일주일에 5회 구매,WEEKLY,ACTION_REWARD,5,CREATE_ORDER,{},1,POINT,300,100
+2,DAILY_ORDER,일일 주문,매일 1회 주문,DAILY,ACTION_REWARD,1,CREATE_ORDER,{},1,POINT,50,50
+3,WEEKLY_SELLER,주간 판매왕,일주일에 3개 상품 등록,WEEKLY,ACTION_REWARD,3,CREATE_PRODUCT,{},1,POINT,200,150

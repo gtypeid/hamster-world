@@ -48,6 +48,11 @@ services:
     description: Hamster PG 서비스 (외부 PG, 참고용)
     owns: []
 
+  - name: progression-service
+    description: Progression 서비스 (Archive, Quota 관리)
+    owns:
+      - progression-events
+
 # ========================================
 # 토픽 정의
 # ========================================
@@ -66,3 +71,8 @@ topics:
     partitions: 3
     replication-factor: 1
     description: Cash Gateway Service 이벤트 (결제 승인, 실패, 취소)
+
+  - name: progression-events
+    partitions: 3
+    replication-factor: 1
+    description: Progression Service 이벤트 (Archive 완료/클레임, Quota 완료/클레임)
