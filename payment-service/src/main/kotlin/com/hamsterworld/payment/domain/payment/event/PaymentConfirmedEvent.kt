@@ -1,6 +1,6 @@
 package com.hamsterworld.payment.domain.payment.event
 
-import com.hamsterworld.common.web.threadlocal.AuditContextHolder
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.payment.domain.payment.constant.PaymentStatus
 import com.hamsterworld.payment.web.event.PaymentDomainEvent
 import java.math.BigDecimal
@@ -31,13 +31,15 @@ data class PaymentConfirmedEvent(
     val amount: BigDecimal,                // 결제 금액
     val status: PaymentStatus,             // APPROVED
     val gatewayPaymentPublicId: String,    // Cash Gateway Payment Public ID (Communication Truth)
-    // DomainEvent 메타데이터
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = UUID.randomUUID().toString(),
-    override val traceId: String? = AuditContextHolder.getContext()?.traceId,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
     aggregateId = orderPublicId,  // Order Public ID를 aggregateId로 사용
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 )

@@ -1,7 +1,7 @@
 package com.hamsterworld.payment.domain.product.event
 
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.payment.web.event.PaymentDomainEvent
-import com.hamsterworld.common.web.threadlocal.AuditContextHolder
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -33,14 +33,16 @@ data class OrderStockReservedEvent(
     val orderNumber: String,          // 주문 번호
     val totalPrice: BigDecimal,       // 총 주문 금액
     val items: List<OrderItemDto>,    // 주문 항목 리스트
-    // DomainEvent 메타데이터
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),
-    override val traceId: String? = AuditContextHolder.getContext()?.traceId,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
     aggregateId = orderPublicId,  // Already a String (Public ID)
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 )
 

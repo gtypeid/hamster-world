@@ -79,7 +79,14 @@ class PaymentProcess(
     var requestAttemptCount: Int = 0,  // 총 요청 시도 횟수
 
     @Column(name = "last_pg_response_code", length = 10)
-    var lastPgResponseCode: String? = null  // 마지막 PG 응답 코드 (202, 200 등)
+    var lastPgResponseCode: String? = null,  // 마지막 PG 응답 코드 (202, 200 등)
+
+    // Trace context (for webhook callback)
+    @Column(name = "trace_id", length = 32)
+    var traceId: String? = null,  // OpenTelemetry trace ID
+
+    @Column(name = "span_id", length = 16)
+    var spanId: String? = null  // OpenTelemetry span ID
 ) : AbsDomain() {
     /**
      * PaymentProcess 생성 시 이벤트 등록

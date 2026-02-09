@@ -1,6 +1,6 @@
 package com.hamsterworld.payment.domain.payment.event
 
-import com.hamsterworld.common.web.threadlocal.AuditContextHolder
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.payment.web.event.PaymentDomainEvent
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -30,13 +30,15 @@ data class PaymentProcessFailedEvent(
     val reason: String?,            // 실패 사유
     val code: String?,              // 실패 코드
     val message: String?,           // 실패 메시지
-    // DomainEvent 메타데이터
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),
-    override val traceId: String? = AuditContextHolder.getContext()?.traceId,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
     aggregateId = orderPublicId,  // Order Public ID를 aggregateId로 사용
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 )

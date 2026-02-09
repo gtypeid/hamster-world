@@ -1,5 +1,6 @@
 package com.hamsterworld.progression.domain.archive.event
 
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.progression.web.event.ProgressionDomainEvent
 import java.time.LocalDateTime
 
@@ -14,12 +15,15 @@ data class ArchiveClaimedEvent(
     val archiveId: String,
     val rewardType: String,    // "POINT", "COUPON"
     val rewardAmount: Int,
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),
-    override val traceId: String? = null,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : ProgressionDomainEvent(
     aggregateId = userPublicId,  // User가 aggregate
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 )

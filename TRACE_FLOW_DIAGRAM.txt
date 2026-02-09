@@ -1,0 +1,274 @@
+================================================================================
+                    COMPLETE TRACE FLOW ARCHITECTURE
+                  OrderStockReservedEvent → PaymentProcess
+================================================================================
+
+ENTRY POINT: Kafka Message from payment-events Topic
+═════════════════════════════════════════════════════════════════════════════
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ KAFKA MESSAGE (OrderStockReservedEvent)                          │
+  │                                                                  │
+  │ Headers:                                                         │
+  │  - traceparent: "00-{32charHex}-{16charHex}-01"                │
+  │    └─ Created by OTel Kafka instrumentation                     │
+  │    └─ Indicates this message is part of a trace                 │
+  │                                                                  │
+  │ Body (JSON):                                                     │
+  │  {                                                              │
+  │    "eventType": "OrderStockReservedEvent",                       │
+  │    "aggregateId": "order-12345",                                 │
+  │    "payload": {                                                 │
+  │      "orderPublicId": "...",                                     │
+  │      "userPublicId": "...",                                      │
+  │      "orderNumber": "...",                                       │
+  │      "totalPrice": 10000                                         │
+  │    },                                                            │
+  │    "metadata": {                                                 │
+  │      "eventId": "550e8400-e29b-41d4-a716-446655440000",         │
+  │      "traceId": "{SAME 32charHex AS KAFKA HEADER}",             │
+  │      "spanId": "{SAME 16charHex AS KAFKA HEADER}",              │
+  │      "occurredAt": "2024-01-30T12:00:00Z"                      │
+  │    }                                                             │
+  │  }                                                              │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ OTel Kafka Consumer Interceptor (Automatic)
+              │ ├─ Reads traceparent header
+              │ ├─ Creates child span from parent
+              │ ├─ Stores in OTel Context.current()
+              │ └─ Scope becomes active for this thread
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentEventConsumer.consume()                                   │
+  │ @KafkaListener(topics=["${kafka.topics.payment-events}"])        │
+  │ @Transactional(propagation = REQUIRES_NEW)                      │
+  │                                                                  │
+  │ Thread: kafka-consumer-0                                         │
+  │ OTel Status: ✅ Span created from Kafka header                   │
+  │              ✅ Context should be current                        │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ Calls: super.consumeEvent(message, ack)
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ BaseKafkaConsumer.consumeEvent() [TEMPLATE METHOD]               │
+  │ @Transactional(propagation = MANDATORY)                          │
+  │                                                                  │
+  │ ┌──────────────────────────────────────────────────────────┐   │
+  │ │ 1. parseEvent(message: String): ParsedEvent             │   │
+  │ │    ├─ JSON.parse()                                       │   │
+  │ │    ├─ Extract: eventType, aggregateId                   │   │
+  │ │    ├─ Extract from metadata:                             │   │
+  │ │    │  - eventId = "550e8400-..."                        │   │
+  │ │    │  - traceId = "00aa...ff" (32 hex chars)            │   │
+  │ │    │  - spanId = "aa...ff" (16 hex chars)               │   │
+  │ │    ├─ AuditContextHolder.setContext(traceId)             │   │
+  │ │    │  └─ Sets ThreadLocal<AuditContext> ← LOGGING ONLY  │   │
+  │ │    │  └─ Does NOT set OTel Context!                     │   │
+  │ │    └─ Return ParsedEvent                                 │   │
+  │ │                                                          │   │
+  │ │ 2. Check: subscribedEvents contains eventType? YES ✓    │   │
+  │ │                                                          │   │
+  │ │ 3. Check: ProcessedEvent.existsByEventId? NO ✓           │   │
+  │ │    └─ First time processing this event                  │   │
+  │ │                                                          │   │
+  │ │ 4. handleEvent(parsedEvent)                              │   │
+  │ │    └─ Calls subclass implementation                      │   │
+  │ └──────────────────────────────────────────────────────────┘   │
+  │                                                                  │
+  │ OTel Status: ✅ Span SHOULD still be active                     │
+  │              ✅ Context SHOULD be accessible                    │
+  │              ⚠️  BUT only in OTel Context, not AuditContextHolder
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ Calls: handleEvent(parsedEvent)
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentEventConsumer.handleOrderStockReserved()                  │
+  │ @Transactional(propagation = MANDATORY)                          │
+  │                                                                  │
+  │ ├─ Parse: eventDto = objectMapper.convertValue<OrderStockReservedEventDto>()
+  │ ├─ Convert: request = domainConverterAdapter.convert(eventDto, PaymentApproveRequest::class)
+  │ └─ Call: paymentService.approve(request)                        │
+  │                                                                  │
+  │ OTel Status: ✅ Span SHOULD still be active                     │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ Calls: paymentService.approve(request)
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentService.approve()                                         │
+  │ @Transactional(propagation = MANDATORY)                          │
+  │                                                                  │
+  │ ├─ Create ApprovePaymentCtx from request                        │
+  │ └─ paymentGatewayClient.bind(provider).payment(ctx)             │
+  │                                                                  │
+  │ OTel Status: ✅ Span SHOULD still be active                     │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ Calls: paymentGatewayClient.bind(provider).payment(ctx)
+              │        = PaymentGatewayClientProtocolCore.payment()
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentGatewayClientProtocolCore.payment()                       │
+  │ @Transactional(propagation = MANDATORY)                          │
+  │                                                                  │
+  │ ├─ provider.prepareRequest(paymentCtx) → PaymentRequest         │
+  │ ├─ objectMapper.writeValueAsString(request) → JSON               │
+  │ └─ domainConverterAdapter.convert(                               │
+  │      PaymentApprovedRequestWithCtx(provider, paymentCtx, request),
+  │      PaymentProcess::class.java                                  │
+  │    )                                                             │
+  │    └─ Calls PaymentRequestToProcessConverter.convert()          │
+  │                                                                  │
+  │ OTel Status: ✅ Span SHOULD still be active                     │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ Calls: PaymentRequestToProcessConverter.convert()
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentRequestToProcessConverter.convert()                       │
+  │                                                                  │
+  │ Line 39:                                                         │
+  │   traceId = TraceContextHolder.getCurrentTraceId()               │
+  │                                                                  │
+  │   ├─ Calls companion object static method                       │
+  │   ├─ val span = Span.current()                                  │
+  │   │  └─ Uses OTel Context.current() to find active span         │
+  │   │  └─ ⚠️ PROBLEM: span.spanContext.isValid returns FALSE     │
+  │   │     Reason: Context not properly accessible                 │
+  │   └─ Returns: NULL ❌                                            │
+  │                                                                  │
+  │ Line 40:                                                         │
+  │   spanId = TraceContextHolder.getCurrentSpanId()                │
+  │   └─ Returns: NULL ❌                                            │
+  │                                                                  │
+  │ Returns PaymentProcess with:                                    │
+  │ ├─ orderPublicId = "..."                                        │
+  │ ├─ userPublicId = "..."                                         │
+  │ ├─ provider = DUMMY                                             │
+  │ ├─ status = UNKNOWN                                             │
+  │ ├─ traceId = null ❌ ← CRITICAL: Should be "00aa...ff"         │
+  │ ├─ spanId = null ❌ ← CRITICAL: Should be "aa...ff"            │
+  │ └─ ...other fields                                              │
+  │                                                                  │
+  │ OTel Status: ✅ Span is still active                            │
+  │              ❌ BUT Span.current() returns invalid span         │
+  │              ❌ Reason: Context not accessible in this scope    │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              │ paymentGatewayCoreService.handleRequest(paymentProcess)
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PaymentGatewayCoreService.handleRequest()                        │
+  │                                                                  │
+  │ ├─ paymentProcessRepository.save(paymentProcess.onCreate())      │
+  │ │  └─ Saves PaymentProcess entity to DB                         │
+  │ │  └─ ❌ PaymentProcess.traceId = null (NOT CAPTURED)          │
+  │ │  └─ ❌ PaymentProcess.spanId = null (NOT CAPTURED)           │
+  │ │                                                                │
+  │ ├─ Registers PaymentProcessCreatedEvent                         │
+  │ └─ Event published via OutboxEventRecorder                      │
+  │                                                                  │
+  └──────────────────────────────────────────────────────────────────┘
+
+LATER: Webhook Callback (DOOMED TO FAIL)
+═════════════════════════════════════════════════════════════════════════════
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PG Webhook HTTP Request (From PG Service)                        │
+  │                                                                  │
+  │ Headers:                                                         │
+  │  - Content-Type: application/json                               │
+  │  - (No traceparent header - PG doesn't know about our trace)    │
+  │                                                                  │
+  │ Body: { tid: "...", approvalNo: "...", status: "SUCCESS" }      │
+  │                                                                  │
+  │ Note: This is a NEW HTTP request, OTel creates NEW trace       │
+  └───────────┬────────────────────────────────────────────────────┘
+              │
+              ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ PgWebhookController.handleWebhook()                              │
+  │ → PgWebhookService.handleWebhook()                               │
+  │ → PaymentGatewayClientProtocolCore.handleWebhook()              │
+  │ → handleInternalWebhook()                                        │
+  │                                                                  │
+  │ Line 351:                                                        │
+  │   traceContextHolder.executeWithRestoredTrace(                   │
+  │       spanName = "webhook-callback",                             │
+  │       traceId = existingProcess.traceId,   ← NULL ❌            │
+  │       parentSpanId = existingProcess.spanId ← NULL ❌           │
+  │   ) {                                                            │
+  │       paymentGatewayCoreService.handleResponseSuccess()          │
+  │   }                                                              │
+  │                                                                  │
+  │ Result:                                                          │
+  │   ├─ Cannot restore trace (traceId is null)                     │
+  │   ├─ Events published with WRONG trace ID (webhook's trace)     │
+  │   └─ Distributed trace is BROKEN:                              │
+  │      ecommerce-service trace ≠ webhook trace                    │
+  │                                                                  │
+  └──────────────────────────────────────────────────────────────────┘
+
+
+KEY INSIGHTS
+═════════════════════════════════════════════════════════════════════════════
+
+1. NO THREAD BOUNDARY ✅
+   - Everything runs in kafka-consumer-X thread
+   - No @Async or executor service calls
+   - Thread-local context should be preserved
+
+2. TRACE CONTEXT IS CAPTURED BY OTel ✅
+   - Kafka message has traceparent header
+   - OTel auto-instrumentation creates span
+   - Context stored in OTel Context API
+
+3. THE PROBLEM ❌
+   - BaseKafkaConsumer sets AuditContextHolder (for logging)
+   - But does NOT set OTel Context scope
+   - PaymentRequestToProcessConverter calls Span.current()
+   - Span.current() looks in OTel Context, finds invalid span
+   - Returns NULL for traceId and spanId
+
+4. THE CONSEQUENCE ❌
+   - PaymentProcess saved with traceId=null, spanId=null
+   - Webhook callback cannot restore trace
+   - Distributed trace is broken: webhook events in different trace
+
+5. WHY OutboxEventProcessor WORKS ✅
+   - OutboxEventProcessor explicitly calls executeWithRestoredTrace()
+   - It retrieves traceId/spanId from database
+   - Creates micrometer span manually
+   - Kafka send() executes within that span scope
+   - Result: Kafka header has correct traceparent
+
+
+MISMATCH BETWEEN TWO TRACE STORES
+═════════════════════════════════════════════════════════════════════════════
+
+┌─ Kafka Message Metadata                    ┌─ OTel Context API
+│ metadata.traceId = "00aa...ff" ────────────┘ Context.current()
+│ metadata.spanId = "aa...ff"                  └─ Span.current()
+│                                                 └─ spanContext.traceId
+│ (Set by OutboxEventProcessor)                  (Set by OTel instrumentation)
+│ (Available in ParsedEvent)                     (Should match!)
+│
+│ BUT:                                        BUT:
+│ BaseKafkaConsumer uses this ✅              PaymentRequestToProcessConverter
+│ for AuditContextHolder (logging)            uses this ❌ (can't access)
+│                                             Result: NULL
+│
+└─ Solution: Make BaseKafkaConsumer restore the OTel Context
+   so that Span.current() becomes valid and matches the metadata
+
+

@@ -2,6 +2,7 @@ package com.hamsterworld.cashgateway.domain.payment.event
 
 import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
+import com.hamsterworld.common.tracing.TraceContextHolder
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -31,14 +32,16 @@ data class PaymentApprovedEvent(
     val pgApprovalNo: String,        // NOT NULL
     val gatewayPaymentPublicId: String,  // NOT NULL (Cash Gateway Payment Public ID)
     val originSource: String,
-    // DomainEvent 메타데이터
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),
-    override val traceId: String? = null,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : CashGatewayDomainEvent(
     aggregateId = orderPublicId ?: paymentPublicId,  // orderPublicId가 있으면 사용, 없으면 paymentPublicId
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 ) {
     companion object {

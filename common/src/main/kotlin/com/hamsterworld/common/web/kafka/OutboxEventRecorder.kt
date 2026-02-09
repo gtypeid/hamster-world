@@ -148,13 +148,14 @@ class OutboxEventRecorder(
         // 메타데이터는 이벤트 필드에서 추출
         val eventId = event.eventId
         val traceId = event.traceId ?: UUID.randomUUID().toString()
+        val spanId = event.spanId  // spanId 추가
         val occurredAt = event.occurredAt
 
-        // payload는 aggregateId, topic, eventId, traceId, occurredAt을 제외한 순수 비즈니스 데이터
+        // payload는 aggregateId, topic, eventId, traceId, spanId, occurredAt을 제외한 순수 비즈니스 데이터
         @Suppress("UNCHECKED_CAST")
         val eventMap = objectMapper.convertValue(event, Map::class.java) as Map<String, Any?>
         val payloadMap = eventMap.filterKeys {
-            it !in setOf("aggregateId", "topic", "eventId", "traceId", "occurredAt")
+            it !in setOf("aggregateId", "topic", "eventId", "traceId", "spanId", "occurredAt")
         }
 
         return objectMapper.writeValueAsString(
@@ -165,6 +166,7 @@ class OutboxEventRecorder(
                 "metadata" to mapOf(
                     "eventId" to eventId,
                     "traceId" to traceId,
+                    "spanId" to spanId,  // spanId 추가
                     "occurredAt" to occurredAt
                 )
             )

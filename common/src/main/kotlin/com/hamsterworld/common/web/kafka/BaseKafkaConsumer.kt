@@ -123,17 +123,14 @@ abstract class BaseKafkaConsumer(
             null  // 일단 null로 유지
         }
 
-        // traceId + spanId로 OpenTelemetry trace context 복원 (분산 추적)
-        if (traceId != null && spanId != null) {
-            // 1. AuditContext 설정 (기존 로직 - 로깅용)
+        // AuditContext 설정 (로깅용)
+        // Note: OpenTelemetry trace context는 OTel 자동 계측이 Kafka 헤더에서 복원함
+        //       수동으로 setTraceContext()를 호출하면 오히려 충돌 발생
+        if (traceId != null) {
             AuditContextHolder.setContext(AuditContext(traceId = traceId))
-
-            // 2. OpenTelemetry trace context 복원 (parent-child 연결)
-            //    setParent를 통해 Kafka 건너편의 span과 연결됨
-            TraceContextHolder.setTraceContext(traceId, spanId)
-            logger.debug("Restored trace context from Kafka: traceId={}, parentSpanId={}", traceId, spanId)
+            logger.debug("Set AuditContext for logging: traceId={}", traceId)
         } else {
-            logger.warn("Missing trace context in Kafka event: traceId={}, spanId={}", traceId, spanId)
+            logger.warn("Missing traceId in Kafka event metadata", )
         }
 
         val payload = eventData["payload"] as? Map<String, Any>

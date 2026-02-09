@@ -16,18 +16,30 @@ import org.springframework.transaction.annotation.Transactional
  *
  * Transactional Outbox Pattern의 비동기 발행 담당
  *
+ * ## 변경 이력
+ * - **2026-02-09** (Claude Opus 4 / claude-opus-4-6):
+ *   `TraceContextHolder` 빈 주입 추가. `relay()` 메서드에서 Kafka 발행 전
+ *   `traceContextHolder.executeWithRestoredTrace()`를 호출하여 원본 trace에 자식 span을 생성.
+ *   이를 통해 `@Scheduled` 스케줄러가 생성하는 새 trace 대신, 원래 도메인 이벤트가 발생한
+ *   HTTP 요청의 trace를 이어서 사용할 수 있음.
+ *
  * ## 작동 방식
  * ```
  * [트랜잭션 내부 - 이미 완료됨]
- * 1. Order 생성
+ * 1. Order 생성 (HTTP 요청 trace 내부)
  * 2. OutboxEventRecorder가 OutboxEvent 저장 (BEFORE_COMMIT)
- * 3. DB COMMIT ✅ (Order + OutboxEvent 원자적 저장)
+ *    → 이 시점의 traceId/spanId를 OutboxEvent에 함께 저장
+ * 3. DB COMMIT (Order + OutboxEvent 원자적 저장)
  *
  * [이 클래스가 담당 - 비동기 처리]
- * 4. 주기적으로 PENDING 이벤트 조회
- * 5. Kafka로 발행 시도
- * 6. 성공 시 status → PUBLISHED
- * 7. 실패 시 retryCount 증가, 최대 재시도 초과 시 status → FAILED
+ * 4. @Scheduled 스케줄러가 주기적으로 PENDING 이벤트 조회
+ *    → Spring Observation이 자동으로 새 trace를 생성함 (스케줄러 trace)
+ * 5. executeWithRestoredTrace()로 OutboxEvent의 traceId/spanId를 복원
+ *    → micrometer scope chain에 원본 trace의 자식 span이 등록됨
+ * 6. kafkaTemplate.send()가 micrometer scope에서 traceId를 읽어
+ *    Kafka 헤더에 traceparent 주입 (원본 traceId 사용)
+ * 7. Consumer가 traceparent를 읽어 동일한 traceId로 처리
+ *    → Grafana Tempo에서 HTTP 요청 → Kafka → Consumer가 단일 trace tree로 표시
  * ```
  *
  * ## 활성화 방법
@@ -52,6 +64,9 @@ import org.springframework.transaction.annotation.Transactional
  * - 기본: 1초마다 실행 (fixedDelay = 1000)
  * - PENDING 이벤트를 created_at 오름차순으로 조회 (오래된 것부터 처리)
  * - 배치 크기: 100개 (한 번에 너무 많이 처리하지 않음)
+ *
+ * @see TraceContextHolder.executeWithRestoredTrace 비동기 경계에서의 trace 복원 메커니즘
+ * @see com.hamsterworld.common.web.kafka.OutboxEventRecorder traceId/spanId를 OutboxEvent에 저장하는 로직
  */
 @Component
 @ConditionalOnProperty(
@@ -62,7 +77,8 @@ import org.springframework.transaction.annotation.Transactional
 )
 class OutboxEventProcessor(
     private val outboxEventRepository: OutboxEventRepository,
-    private val kafkaTemplate: KafkaTemplate<String, String>
+    private val kafkaTemplate: KafkaTemplate<String, String>,
+    private val traceContextHolder: TraceContextHolder
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(OutboxEventProcessor::class.java)
@@ -100,30 +116,40 @@ class OutboxEventProcessor(
             // 각 이벤트를 동기 방식으로 처리
             claimed.forEach { event ->
                 try {
-                    // ★ CRITICAL: 원본 trace context 복원
-                    //    OutboxEvent에 저장된 traceId + spanId로 OpenTelemetry context 복원
-                    //    이렇게 해야 OTel 자동 계측이 Kafka 헤더에 올바른 trace ID를 주입함
-                    if (event.traceId != null && event.spanId != null) {
-                        TraceContextHolder.setTraceContext(event.traceId, event.spanId)
-                        log.debug(
-                            "Restored trace context before Kafka send: traceId={}, spanId={}",
-                            event.traceId, event.spanId
-                        )
-                    } else {
-                        log.warn(
-                            "Missing trace context in OutboxEvent: eventId={}, traceId={}, spanId={}",
-                            event.eventId, event.traceId, event.spanId
+                    // [2026-02-09] Claude Opus 4: trace 복원 후 Kafka 발행
+                    //
+                    // ★ CRITICAL: 명시적 span 생성으로 원본 trace에 연결
+                    //
+                    // 문제 상황:
+                    //   @Scheduled 메서드는 Spring Observation에 의해 자동으로 새 trace가 생성됨.
+                    //   그대로 kafkaTemplate.send()하면 스케줄러의 traceId가 Kafka 헤더에 주입되어
+                    //   Consumer는 원본 HTTP 요청과 다른 traceId를 받게 됨.
+                    //
+                    // 해결:
+                    //   OutboxEvent에 저장된 원본 traceId/spanId로 micrometer 자식 span을 생성하면,
+                    //   그 scope 안에서 호출되는 kafkaTemplate.send()가 원본 traceId를 사용함.
+                    //
+                    // 결과: ecommerce → payment → cash-gateway 전 구간이 단일 trace로 통합됨 (Grafana Tempo)
+                    traceContextHolder.executeWithRestoredTrace(
+                        spanName = "outbox-relay",
+                        traceId = event.traceId,
+                        parentSpanId = event.spanId
+                    ) {
+                        // Kafka로 동기 발행 (get()으로 완료 대기)
+                        // executeWithRestoredTrace() 블록 안이므로 micrometer scope에
+                        // 원본 traceId를 가진 span이 활성 상태 → traceparent 헤더에 올바른 traceId 주입
+                        kafkaTemplate
+                            .send(event.topic, event.aggregateId, event.payload)
+                            .get()  // 동기 대기 - 발행 실패 시 ExecutionException throw
+
+                        // 발행 성공 처리
+                        markSent(event)
+
+                        log.info(
+                            "Successfully published OutboxEvent - EventId: {}, Type: {}, Topic: {}",
+                            event.eventId, event.eventType, event.topic
                         )
                     }
-
-                    // Kafka로 동기 발행 (get()으로 완료 대기)
-                    // OTel 자동 계측이 현재 trace context를 Kafka 헤더에 주입함
-                    kafkaTemplate
-                        .send(event.topic, event.aggregateId, event.payload)
-                        .get()  // 동기 대기
-
-                    // 발행 성공 처리
-                    markSent(event)
 
                 } catch (ex: Exception) {
                     // 발행 실패 처리

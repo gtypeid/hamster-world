@@ -11,6 +11,30 @@ spring:
   kafka:
     bootstrap-servers: localhost:9093
 
+    # ========================================
+    # Observation (분산 추적 - Kafka 헤더에 W3C traceparent 전파)
+    # ========================================
+    # [2026-02-09] Claude Opus 4 (claude-opus-4-6) 추가
+    #
+    # Spring Kafka 3.x에서 observation-enabled는 기본값 false.
+    # 이 설정을 true로 하면:
+    #   - Producer: kafkaTemplate.send() 시 현재 micrometer scope의 traceId를
+    #     W3C traceparent 헤더로 Kafka 메시지에 자동 주입
+    #   - Consumer: Kafka 메시지 수신 시 traceparent 헤더에서 traceId를 추출하여
+    #     micrometer scope에 parent로 설정 → 동일한 traceId로 span 생성
+    #
+    # 이 설정이 없으면 Kafka를 통한 서비스 간 trace 전파가 불가능하여
+    # 각 서비스가 독립된 traceId를 생성함 (Grafana Tempo에서 서비스별 별도 trace로 표시)
+    template:
+      observation-enabled: true   # Producer 측: Kafka 헤더에 traceparent 주입
+    listener:
+      # ⚠️ 주의: KafkaConsumerConfig.kt에서 커스텀 ConcurrentKafkaListenerContainerFactory 빈을
+      # 직접 정의하고 있으므로, 이 YAML의 listener 설정은 Spring Boot 자동설정 ContainerFactory에만 적용됨.
+      # 실제 Consumer 측 observation 활성화는 KafkaConsumerConfig.kt에서 프로그래밍 방식으로 적용:
+      #   factory.containerProperties.isObservationEnabled = true
+      # 여기에도 명시하는 이유: 향후 커스텀 빈 제거 시 자동설정이 올바르게 동작하도록 선언적 보장
+      observation-enabled: true   # Consumer 측: Kafka 헤더에서 traceparent 추출
+
     producer:
       # ========================================
       # 신뢰성 설정 (at-least-once 보장)

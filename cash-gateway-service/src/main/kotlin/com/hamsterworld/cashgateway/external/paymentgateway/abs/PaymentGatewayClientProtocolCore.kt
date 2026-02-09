@@ -20,12 +20,29 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.client.RestTemplate
 import org.springframework.http.*
 
+/**
+ * PG 결제 게이트웨이 클라이언트 프로토콜 코어
+ *
+ * ## 변경 이력
+ * - **2026-02-09** (Claude Opus 4 / claude-opus-4-6):
+ *   `traceContextHolder` 생성자 파라미터 추가.
+ *   `handleInternalWebhook()`에서 `executeWithRestoredTrace("webhook-callback")`을 호출하여
+ *   PG Webhook 콜백 시 원본 결제 요청의 trace를 복원.
+ *   Webhook은 PG 서비스가 보내는 별도 HTTP 요청이므로 OTel이 새 trace를 생성하지만,
+ *   PaymentProcess에 저장된 traceId/spanId로 원본 trace에 자식 span을 연결함.
+ *
+ * @param traceContextHolder 비동기 경계(Webhook)에서 원본 trace를 복원하기 위한 헬퍼.
+ *        micrometer Tracer를 내부적으로 사용하여 Spring Kafka observation scope chain에 등록됨.
+ *
+ * @see com.hamsterworld.common.tracing.TraceContextHolder.executeWithRestoredTrace trace 복원 메커니즘
+ */
 abstract class PaymentGatewayClientProtocolCore(
     private val pgRestTemplate: RestTemplate,
     private val objectMapper: ObjectMapper,
     private val domainConverterAdapter: DomainConverterAdapter,
     private val paymentGatewayCoreService: PaymentGatewayCoreService,
-    private val provider: PaymentGatewayProvider
+    private val provider: PaymentGatewayProvider,
+    private val traceContextHolder: com.hamsterworld.common.tracing.TraceContextHolder
 ) : PaymentGatewayClientProtocol {
 
     private val log = LoggerFactory.getLogger(PaymentGatewayClientProtocolCore::class.java)
@@ -317,19 +334,39 @@ abstract class PaymentGatewayClientProtocolCore(
         log.info("[{}] 내부 요청 Webhook 처리 시작 | processId={}, 기존 status={}",
             provider.getProvider().name, existingProcess.id, existingProcess.status)
 
-        // 응답 데이터로 PaymentProcess 업데이트 준비
-        existingProcess.pgTransaction = response.getPgTransaction()
-        existingProcess.pgApprovalNo = response.getPgApprovalNo()
-        existingProcess.code = response.getCode()
-        existingProcess.message = response.getMessage()
-        existingProcess.responsePayload = rawPayload
+        // [2026-02-09] Claude Opus 4: Webhook 경계에서 원본 trace 복원
+        //
+        // ★ CRITICAL: Webhook은 PG 서비스가 보내는 별도 HTTP 요청이므로
+        // OTel 자동 계측이 새 trace를 생성함. 결제 요청 시점의 trace와 연결하려면
+        // PaymentProcess에 저장된 traceId/spanId로 명시적으로 자식 span을 생성해야 함.
+        //
+        // 동작 원리:
+        //   1. PaymentProcess.traceId/spanId = 최초 결제 요청(ecommerce → cash-gateway) 시점의 trace 정보
+        //   2. executeWithRestoredTrace()가 micrometer scope에 원본 trace의 자식 span 등록
+        //   3. 이 scope 안에서 paymentGatewayCoreService의 이벤트 발행이 올바른 traceId 사용
+        //
+        // 주의: PG 서비스가 Webhook에 traceparent 헤더를 전달하지 않는 한,
+        // 결제 요청 trace와 Webhook trace는 별도로 존재할 수 있음.
+        // 이 코드는 PaymentProcess에 저장된 traceId로 Webhook 측 trace를 원본에 연결하는 역할.
+        traceContextHolder.executeWithRestoredTrace(
+            spanName = "webhook-callback",
+            traceId = existingProcess.traceId,
+            parentSpanId = existingProcess.spanId
+        ) {
+            // 응답 데이터로 PaymentProcess 업데이트 준비
+            existingProcess.pgTransaction = response.getPgTransaction()
+            existingProcess.pgApprovalNo = response.getPgApprovalNo()
+            existingProcess.code = response.getCode()
+            existingProcess.message = response.getMessage()
+            existingProcess.responsePayload = rawPayload
 
-        if (provider.isSuccess(response)) {
-            // 성공 → 이벤트 발행
-            paymentGatewayCoreService.handleResponseSuccess(existingProcess)
-        } else {
-            // 실패 → PaymentProcess만 업데이트 + 이벤트 발행
-            paymentGatewayCoreService.handleResponseFailure(existingProcess)
+            if (provider.isSuccess(response)) {
+                // 성공 → 이벤트 발행
+                paymentGatewayCoreService.handleResponseSuccess(existingProcess)
+            } else {
+                // 실패 → PaymentProcess만 업데이트 + 이벤트 발행
+                paymentGatewayCoreService.handleResponseFailure(existingProcess)
+            }
         }
     }
 

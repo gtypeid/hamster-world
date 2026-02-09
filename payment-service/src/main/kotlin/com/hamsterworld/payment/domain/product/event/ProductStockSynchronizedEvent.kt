@@ -1,7 +1,7 @@
 package com.hamsterworld.payment.domain.product.event
 
 import com.hamsterworld.payment.web.event.PaymentDomainEvent
-import com.hamsterworld.common.web.threadlocal.AuditContextHolder
+import com.hamsterworld.common.tracing.TraceContextHolder
 import java.time.LocalDateTime
 
 /**
@@ -32,13 +32,15 @@ data class ProductStockSynchronizedEvent(
     val stock: Int,                   // 현재 재고 수량 (절대값)
     val isSoldOut: Boolean,           // 품절 여부
     val reason: String,               // 변경 사유
-    // DomainEvent 메타데이터
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),
-    override val traceId: String? = AuditContextHolder.getContext()?.traceId,
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
     aggregateId = ecommerceProductId,  // E-commerce Product의 Public ID
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt
 )
