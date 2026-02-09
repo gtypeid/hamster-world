@@ -1,0 +1,51 @@
+# Monitoring Configuration (Grafana Stack)
+#
+# Prometheus + Loki + Tempo 연동을 위한 공통 설정
+# 모든 서비스가 이 파일을 import하여 모니터링 기능을 활성화합니다.
+
+# ===== Actuator 설정 =====
+management:
+  endpoints:
+    web:
+      exposure:
+        # Prometheus 메트릭 엔드포인트 노출
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      # 히스토그램 버킷 설정 (HTTP 요청 시간 분포)
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      # 모든 메트릭에 애플리케이션 이름 태그 추가
+      application: ${spring.application.name}
+
+  # Tracing 설정 (OpenTelemetry → Tempo)
+  tracing:
+    sampling:
+      probability: 1.0  # 100% 샘플링 (개발 환경)
+
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+      # compression: gzip  # 프로덕션 환경에서 활성화
+
+# ===== Logging 설정 =====
+logging:
+  pattern:
+    # Trace ID와 Span ID를 로그에 포함 (Tempo 연동)
+    level: '%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]'
+  level:
+    # 모니터링 관련 로그 레벨
+    io.micrometer: INFO
+    io.opentelemetry: INFO

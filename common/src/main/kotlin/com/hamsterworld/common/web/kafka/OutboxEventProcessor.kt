@@ -3,6 +3,7 @@ package com.hamsterworld.common.web.kafka
 import com.hamsterworld.common.domain.outboxevent.model.OutboxEvent
 import com.hamsterworld.common.domain.outboxevent.model.OutboxEventStatus
 import com.hamsterworld.common.domain.outboxevent.repository.OutboxEventRepository
+import com.hamsterworld.common.tracing.TraceContextHolder
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.core.KafkaTemplate
@@ -99,7 +100,24 @@ class OutboxEventProcessor(
             // 각 이벤트를 동기 방식으로 처리
             claimed.forEach { event ->
                 try {
+                    // ★ CRITICAL: 원본 trace context 복원
+                    //    OutboxEvent에 저장된 traceId + spanId로 OpenTelemetry context 복원
+                    //    이렇게 해야 OTel 자동 계측이 Kafka 헤더에 올바른 trace ID를 주입함
+                    if (event.traceId != null && event.spanId != null) {
+                        TraceContextHolder.setTraceContext(event.traceId, event.spanId)
+                        log.debug(
+                            "Restored trace context before Kafka send: traceId={}, spanId={}",
+                            event.traceId, event.spanId
+                        )
+                    } else {
+                        log.warn(
+                            "Missing trace context in OutboxEvent: eventId={}, traceId={}, spanId={}",
+                            event.eventId, event.traceId, event.spanId
+                        )
+                    }
+
                     // Kafka로 동기 발행 (get()으로 완료 대기)
+                    // OTel 자동 계측이 현재 trace context를 Kafka 헤더에 주입함
                     kafkaTemplate
                         .send(event.topic, event.aggregateId, event.payload)
                         .get()  // 동기 대기

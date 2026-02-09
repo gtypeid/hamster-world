@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hamsterworld.common.domain.processedevent.model.ProcessedEvent
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.common.web.threadlocal.AuditContext
 import com.hamsterworld.common.web.threadlocal.AuditContextHolder
 import org.slf4j.LoggerFactory
@@ -116,14 +117,23 @@ abstract class BaseKafkaConsumer(
         val metadata = eventData["metadata"] as? Map<*, *>
         val eventId = metadata?.get("eventId") as? String
         val traceId = metadata?.get("traceId") as? String
+        val spanId = metadata?.get("spanId") as? String
         val timestamp = (metadata?.get("occurredAt") as? String)?.let {
             // ISO 8601 문자열을 timestamp로 변환하거나 그냥 사용
             null  // 일단 null로 유지
         }
 
-        // traceId를 AuditContextHolder에 설정 (분산 추적)
-        if (traceId != null) {
+        // traceId + spanId로 OpenTelemetry trace context 복원 (분산 추적)
+        if (traceId != null && spanId != null) {
+            // 1. AuditContext 설정 (기존 로직 - 로깅용)
             AuditContextHolder.setContext(AuditContext(traceId = traceId))
+
+            // 2. OpenTelemetry trace context 복원 (parent-child 연결)
+            //    setParent를 통해 Kafka 건너편의 span과 연결됨
+            TraceContextHolder.setTraceContext(traceId, spanId)
+            logger.debug("Restored trace context from Kafka: traceId={}, parentSpanId={}", traceId, spanId)
+        } else {
+            logger.warn("Missing trace context in Kafka event: traceId={}, spanId={}", traceId, spanId)
         }
 
         val payload = eventData["payload"] as? Map<String, Any>

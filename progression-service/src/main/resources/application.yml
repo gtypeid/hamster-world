@@ -6,18 +6,19 @@ spring:
   config:
     import:
       - classpath:application-kafka.yml
+      - classpath:application-monitoring.yml
       - classpath:kafka-topology.yml
       - classpath:kafka-event-registry.yml
 
   datasource:
-    url: jdbc:mysql://localhost:3306/progression_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3311/progression_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: 12555!@
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -25,7 +26,7 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
 
 server:
-  port: 8090
+  port: 8087
 
 logging:
   level:

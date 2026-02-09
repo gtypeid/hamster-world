@@ -1,0 +1,84 @@
+# Prometheus Configuration
+#
+# Hamster World 마이크로서비스 메트릭 수집 설정
+#
+# ## Scrape Targets:
+# - ecommerce-service (8080)
+# - payment-service (8081)
+# - cash-gateway-service (8082)
+# - hamster-pg-service (8083)
+# - notification-service (8085)
+# - progression-service (8087)
+#
+# ## 메트릭 수집 주기: 15초
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager 설정 (선택적)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - 'alertmanager:9093'
+
+scrape_configs:
+  # Prometheus 자체 모니터링
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Ecommerce Service
+  - job_name: 'ecommerce-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          service: 'ecommerce-service'
+          environment: 'local'
+
+  # Payment Service
+  - job_name: 'payment-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8081']
+        labels:
+          service: 'payment-service'
+          environment: 'local'
+
+  # Cash Gateway Service
+  - job_name: 'cash-gateway-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8082']
+        labels:
+          service: 'cash-gateway-service'
+          environment: 'local'
+
+  # Hamster PG Service
+  - job_name: 'hamster-pg-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8083']
+        labels:
+          service: 'hamster-pg-service'
+          environment: 'local'
+
+  # Notification Service
+  - job_name: 'notification-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8085']
+        labels:
+          service: 'notification-service'
+          environment: 'local'
+
+  # Progression Service
+  - job_name: 'progression-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8087']
+        labels:
+          service: 'progression-service'
+          environment: 'local'

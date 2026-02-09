@@ -1,0 +1,27 @@
+# Topology URL Mappings
+#
+# notification-service가 전체 Kafka 토폴로지를 수집할 때 사용하는 서비스 URL 매핑입니다.
+#
+# ## 동작 방식:
+# 1. kafka-topology.yml에서 전체 서비스 목록 자동 로드
+# 2. 이 파일에서 각 서비스의 Base URL 조회
+# 3. {baseUrl}/api/internal/event-registry 호출하여 event-registry 수집
+#
+# ## 환경별 설정:
+# - Local: localhost:{port}
+# - K8s: http://{service-name} (Kubernetes Service DNS)
+#
+# ## 주의:
+# - 서비스명은 kafka-topology.yml의 services[].name과 정확히 일치해야 합니다
+# - 새로운 서비스 추가 시:
+#   1. kafka-topology.yml에 서비스 정의 추가
+#   2. 이 파일에 URL 매핑 추가
+#
+topology:
+  url-mappings:
+    ecommerce-service: http://localhost:8080
+    payment-service: http://localhost:8081
+    cash-gateway-service: http://localhost:8082
+    hamster-pg-service: http://localhost:8083
+    notification-service: http://localhost:8085
+    progression-service: http://localhost:8087

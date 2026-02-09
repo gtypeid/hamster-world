@@ -188,4 +188,30 @@ class Quota(
             CycleType.NEVER -> false
         }
     }
+
+    companion object {
+        /**
+         * Quota 생성 팩토리 메서드
+         *
+         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
+         *
+         * @param userPublicId 유저 Public ID
+         * @param quotaMaster Quota 마스터 데이터
+         * @return 생성된 Quota
+         */
+        fun create(
+            userPublicId: String,
+            quotaMaster: QuotaMaster
+        ): Quota {
+            return Quota(
+                userPublicId = userPublicId,
+                quotaKey = quotaMaster.quotaKey,
+                cycleType = quotaMaster.cycleType,
+                quotaType = quotaMaster.quotaType,
+                maxLimit = quotaMaster.maxLimit,
+                consumed = 0,
+                claimed = false
+            )
+        }
+    }
 }

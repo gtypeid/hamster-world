@@ -53,6 +53,10 @@ services:
     owns:
       - progression-events
 
+  - name: notification-service
+    description: Notification 서비스 (DLQ 관리, Discord/Slack 알림)
+    owns: []
+
 # ========================================
 # 토픽 정의
 # ========================================
@@ -76,3 +80,26 @@ topics:
     partitions: 3
     replication-factor: 1
     description: Progression Service 이벤트 (Archive 완료/클레임, Quota 완료/클레임)
+
+  # ========================================
+  # DLT (Dead Letter Topics)
+  # ========================================
+  - name: ecommerce-events-dlt
+    partitions: 3
+    replication-factor: 1
+    description: E-commerce Service DLT (KafkaErrorHandler에서 자동 전송)
+
+  - name: payment-events-dlt
+    partitions: 3
+    replication-factor: 1
+    description: Payment Service DLT (KafkaErrorHandler에서 자동 전송)
+
+  - name: cash-gateway-events-dlt
+    partitions: 3
+    replication-factor: 1
+    description: Cash Gateway Service DLT (KafkaErrorHandler에서 자동 전송)
+
+  - name: progression-events-dlt
+    partitions: 3
+    replication-factor: 1
+    description: Progression Service DLT (KafkaErrorHandler에서 자동 전송)

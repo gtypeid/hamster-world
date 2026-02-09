@@ -1,5 +1,6 @@
 package com.hamsterworld.common.web.filter
 
+import com.hamsterworld.common.tracing.TraceContextHolder
 import com.hamsterworld.common.web.filter.support.DomainLogCreator
 import com.hamsterworld.common.web.filter.support.ProcessingResult
 import com.hamsterworld.common.web.filter.support.RequestSkipChecker
@@ -45,7 +46,8 @@ class DomainLogFilter(
         val wrappedRequest = ContentCachingRequestWrapper(httpRequest)
         val wrappedResponse = ContentCachingResponseWrapper(httpResponse)
 
-        val traceId = UUID.randomUUID().toString()
+        // OpenTelemetry trace ID 사용 (없으면 UUID로 fallback)
+        val traceId = TraceContextHolder.getCurrentTraceId() ?: UUID.randomUUID().toString()
         initializeAuditContext(traceId)
 
         var processingResult: ProcessingResult? = null

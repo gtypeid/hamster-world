@@ -20,11 +20,13 @@ abstract class PaymentDomainEvent(
     aggregateId: String,
     eventId: String = UUID.randomUUID().toString(),
     traceId: String? = null,
+    spanId: String? = null,
     occurredAt: LocalDateTime = LocalDateTime.now()
 ) : BaseDomainEvent(
     aggregateId = aggregateId,
     eventId = eventId,
     traceId = traceId,
+    spanId = spanId,
     occurredAt = occurredAt,
     topic = PaymentDomainEventTopicProvider.topic
 )

@@ -9,6 +9,7 @@ dependencies {
 
     // Jackson
     api 'com.fasterxml.jackson.module:jackson-module-kotlin'
+    api 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
 
     // Spring
     api 'org.springframework:spring-context:6.2.4'
@@ -25,6 +26,21 @@ dependencies {
     api 'io.jsonwebtoken:jjwt-api:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // ===== Monitoring (Grafana Stack) =====
+
+    // Actuator (메트릭 노출)
+    api 'org.springframework.boot:spring-boot-starter-actuator:3.5.7'
+
+    // Prometheus (메트릭 수집)
+    api 'io.micrometer:micrometer-registry-prometheus:1.14.2'
+
+    // Loki (로그 수집)
+    api 'com.github.loki4j:loki-logback-appender:1.5.2'
+
+    // OpenTelemetry (분산 추적 - Tempo)
+    api 'io.micrometer:micrometer-tracing-bridge-otel:1.4.2'
+    api 'io.opentelemetry:opentelemetry-exporter-otlp:1.45.0'
 
     // QueryDSL
     api 'com.querydsl:querydsl-jpa:5.1.0:jakarta'

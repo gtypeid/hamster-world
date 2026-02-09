@@ -179,4 +179,28 @@ class SeasonPromotion(
     fun isStepClaimed(step: Int): Boolean {
         return claimedSteps.contains(step)
     }
+
+    companion object {
+        /**
+         * SeasonPromotion 생성 팩토리 메서드
+         *
+         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
+         *
+         * @param userPublicId 유저 Public ID
+         * @param promotionId 프로모션 ID
+         * @return 생성된 SeasonPromotion
+         */
+        fun create(
+            userPublicId: String,
+            promotionId: String
+        ): SeasonPromotion {
+            return SeasonPromotion(
+                userPublicId = userPublicId,
+                promotionId = promotionId,
+                currentStep = 0,
+                isVip = false,
+                claimedSteps = mutableSetOf()
+            )
+        }
+    }
 }

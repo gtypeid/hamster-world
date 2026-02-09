@@ -70,4 +70,38 @@ class Order(
         this.status = OrderStatus.PAYMENT_FAILED
         return this
     }
+
+    companion object {
+        /**
+         * Order 생성 팩토리 메서드
+         *
+         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
+         *
+         * @param userId 사용자 ID
+         * @param price 주문 금액
+         * @return 생성된 Order
+         */
+        fun create(
+            userId: Long,
+            price: BigDecimal
+        ): Order {
+            val orderNumber = generateOrderNumber()
+            return Order(
+                userId = userId,
+                orderNumber = orderNumber,
+                price = price,
+                status = OrderStatus.CREATED
+            )
+        }
+
+        /**
+         * 주문번호 생성 (Private)
+         *
+         * 형식: yyyyMMddHHmmssSSS (17자리 숫자)
+         */
+        private fun generateOrderNumber(): String {
+            return java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))
+        }
+    }
 }

@@ -167,11 +167,11 @@ class SeasonPromotionService(
             return existing
         }
 
-        return seasonPromotionRepository.save(
-            SeasonPromotion(
-                userPublicId = userPublicId,
-                promotionId = master.promotionId
-            )
+        // DDD 팩토리 메서드 사용
+        val promotion = SeasonPromotion.create(
+            userPublicId = userPublicId,
+            promotionId = master.promotionId
         )
+        return seasonPromotionRepository.save(promotion)
     }
 }

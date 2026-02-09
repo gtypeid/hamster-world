@@ -99,6 +99,12 @@ class OutboxEvent(
     @Column(name = "payload", nullable = false, columnDefinition = "MEDIUMTEXT")
     var payload: String = "",
 
+    @Column(name = "trace_id", length = 32)
+    var traceId: String? = null,
+
+    @Column(name = "span_id", length = 16)
+    var spanId: String? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     var status: OutboxEventStatus = OutboxEventStatus.PENDING,

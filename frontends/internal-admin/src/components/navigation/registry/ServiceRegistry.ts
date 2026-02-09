@@ -3,7 +3,7 @@
  * - 서비스별 공통 설정 중앙 관리
  */
 
-export type ServiceType = 'payment' | 'gateway' | 'ecommerce'
+export type ServiceType = 'payment' | 'gateway' | 'ecommerce' | 'notification'
 
 export interface ServiceConfig {
   name: string // 표시 이름
@@ -31,6 +31,12 @@ class ServiceRegistryClass {
       icon: '🛒',
       color: 'bg-green-500',
       listRoute: '/ecommerce/orders',
+    },
+    notification: {
+      name: 'NOTIFICATION',
+      icon: '🔔',
+      color: 'bg-orange-500',
+      listRoute: '/notification/deadletter',
     },
   }
 

@@ -98,13 +98,15 @@ class OutboxEventRecorder(
             // 이벤트 직렬화 (Kafka에 발행할 JSON)
             val payload = serializeEvent(event, eventType)
 
-            // OutboxEvent 생성
+            // OutboxEvent 생성 (trace context 포함)
             val outboxEvent = OutboxEvent(
                 eventId = eventId,
                 eventType = eventType,
                 aggregateId = aggregateId,
                 topic = topic,
-                payload = payload
+                payload = payload,
+                traceId = event.traceId,
+                spanId = event.spanId
             )
 
             // OutboxEvent 저장 (같은 트랜잭션)

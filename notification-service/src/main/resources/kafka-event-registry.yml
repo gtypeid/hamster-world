@@ -1,0 +1,26 @@
+# Notification Service - Kafka Event Registry
+#
+# 이 서비스가 구독/발행하는 모든 이벤트를 명시적으로 정의합니다.
+# 설정과 실제 구현이 일치하지 않으면 애플리케이션 시작 시 종료됩니다.
+#
+# 서비스명은 spring.application.name에서 자동으로 가져옵니다.
+
+event:
+  # 구독하는 이벤트 (Consume)
+  # DLT 토픽은 이벤트 타입과 무관하게 모두 수신하므로 events: [] 빈 배열
+  subscribes:
+    - topic: ${kafka.topics.ecommerce-events-dlt}
+      events: []  # DLT는 모든 메시지 수신
+
+    - topic: ${kafka.topics.payment-events-dlt}
+      events: []
+
+    - topic: ${kafka.topics.cash-gateway-events-dlt}
+      events: []
+
+    - topic: ${kafka.topics.progression-events-dlt}
+      events: []
+
+  # 발행하는 이벤트 (Publish)
+  # Notification Service는 이벤트를 발행하지 않음 (순수 Consumer)
+  publishes: []

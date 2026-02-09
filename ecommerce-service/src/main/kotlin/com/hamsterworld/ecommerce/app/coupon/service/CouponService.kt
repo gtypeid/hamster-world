@@ -230,8 +230,8 @@ class CouponService(
         // 6. 할인 금액 계산
         val discountAmount = calculateDiscount(couponPolicy, order)
 
-        // 7. CouponUsage 저장
-        val couponUsage = CouponUsage(
+        // 7. CouponUsage 저장 (DDD 팩토리 메서드)
+        val couponUsage = CouponUsage.create(
             userId = userId,
             couponPolicyId = couponPolicy.id!!,
             couponCode = couponCode,

@@ -10,6 +10,8 @@ import { ResourceTracker } from '@/features/payment/ResourceTracker'
 import { TransactionHistory } from '@/features/payment/TransactionHistory'
 import { SettlementManagement } from '@/features/payment/SettlementManagement'
 import { OrderList } from '@/features/ecommerce/OrderList'
+import { DeadLetterList } from '@/features/notification/DeadLetterList'
+import { TopologyPage } from '@/pages/TopologyPage'
 
 // Navigation System
 import { NavigationProvider } from '@/components/navigation/NavigationContext'
@@ -45,6 +47,19 @@ function AppContent() {
       <Route path="/login" element={<LoginPage />} />
 
       {/* Protected Routes - Require DEVELOPER role */}
+      {/* Topology Page - Full Screen (No TracerPane) */}
+      <Route
+        path="/notification/topology"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TopologyPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Other Pages - With SplitLayout */}
       <Route
         path="/*"
         element={
@@ -68,6 +83,9 @@ function AppContent() {
                     <Route path="/payment/resource" element={<ResourceTracker />} />
                     <Route path="/payment/transactions" element={<TransactionHistory />} />
                     <Route path="/payment/settlement" element={<SettlementManagement />} />
+
+                    {/* Notification Service */}
+                    <Route path="/notification/deadletter" element={<DeadLetterList />} />
                   </Routes>
                 }
                 tracerPane={<TracerPane />}

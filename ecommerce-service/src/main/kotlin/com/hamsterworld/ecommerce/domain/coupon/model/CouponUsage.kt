@@ -113,4 +113,37 @@ class CouponUsage(
         copied.modifiedAt = this.modifiedAt
         return copied
     }
+
+    companion object {
+        /**
+         * CouponUsage 생성 팩토리 메서드
+         *
+         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
+         *
+         * @param userId 사용자 ID
+         * @param couponPolicyId 쿠폰 정책 ID
+         * @param couponCode 쿠폰 코드
+         * @param orderId 주문 ID
+         * @param orderPublicId 주문 Public ID
+         * @param discountAmount 할인 금액
+         * @return 생성된 CouponUsage
+         */
+        fun create(
+            userId: Long,
+            couponPolicyId: Long,
+            couponCode: String,
+            orderId: Long,
+            orderPublicId: String,
+            discountAmount: BigDecimal
+        ): CouponUsage {
+            return CouponUsage(
+                userId = userId,
+                couponPolicyId = couponPolicyId,
+                couponCode = couponCode,
+                orderId = orderId,
+                orderPublicId = orderPublicId,
+                discountAmount = discountAmount
+            )
+        }
+    }
 }

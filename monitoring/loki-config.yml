@@ -1,0 +1,45 @@
+# Loki Configuration
+#
+# "Prometheus for Logs" - 로그 수집 및 저장 설정
+#
+# ## 동작 방식:
+# 1. Logback에서 Loki Appender를 통해 로그 전송
+# 2. Loki가 로그를 인덱싱 및 저장
+# 3. Grafana에서 LogQL로 로그 조회
+#
+# ## 저장소: 로컬 파일시스템 (/loki)
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 최대 쿼리 기간 (30일)
+  max_query_length: 720h
+  # 수집 제한 (20MB/s per stream)
+  ingestion_rate_mb: 20
+  ingestion_burst_size_mb: 30

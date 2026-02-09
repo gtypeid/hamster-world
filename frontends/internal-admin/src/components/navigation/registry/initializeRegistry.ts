@@ -8,6 +8,8 @@ import { PaymentDetailViewer } from '../viewers/PaymentDetailViewer'
 import { EcommerceProductDetailViewer } from '../viewers/EcommerceProductDetailViewer'
 import { OrderDetailViewer } from '../viewers/OrderDetailViewer'
 import { UserDetailViewer } from '../viewers/UserDetailViewer'
+import { DLQMessageViewer } from '../viewers/DLQMessageViewer'
+import { TraceTimelineViewer } from '../viewers/TraceTimelineViewer'
 
 // API Services
 import { fetchProductDetail, fetchPaymentDetail } from '@/api/productService'
@@ -123,6 +125,34 @@ export function initializeRegistry() {
     myItem: {
       searchBy: (id) => ({ field: 'publicId', value: id }),
     },
+  })
+
+  // DLQ Message Detail (Notification Service)
+  ViewerRegistry.register({
+    type: 'dlq-message-detail',
+    title: 'DLQ 메시지 상세',
+    component: DLQMessageViewer,
+    service: 'notification',
+    // fetcher: fetchDLQMessageDetail, // TODO: 백엔드 API 연동
+    isEmbeddedOnly: true, // DeadLetterList에서 data를 직접 전달
+    myItem: {
+      searchBy: (id) => ({ field: 'id', value: id }),
+      listRoute: '/notification/deadletter',
+    },
+  })
+
+  // Trace Timeline (Cross-service)
+  ViewerRegistry.register({
+    type: 'trace-timeline',
+    title: 'Trace Timeline',
+    component: TraceTimelineViewer,
+    service: 'gateway', // 기본 서비스 (cross-service이지만 gateway로 분류)
+    fetcher: async (traceId: string) => {
+      // TODO: 백엔드 API 연동 (GET /api/traces/{traceId}/events)
+      // 현재는 mock 데이터로 TraceTimelineViewer 내부에서 처리
+      return { traceId } // 뷰어에서 자체적으로 mock 데이터 생성
+    },
+    myItem: false, // 단독 리스트 페이지 없음
   })
 
   // TODO: 추가 뷰어 등록

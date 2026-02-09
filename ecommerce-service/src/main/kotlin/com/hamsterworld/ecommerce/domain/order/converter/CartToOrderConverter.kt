@@ -33,15 +33,16 @@ class CartToOrderConverter(
             }
             .fold(BigDecimal.ZERO) { acc, price -> acc.add(price) }
 
-        val order = Order(
+        // DDD 팩토리 메서드 사용
+        val order = Order.create(
             userId = source.cart.userId,
-            orderNumber = generateOrderNumber(),
             price = totalPrice
         )
 
         // Order PK파악 불가 하위에서 부착 시킴
+        // DDD 팩토리 메서드 사용
         val orderItems = source.items.map { item ->
-            OrderItem(
+            OrderItem.create(
                 orderId = null,
                 productId = item.cartItem.productId,
                 productPublicId = item.product.publicId,  // Product의 Public ID 저장
@@ -54,9 +55,5 @@ class CartToOrderConverter(
             order = order,
             items = orderItems
         )
-    }
-
-    private fun generateOrderNumber(): String {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))
     }
 }

@@ -9,6 +9,7 @@ enum class MissionType {
     // Order 관련
     CREATE_ORDER,          // OrderCreatedEvent
     COMPLETE_ORDER,        // OrderCompletedEvent (미래)
+    COMPLETE_DELIVERY,      // test
 
     // Product 관련
     CREATE_PRODUCT,        // ProductCreatedEvent
@@ -27,6 +28,7 @@ enum class MissionType {
     ORDER_COUNT,           // 주문 횟수
     PRODUCT_COUNT,         // 상품 등록 수
     REVIEW_COUNT;          // 리뷰 작성 수
+
 }
 
 /**

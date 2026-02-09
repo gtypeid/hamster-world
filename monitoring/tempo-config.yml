@@ -1,0 +1,49 @@
+# Tempo Configuration (Single Instance)
+#
+# Distributed Tracing (Zipkin 대체)
+#
+# ## 프로토콜 지원:
+# - OTLP (OpenTelemetry Protocol): gRPC 4317, HTTP 4318
+# - Zipkin: 9411 (호환성)
+# - Jaeger: gRPC 14250
+#
+# ## 저장소: 로컬 파일시스템 (/tmp/tempo)
+
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    # OpenTelemetry Protocol (권장)
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    # Zipkin Protocol (호환성)
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  max_block_duration: 5m
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/blocks
+    wal:
+      path: /tmp/tempo/wal
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: []

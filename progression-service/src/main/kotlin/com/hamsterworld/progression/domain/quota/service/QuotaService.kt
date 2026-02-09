@@ -137,14 +137,11 @@ class QuotaService(
             return existing
         }
 
-        return quotaRepository.save(
-            Quota(
-                userPublicId = userPublicId,
-                quotaKey = quotaMaster.quotaKey,
-                cycleType = quotaMaster.cycleType,
-                quotaType = quotaMaster.quotaType,
-                maxLimit = quotaMaster.maxLimit
-            )
+        // DDD 팩토리 메서드 사용
+        val quota = Quota.create(
+            userPublicId = userPublicId,
+            quotaMaster = quotaMaster
         )
+        return quotaRepository.save(quota)
     }
 }

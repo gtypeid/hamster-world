@@ -52,4 +52,34 @@ class OrderItem(
         copied.modifiedAt = this.modifiedAt
         return copied
     }
+
+    companion object {
+        /**
+         * OrderItem 생성 팩토리 메서드
+         *
+         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
+         *
+         * @param orderId 주문 ID (nullable, 나중에 설정됨)
+         * @param productId 상품 ID
+         * @param productPublicId 상품 Public ID
+         * @param quantity 수량
+         * @param price 가격
+         * @return 생성된 OrderItem
+         */
+        fun create(
+            orderId: Long?,
+            productId: Long,
+            productPublicId: String,
+            quantity: Int,
+            price: BigDecimal
+        ): OrderItem {
+            return OrderItem(
+                orderId = orderId,
+                productId = productId,
+                productPublicId = productPublicId,
+                quantity = quantity,
+                price = price
+            )
+        }
+    }
 }

@@ -1,0 +1,61 @@
+# Grafana Datasources Provisioning
+#
+# Prometheus + Loki + Tempo를 자동으로 Grafana에 등록합니다.
+# Grafana 시작 시 자동으로 데이터소스가 구성됩니다.
+
+apiVersion: 1
+
+datasources:
+  # Prometheus (메트릭)
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        # Prometheus에서 Trace ID를 클릭하면 Tempo로 이동
+        - name: traceID
+          datasourceUid: tempo
+
+  # Loki (로그)
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # 로그에서 Trace ID를 추출하여 Tempo로 연결
+        - datasourceUid: tempo
+          matcherRegex: "traceId=(\\w+)"
+          name: TraceID
+          url: '$${__value.raw}'
+
+  # Tempo (분산 추적)
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    editable: true
+    jsonData:
+      httpMethod: GET
+      tracesToLogs:
+        # Trace에서 로그로 이동
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+        tags: ['job', 'instance', 'service']
+      tracesToMetrics:
+        # Trace에서 메트릭으로 이동
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true

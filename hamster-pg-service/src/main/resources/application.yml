@@ -5,6 +5,7 @@ spring:
   config:
     import:
       - classpath:application-kafka.yml
+      - classpath:application-monitoring.yml
       - classpath:kafka-topology.yml
       - classpath:kafka-event-registry.yml
 

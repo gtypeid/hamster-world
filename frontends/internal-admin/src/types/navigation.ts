@@ -20,6 +20,9 @@ export type IdType =
   | 'user-id' // User publicId
   | 'ecommerce-product-id' // Ecommerce Product publicId
 
+  // Notification Service
+  | 'dlq-message-id' // DLQ Message ID (MongoDB _id)
+
 /**
  * 상세 뷰어 타입 정의
  * - TracerPane에 표시될 뷰어들
@@ -34,6 +37,7 @@ export type ViewerType =
   | 'ecommerce-product-detail' // Ecommerce Product 상세
   | 'order-detail' // Order 상세 (Ecommerce)
   | 'user-detail' // User 상세 (Ecommerce)
+  | 'dlq-message-detail' // DLQ Message 상세 (Notification)
 
 /**
  * 네비게이션 아이템 (TracerPane에 표시할 내용)
@@ -110,8 +114,9 @@ export interface ViewerConfig {
   component: React.ComponentType<ViewerProps>
 
   // API 설정 (필수 - 서비스 아이콘/색상 결정)
-  service: 'payment' | 'gateway' | 'ecommerce' // 어느 서비스의 API인지
+  service: 'payment' | 'gateway' | 'ecommerce' | 'notification' // 어느 서비스의 API인지
   fetcher?: ApiFetcher // ID로 데이터 조회하는 함수
+  isEmbeddedOnly?: boolean // true면 부모에서 data를 직접 전달 (fetcher 없이도 OK)
 
   // "내 아이템 가기" 설정 (기본: 활성화, 비활성화하려면 false)
   myItem?: MyItemConfig | false

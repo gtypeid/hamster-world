@@ -69,6 +69,23 @@ services:
       - hamster-network
     restart: unless-stopped
 
+  # Progression Service DB
+  progression-db:
+    image: mysql:8.0
+    container_name: hamster-progression-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: progression_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3311:3306"
+    volumes:
+      - ./.local/mysql/progression-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
   # Kafka (KRaft 모드 - Zookeeper 불필요)
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -154,6 +171,114 @@ services:
       - "3310:3306"
     volumes:
       - ./.local/mysql/keycloak-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # MongoDB (Notification Service - DLQ 저장)
+  mongodb:
+    image: mongo:7.0
+    container_name: hamster-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: 12555!@
+      MONGO_INITDB_DATABASE: notification_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./.local/mongodb:/data/db
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Mongo Express (MongoDB Web UI)
+  mongo-express:
+    image: mongo-express:1.0-20
+    container_name: hamster-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      # 패스워드 URL 인코딩 (! → %21, @ → %40)
+      ME_CONFIG_MONGODB_ADMINPASSWORD: 12555!@
+      ME_CONFIG_MONGODB_URL: mongodb://admin:12555%21%40@mongodb:27017/
+      ME_CONFIG_BASICAUTH: false
+    ports:
+      - "8091:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # ===== Grafana Stack =====
+
+  # Prometheus (Metrics Collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hamster-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./.local/prometheus:/prometheus
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Loki (Log Aggregation)
+  loki:
+    image: grafana/loki:latest
+    container_name: hamster-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/loki-config.yml
+      - ./.local/loki:/loki
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Tempo (Distributed Tracing)
+  tempo:
+    image: grafana/tempo:2.4.0
+    container_name: hamster-tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "9411:9411"   # Zipkin (compatibility)
+    command: -target=all -config.file=/etc/tempo/tempo-config.yml
+    volumes:
+      - ./monitoring/tempo-config.yml:/etc/tempo/tempo-config.yml
+      - ./.local/tempo:/tmp/tempo
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
+  # Grafana (Unified Dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hamster-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - ./.local/grafana:/var/lib/grafana
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./monitoring/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards/json
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
     networks:
       - hamster-network
     restart: unless-stopped
