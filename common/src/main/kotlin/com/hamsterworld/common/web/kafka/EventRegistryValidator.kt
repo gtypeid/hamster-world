@@ -81,6 +81,7 @@ class EventRegistryValidator(
      * kafka-event-registry.yml의 subscribes 설정을 검증합니다.
      * - 모든 토픽이 kafka-topology.yml에 정의되어 있어야 함
      * - 토픽별로 최소 1개 이상의 이벤트가 등록되어 있어야 함
+     * - **예외**: DLT 토픽(토픽명이 -dlt로 끝나는 경우)은 events: [] 허용
      */
     private fun validateSubscriptions() {
         val subscriptions = eventRegistryProperties.event.subscribes
@@ -115,16 +116,26 @@ class EventRegistryValidator(
                 System.exit(1)
             }
 
-            if (events.isEmpty()) {
-                logger.error("❌ 토픽 '{}'에 구독할 이벤트가 하나도 등록되지 않았습니다.", topic)
-                logger.error("토픽을 구독하면서 이벤트를 하나도 처리하지 않는 것은 설정 오류일 가능성이 높습니다.")
-                logger.error("의도한 것이라면 해당 토픽을 구독 목록에서 제거하세요.")
-                System.exit(1)
-            }
+            // ✅ DLT 토픽 예외 처리
+            // DLT(Dead Letter Topic)는 모든 실패 메시지를 수신하므로 특정 이벤트 타입이 없음
+            val isDLTTopic = topic.endsWith("-dlt")
 
-            logger.info("  - 토픽: {} (정의 ✓)", topic)
-            events.forEach { eventType ->
-                logger.info("      ✓ {}", eventType)
+            if (events.isEmpty()) {
+                if (isDLTTopic) {
+                    // DLT 토픽은 events: [] 허용
+                    logger.info("  - 토픽: {} (정의 ✓, DLT 토픽 - 이벤트 타입 무관)", topic)
+                } else {
+                    logger.error("❌ 토픽 '{}'에 구독할 이벤트가 하나도 등록되지 않았습니다.", topic)
+                    logger.error("토픽을 구독하면서 이벤트를 하나도 처리하지 않는 것은 설정 오류일 가능성이 높습니다.")
+                    logger.error("의도한 것이라면 해당 토픽을 구독 목록에서 제거하세요.")
+                    logger.error("DLT 토픽이라면 토픽 이름이 '-dlt'로 끝나야 합니다. (예: ecommerce-events-dlt)")
+                    System.exit(1)
+                }
+            } else {
+                logger.info("  - 토픽: {} (정의 ✓)", topic)
+                events.forEach { eventType ->
+                    logger.info("      ✓ {}", eventType)
+                }
             }
         }
     }

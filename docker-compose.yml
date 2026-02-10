@@ -86,6 +86,23 @@ services:
       - hamster-network
     restart: unless-stopped
 
+  # Notification Service DB (ProcessedEvent 등 JPA 엔티티용)
+  notification-db:
+    image: mysql:8.0
+    container_name: hamster-notification-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12555!@
+      MYSQL_DATABASE: notification_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3312:3306"
+    volumes:
+      - ./.local/mysql/notification-db:/var/lib/mysql
+    networks:
+      - hamster-network
+    restart: unless-stopped
+
   # Kafka (KRaft 모드 - Zookeeper 불필요)
   kafka:
     image: confluentinc/cp-kafka:7.5.0
