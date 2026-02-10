@@ -8,7 +8,7 @@
 event:
   # 구독하는 이벤트 (Consume)
   subscribes:
-    - topic: ${kafka.topics.ecommerce-events}
+    - topic: ecommerce-events
       events:
         - OrderCreatedEvent    # 주문 생성 → Archive/Quota 체크
         - ProductCreatedEvent  # 상품 생성 → Archive/Quota 체크
@@ -17,7 +17,7 @@ event:
   # 발행하는 이벤트 (Publish)
   # Internal 이벤트는 Kafka로 발행되지 않으므로 registry에 포함하지 않음
   publishes:
-    - topic: ${kafka.service.progression-service.topic}
+    - topic: progression-events
       events:
         # Archive 이벤트 (Kafka 전송)
         - ArchiveClaimedEvent   # Archive 보상 클레임 → Payment Service 소비

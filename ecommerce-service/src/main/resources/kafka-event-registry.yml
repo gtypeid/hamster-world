@@ -8,7 +8,7 @@
 event:
   # 구독하는 이벤트 (Consume)
   subscribes:
-    - topic: ${kafka.topics.payment-events}
+    - topic: payment-events
       events:
         - PaymentConfirmedEvent           # 결제 확정 완료 (Business Truth) → Order 상태 PAID
         - PaymentProcessFailedEvent       # 결제 실패 확정 (Business Truth) → Order 상태 PAYMENT_FAILED
@@ -18,7 +18,7 @@ event:
 
   # 발행하는 이벤트 (Publish)
   publishes:
-    - topic: ${kafka.service.ecommerce-service.topic}
+    - topic: ecommerce-events
       events:
         - ProductCreatedEvent           # 상품 생성
         - StockAdjustmentRequestedEvent # 재고 조정 요청

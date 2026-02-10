@@ -8,13 +8,13 @@
 event:
   # 구독하는 이벤트 (Consume)
   subscribes:
-    - topic: ${kafka.topics.payment-events}
+    - topic: payment-events
       events:
         - OrderStockReservedEvent  # 재고 확보 완료 → PG 결제 요청
 
   # 발행하는 이벤트 (Publish)
   publishes:
-    - topic: ${kafka.service.cash-gateway-service.topic}
+    - topic: cash-gateway-events
       events:
         - PaymentApprovedEvent   # 결제 승인 성공
         - PaymentFailedEvent     # 결제 실패

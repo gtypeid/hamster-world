@@ -7,27 +7,11 @@
 # 이 파일을 수정하면:
 # 1. EventRegistryValidator가 검증 (존재하지 않는 토픽 참조 시 애플리케이션 종료)
 # 2. (선택적) KafkaTopicInitializer가 토픽 자동 생성
-#
-# ========================================
-# Spring Property 자동 등록 (KafkaTopologyPropertyRegistrar)
-# ========================================
-# 이 파일의 서비스/토픽 정보는 자동으로 Spring Property로 등록됩니다:
-#
-# 1. kafka.topics.{토픽명} = {토픽명}
-#    예: kafka.topics.ecommerce-events = ecommerce-events
-#    사용처: kafka-event-registry.yml의 subscribes에서 다른 서비스 토픽 구독 시
-#    예시: topic: ${kafka.topics.payment-events}
-#
-# 2. kafka.service.{서비스명}.topic = {첫 번째 소유 토픽}
-#    예: kafka.service.ecommerce-service.topic = ecommerce-events
-#    사용처: kafka-event-registry.yml의 publishes에서 자기 서비스 토픽에 발행 시
-#    예시: topic: ${kafka.service.ecommerce-service.topic}
 
 # ========================================
 # 서비스 정의
 # ========================================
 # owns: 이 서비스가 소유한 토픽 목록 (발행하는 토픽)
-#       - 첫 번째 토픽이 ${kafka.service.{서비스명}.topic}으로 등록됨
 services:
   - name: ecommerce-service
     description: E-commerce 서비스 (주문, 상품 관리)

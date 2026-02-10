@@ -11,11 +11,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * ## 설정 파일 예시
  * ```yaml
  * # cash-gateway-service/src/main/resources/kafka-event-registry.yml
- * # 서비스명은 spring.application.name에서 자동으로 가져옴
  *
  * event:
  *   subscribes:
- *     - topic: ecommerce-events  # 실제 토픽 이름 (placeholder는 EventRegistryPropertiesPostProcessor에서 해결됨)
+ *     - topic: payment-events
  *       events:
  *         - OrderStockReservedEvent
  *
@@ -27,25 +26,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  *         - PaymentCancelledEvent
  * ```
  *
- * ## Placeholder 해결
- * - EventRegistryPropertiesPostProcessor에서 YAML 바인딩 후 placeholder 해결
- * - 불변 data class로 유지 (생성자 주입 불필요)
- *
  * @property event 이벤트 구독/발행 설정
  */
 @ConfigurationProperties(prefix = "")
 data class EventRegistryProperties(
     val event: EventConfig = EventConfig()
 ) {
-    // Placeholder가 해결된 토픽 → 이벤트 매핑 캐시
-    // Placeholder가 해결된 토픽 → 이벤트 매핑 캐시
-    // EventRegistryPropertiesPostProcessor에서 초기화됨
-    @Transient
-    internal val subscribedEventsCache = mutableMapOf<String, Set<String>>()
-
-    @Transient
-    internal val publishedEventsCache = mutableMapOf<String, Set<String>>()
-
     /**
      * 이벤트 구독/발행 설정
      *
@@ -60,7 +46,7 @@ data class EventRegistryProperties(
     /**
      * 토픽 구독 정보
      *
-     * @property topic 구독하는 Kafka 토픽 이름 (placeholder 가능: ${kafka.topics.xxx})
+     * @property topic 구독하는 Kafka 토픽 이름
      * @property events 해당 토픽에서 처리할 이벤트 타입 목록
      */
     data class TopicSubscription(
@@ -71,7 +57,7 @@ data class EventRegistryProperties(
     /**
      * 토픽 발행 정보
      *
-     * @property topic 발행하는 Kafka 토픽 이름 (placeholder 가능: ${kafka.service.xxx.topic})
+     * @property topic 발행하는 Kafka 토픽 이름
      * @property events 해당 토픽에 발행하는 이벤트 타입 목록
      */
     data class TopicPublication(
@@ -82,20 +68,26 @@ data class EventRegistryProperties(
     /**
      * 특정 토픽에서 구독하는 이벤트 목록 조회
      *
-     * @param topic 토픽 이름 (실제 해결된 이름)
+     * @param topic 토픽 이름
      * @return 구독하는 이벤트 타입 Set (없으면 빈 Set)
      */
     fun getSubscribedEvents(topic: String): Set<String> {
-        return subscribedEventsCache[topic] ?: emptySet()
+        return event.subscribes
+            .firstOrNull { it.topic == topic }
+            ?.events?.toSet()
+            ?: emptySet()
     }
 
     /**
      * 특정 토픽에 발행하는 이벤트 목록 조회
      *
-     * @param topic 토픽 이름 (실제 해결된 이름)
+     * @param topic 토픽 이름
      * @return 발행하는 이벤트 타입 Set (없으면 빈 Set)
      */
     fun getPublishedEvents(topic: String): Set<String> {
-        return publishedEventsCache[topic] ?: emptySet()
+        return event.publishes
+            .firstOrNull { it.topic == topic }
+            ?.events?.toSet()
+            ?: emptySet()
     }
 }

@@ -33,11 +33,14 @@ import org.springframework.transaction.annotation.Transactional
  *     objectMapper: ObjectMapper,
  *     processedEventRepository: ProcessedEventRepository,
  *     eventRegistryProperties: EventRegistryProperties,
- *     private val productService: ProductService,
- *     @Value("\${kafka.topics.ecommerce-events}") topicName: String
- * ) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, topicName) {
+ *     private val productService: ProductService
+ * ) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, TOPIC) {
  *
- *     @KafkaListener(topics = ["\${kafka.topics.ecommerce-events}"], ...)
+ *     companion object {
+ *         const val TOPIC = "ecommerce-events"
+ *     }
+ *
+ *     @KafkaListener(topics = [TOPIC], ...)
  *     fun consumeEvent(message: String, ack: Acknowledgment) {
  *         super.consumeEvent(message, ack)
  *     }
@@ -84,7 +87,6 @@ abstract class BaseKafkaConsumer(
      * 현재 토픽에서 구독하는 이벤트 목록 (YML 기반)
      *
      * kafka-event-registry.yml에서 로드됨
-     * EventRegistryProperties의 @PostConstruct에서 placeholder 해결 완료 후 접근
      * 빈 Set인 경우 = YML 설정 누락 (EventRegistryValidator가 애플리케이션 시작 시 검증)
      */
     private fun getSubscribedEvents(): Set<String> {

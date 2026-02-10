@@ -4,7 +4,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.ApplicationListener
-import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 
 /**
@@ -24,13 +23,12 @@ import org.springframework.stereotype.Component
  *
  * @property eventRegistryProperties kafka-event-registry.yml 설정
  * @property kafkaTopologyProperties kafka-topology.yml 설정
- * @property currentServiceName spring.application.name
+ * @property currentServiceName spring.application.name (서비스명 검증용)
  */
 @Component
 class EventRegistryValidator(
     private val eventRegistryProperties: EventRegistryProperties,
     private val kafkaTopologyProperties: KafkaTopologyProperties,
-    private val environment: Environment,
     @Value("\${spring.application.name}") private val currentServiceName: String
 ) : ApplicationListener<ApplicationReadyEvent> {
 
@@ -94,8 +92,7 @@ class EventRegistryValidator(
 
         logger.info("구독 이벤트 검증:")
         subscriptions.forEach { subscription ->
-            val topicRaw = subscription.topic
-            val topic = environment.resolvePlaceholders(topicRaw)  // Placeholder resolve
+            val topic = subscription.topic
             val events = subscription.events
 
             if (topic.isBlank()) {
@@ -149,8 +146,7 @@ class EventRegistryValidator(
 
         logger.info("발행 이벤트 검증:")
         publications.forEach { publication ->
-            val topicRaw = publication.topic
-            val topic = environment.resolvePlaceholders(topicRaw)  // Placeholder resolve
+            val topic = publication.topic
             val events = publication.events
 
             if (topic.isBlank()) {

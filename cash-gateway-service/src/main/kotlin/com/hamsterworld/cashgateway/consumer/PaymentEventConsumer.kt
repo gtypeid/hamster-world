@@ -8,8 +8,8 @@ import com.hamsterworld.common.domain.converter.DomainConverterAdapter
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.EventRegistryProperties
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
@@ -40,12 +40,11 @@ class PaymentEventConsumer(
     processedEventRepository: ProcessedEventRepository,
     eventRegistryProperties: EventRegistryProperties,
     private val paymentService: PaymentService,
-    private val domainConverterAdapter: DomainConverterAdapter,
-    @Value("\${kafka.topics.payment-events}") topicName: String
-) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, topicName) {
+    private val domainConverterAdapter: DomainConverterAdapter
+) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.PAYMENT_EVENTS) {
 
     @KafkaListener(
-        topics = ["\${kafka.topics.payment-events}"],
+        topics = [KafkaTopics.PAYMENT_EVENTS],
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)

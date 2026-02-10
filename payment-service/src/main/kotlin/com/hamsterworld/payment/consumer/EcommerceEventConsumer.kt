@@ -5,9 +5,9 @@ import com.fasterxml.jackson.module.kotlin.convertValue
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.EventRegistryProperties
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
 import com.hamsterworld.payment.domain.product.service.ProductService
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
@@ -32,12 +32,11 @@ class EcommerceEventConsumer(
     objectMapper: ObjectMapper,
     processedEventRepository: ProcessedEventRepository,
     eventRegistryProperties: EventRegistryProperties,
-    private val productService: ProductService,
-    @Value("\${kafka.topics.ecommerce-events}") topicName: String
-) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, topicName) {
+    private val productService: ProductService
+) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.ECOMMERCE_EVENTS) {
 
     @KafkaListener(
-        topics = ["\${kafka.topics.ecommerce-events}"],
+        topics = [KafkaTopics.ECOMMERCE_EVENTS],
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)

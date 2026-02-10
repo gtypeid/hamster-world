@@ -5,12 +5,12 @@ import com.fasterxml.jackson.module.kotlin.convertValue
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.EventRegistryProperties
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
 import com.hamsterworld.progression.domain.archive.service.ArchiveService
 import com.hamsterworld.progression.domain.quota.service.QuotaService
 import com.hamsterworld.progression.web.csv.ArchiveMasterLoader
 import com.hamsterworld.progression.web.csv.QuotaMasterLoader
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
@@ -32,18 +32,17 @@ class EcommerceEventConsumer(
     objectMapper: ObjectMapper,
     processedEventRepository: ProcessedEventRepository,
     eventRegistryProperties: EventRegistryProperties,
-    @Value("\${kafka.topics.ecommerce-events}") currentTopic: String,
     private val archiveMasterLoader: ArchiveMasterLoader,
     private val quotaMasterLoader: QuotaMasterLoader,
     private val archiveService: ArchiveService,
     private val quotaService: QuotaService
-) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, currentTopic) {
+) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.ECOMMERCE_EVENTS) {
 
     /**
      * Ecommerce Events 토픽 소비
      */
     @KafkaListener(
-        topics = ["\${kafka.topics.ecommerce-events}"],
+        topics = [KafkaTopics.ECOMMERCE_EVENTS],
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)

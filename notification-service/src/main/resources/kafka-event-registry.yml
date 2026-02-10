@@ -9,16 +9,16 @@ event:
   # 구독하는 이벤트 (Consume)
   # DLT 토픽은 이벤트 타입과 무관하게 모두 수신하므로 events: [] 빈 배열
   subscribes:
-    - topic: ${kafka.topics.ecommerce-events-dlt}
+    - topic: ecommerce-events-dlt
       events: []  # DLT는 모든 메시지 수신
 
-    - topic: ${kafka.topics.payment-events-dlt}
+    - topic: payment-events-dlt
       events: []
 
-    - topic: ${kafka.topics.cash-gateway-events-dlt}
+    - topic: cash-gateway-events-dlt
       events: []
 
-    - topic: ${kafka.topics.progression-events-dlt}
+    - topic: progression-events-dlt
       events: []
 
   # 발행하는 이벤트 (Publish)

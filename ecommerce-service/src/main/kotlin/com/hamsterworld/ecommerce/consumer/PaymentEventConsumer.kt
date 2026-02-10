@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.convertValue
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
 import com.hamsterworld.ecommerce.domain.order.constant.OrderStatus
 import com.hamsterworld.ecommerce.domain.order.repository.OrderRepository
 import com.hamsterworld.ecommerce.domain.product.service.ProductService
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
@@ -42,12 +42,11 @@ class PaymentEventConsumer(
     processedEventRepository: ProcessedEventRepository,
     eventRegistryProperties: com.hamsterworld.common.web.kafka.EventRegistryProperties,
     private val productService: ProductService,
-    private val orderRepository: OrderRepository,
-    @Value("\${kafka.topics.payment-events}") topicName: String
-) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, topicName) {
+    private val orderRepository: OrderRepository
+) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.PAYMENT_EVENTS) {
 
     @KafkaListener(
-        topics = ["\${kafka.topics.payment-events}"],
+        topics = [KafkaTopics.PAYMENT_EVENTS],
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)

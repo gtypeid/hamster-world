@@ -5,13 +5,13 @@ import com.fasterxml.jackson.module.kotlin.convertValue
 import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRepository
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.EventRegistryProperties
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
 import com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository
 import com.hamsterworld.payment.domain.payment.event.PaymentProcessFailedEvent
 import com.hamsterworld.payment.domain.payment.model.Payment
 import com.hamsterworld.payment.domain.payment.repository.PaymentRepository
 import com.hamsterworld.payment.domain.product.service.ProductService
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
@@ -50,12 +50,11 @@ class CashGatewayEventConsumer(
     private val productService: ProductService,
     private val orderSnapshotRepository: OrderSnapshotRepository,
     private val paymentRepository: PaymentRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher,
-    @Value("\${kafka.topics.cash-gateway-events}") topicName: String
-) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, topicName) {
+    private val applicationEventPublisher: ApplicationEventPublisher
+) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.CASH_GATEWAY_EVENTS) {
 
     @KafkaListener(
-        topics = ["\${kafka.topics.cash-gateway-events}"],
+        topics = [KafkaTopics.CASH_GATEWAY_EVENTS],
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
