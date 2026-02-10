@@ -75,23 +75,26 @@ export class EventItem extends TopologyWorldItem {
       data: {
         label: (
           <div className="text-center">
-            <div className="text-[8px] font-bold text-purple-900 bg-purple-200 px-1 py-0.5 rounded-t mb-1">
+            <div className={`text-[8px] font-bold px-1 py-0.5 rounded-t mb-1 ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-purple-900 bg-purple-200'
+            }`}>
               EVENT
             </div>
-            <div className="text-[11px] font-bold text-purple-900">{this.eventName}</div>
+            <div className={`text-[11px] font-bold ${isInactive ? 'text-gray-400' : 'text-purple-900'}`}>{this.eventName}</div>
           </div>
         ),
       },
       position: { x: 0, y: 0 },
       style: {
-        background: isInactive ? '#faf5ff' : '#f3e8ff',
-        color: '#581c87',
-        border: '2px solid #9333ea',
+        background: isInactive ? '#fafafa' : '#f3e8ff',
+        color: isInactive ? '#9ca3af' : '#581c87',
+        border: isInactive ? '1px solid #d1d5db' : '3px solid #9333ea',
         borderRadius: '6px',
         padding: '0',
         width: EVENT_NODE_WIDTH,
         height: EVENT_NODE_HEIGHT,
-        opacity: isInactive ? 0.3 : 1,
+        opacity: isInactive ? 0.4 : 1,
+        boxShadow: isInactive ? 'none' : '0 4px 15px -3px rgba(147, 51, 234, 0.3)',
       },
     }
 

@@ -13,6 +13,7 @@ import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 /**
  * E-commerce Service 이벤트 Consumer
@@ -131,14 +132,16 @@ class EcommerceEventConsumer(
             event.orderPublicId, event.userPublicId, event.orderNumber, event.items.size, parsedEvent.eventId
         )
 
-        // 재고 검증 및 선차감
-        // - 성공 시 Product.completeOrder()가 OrderSnapshotCreatedEvent 발행
-        // - OrderSnapshotEventHandler가 수신하여 DB 저장
+        // 재고 검증 + 포인트 차감 + 선차감
+        // - 성공 시 OrderSnapshot 생성 + OrderStockReservedEvent 발행 → Cash-Gateway PG 요청
+        // - 실패 시 OrderStockValidationFailedEvent 발행 → Ecommerce 주문 실패 처리
         productService.validateStockForOrder(
             orderPublicId = event.orderPublicId,
             orderNumber = event.orderNumber,
             userPublicId = event.userPublicId,
             totalPrice = event.totalPrice,
+            couponDiscount = event.couponDiscount ?: BigDecimal.ZERO,
+            pointsToUse = event.pointsToUse ?: BigDecimal.ZERO,
             items = event.items
         )
 

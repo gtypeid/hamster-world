@@ -10,13 +10,17 @@ import java.math.BigDecimal
  *
  * ## 처리 내용
  * - PaymentAttempt 생성
- * - PG 결제 요청
+ * - PG 결제 요청 (cashAmount 기준)
+ *
+ * ## 금액
+ * - cashAmount: 실제 PG 결제 금액 (= totalPrice - couponDiscount - pointsUsed)
+ * - Cash-Gateway는 cashAmount만 알면 됨 (totalPrice, 할인 내역은 Payment Service 책임)
  */
 data class OrderStockReservedEventDto(
     val orderPublicId: String,  // E-commerce Service의 Order Public ID (Snowflake Base62)
     val userPublicId: String,   // E-commerce Service의 User Public ID (Snowflake Base62)
     val orderNumber: String,
-    val totalPrice: BigDecimal,
+    val cashAmount: BigDecimal, // 실제 PG 결제 금액
     val items: List<OrderItemDto>
 )
 

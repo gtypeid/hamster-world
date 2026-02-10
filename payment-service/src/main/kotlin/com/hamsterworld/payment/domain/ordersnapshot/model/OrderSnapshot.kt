@@ -46,7 +46,16 @@ class OrderSnapshot(
     var userPublicId: String,  // E-commerce Service User의 Public ID (Snowflake Base62)
 
     @Column(name = "total_price", nullable = false, precision = 15, scale = 3)
-    var totalPrice: BigDecimal
+    var totalPrice: BigDecimal,
+
+    @Column(name = "coupon_discount", nullable = false, precision = 15, scale = 3)
+    var couponDiscount: BigDecimal = BigDecimal.ZERO,
+
+    @Column(name = "points_used", nullable = false, precision = 15, scale = 3)
+    var pointsUsed: BigDecimal = BigDecimal.ZERO,
+
+    @Column(name = "cash_amount", nullable = false, precision = 15, scale = 3)
+    var cashAmount: BigDecimal = BigDecimal.ZERO
 ) : AbsDomain() {
 
     companion object {
@@ -72,13 +81,19 @@ class OrderSnapshot(
             orderNumber: String,
             userPublicId: String,
             totalPrice: BigDecimal,
+            couponDiscount: BigDecimal,
+            pointsUsed: BigDecimal,
+            cashAmount: BigDecimal,
             items: List<OrderItemDto>
         ): OrderSnapshot {
             val snapshot = OrderSnapshot(
                 orderPublicId = orderPublicId,
                 orderNumber = orderNumber,
                 userPublicId = userPublicId,
-                totalPrice = totalPrice
+                totalPrice = totalPrice,
+                couponDiscount = couponDiscount,
+                pointsUsed = pointsUsed,
+                cashAmount = cashAmount
             )
 
             // OrderStockReservedEvent 발행 (Cash Gateway에 PG 요청 지시)
@@ -88,6 +103,9 @@ class OrderSnapshot(
                     userPublicId = userPublicId,
                     orderNumber = orderNumber,
                     totalPrice = totalPrice,
+                    couponDiscount = couponDiscount,
+                    pointsUsed = pointsUsed,
+                    cashAmount = cashAmount,
                     items = items.map { item ->
                         com.hamsterworld.payment.domain.product.event.OrderItemDto(
                             productId = item.productPublicId,

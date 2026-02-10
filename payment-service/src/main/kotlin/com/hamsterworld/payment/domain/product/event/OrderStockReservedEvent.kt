@@ -31,7 +31,10 @@ data class OrderStockReservedEvent(
     val orderPublicId: String,        // E-commerce Service의 Order Public ID (Snowflake Base62)
     val userPublicId: String,         // User의 Public ID (Snowflake Base62)
     val orderNumber: String,          // 주문 번호
-    val totalPrice: BigDecimal,       // 총 주문 금액
+    val totalPrice: BigDecimal,       // 총 주문 금액 (원가)
+    val couponDiscount: BigDecimal,   // 쿠폰 할인 금액
+    val pointsUsed: BigDecimal,       // 포인트 사용 금액
+    val cashAmount: BigDecimal,       // 실제 PG 결제 금액 (= totalPrice - couponDiscount - pointsUsed)
     val items: List<OrderItemDto>,    // 주문 항목 리스트
     // DomainEvent 메타데이터 (OpenTelemetry trace context)
     override val eventId: String = java.util.UUID.randomUUID().toString(),

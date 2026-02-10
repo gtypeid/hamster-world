@@ -14,6 +14,12 @@ event:
         - StockAdjustmentRequestedEvent # 재고 조정 요청 → ProductRecord 추가
         - OrderCreatedEvent             # 주문 생성 → 재고 검증 및 차감
 
+    - topic: progression-events
+      events:
+        - ArchiveClaimedEvent                  # Archive 보상 클레임 → 포인트 적립
+        - QuotaClaimedEvent                    # Quota 보상 클레임 → 포인트 적립
+        - SeasonPromotionRewardClaimedEvent    # Season Promotion 보상 클레임 → 포인트 적립
+
     - topic: cash-gateway-events
       events:
         - PaymentApprovedEvent   # 결제 승인 → Payment 생성 + PaymentConfirmedEvent 발행
@@ -27,5 +33,7 @@ event:
         - PaymentConfirmedEvent         # 결제 확정 완료 → Ecommerce Order 상태 PAID
         - PaymentProcessFailedEvent     # 결제 실패 확정 → Ecommerce Order 상태 PAYMENT_FAILED
         - PaymentCancelConfirmedEvent   # 결제 취소 확정 → Ecommerce Order 상태 CANCELED
-        - OrderStockReservedEvent       # 재고 확보 완료 → Cash Gateway가 PG 요청
-        - ProductStockSynchronizedEvent # 재고 변경 → Ecommerce 동기화
+        - OrderStockReservedEvent           # 재고 확보 완료 → Cash Gateway가 PG 요청
+        - OrderStockValidationFailedEvent  # 재고/포인트 검증 실패 → Ecommerce 주문 실패 처리
+        - ProductStockSynchronizedEvent    # 재고 변경 → Ecommerce 동기화
+        - AccountBalanceSynchronizedEvent  # 잔액 변경 → 구독 서비스 동기화

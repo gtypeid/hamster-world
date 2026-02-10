@@ -22,7 +22,10 @@ data class OrderCreatedEventDto(
     val userPublicId: String,
     val orderNumber: String,
     val totalPrice: BigDecimal,
-    val items: List<OrderItemDto>
+    val items: List<OrderItemDto>,
+    // 쿠폰/포인트 (nullable: ecommerce가 아직 안 보내면 null → 0 처리)
+    val couponDiscount: BigDecimal? = null,
+    val pointsToUse: BigDecimal? = null
 )
 
 /**

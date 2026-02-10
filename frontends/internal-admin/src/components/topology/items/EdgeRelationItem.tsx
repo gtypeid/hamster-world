@@ -74,10 +74,10 @@ export class EdgeRelationItem extends TopologyWorldItem {
       target: this.target,
       animated: !isInactive,
       style: {
-        stroke: isInactive ? '#d1d5db' : style.stroke,
-        strokeWidth: style.strokeWidth,
+        stroke: isInactive ? '#bfdbfe' : style.stroke,
+        strokeWidth: isInactive ? 1.5 : style.strokeWidth + 0.5,
         strokeDasharray: style.dashed ? '5,5' : undefined,
-        opacity: isInactive ? 0.3 : style.dashed ? 0.7 : 1,
+        opacity: isInactive ? 0.35 : style.dashed ? 1 : 1,
       },
       ...(style.label && { label: style.label }),
       ...(style.label && {

@@ -7,10 +7,13 @@ import com.hamsterworld.payment.domain.product.model.Product
 import com.hamsterworld.payment.domain.productrecord.model.ProductRecord
 import com.hamsterworld.common.domain.eventsourcing.RecordRepository
 import com.hamsterworld.payment.consumer.OrderItemDto
+import com.hamsterworld.payment.domain.account.constant.AccountType
+import com.hamsterworld.payment.domain.account.service.AccountService
 import com.hamsterworld.payment.domain.ordersnapshot.model.OrderSnapshot
 import com.hamsterworld.payment.domain.product.dto.ProductSearchRequest
 import com.hamsterworld.payment.domain.product.repository.ProductRepository
 import com.hamsterworld.payment.domain.productrecord.repository.ProductRecordRepository
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.stereotype.Service
@@ -28,10 +31,10 @@ class ProductService(
     private val productRecordRepository: ProductRecordRepository,
     private val recordRepository: RecordRepository<Product>,
     private val eventPublisher: ApplicationEventPublisher,
-    private val orderSnapshotRepository: com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository
-    // TODO: AttachmentService 제거
-    // private val attachmentService: AttachmentService
+    private val orderSnapshotRepository: com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository,
+    private val accountService: AccountService
 ) {
+    private val log = LoggerFactory.getLogger(ProductService::class.java)
 
     // TODO: ProductCreateRequest 대신 직접 파라미터로 변경 (임시)
     @Transactional
@@ -218,12 +221,14 @@ class ProductService(
     }
 
     /**
-     * OrderCreatedEvent 처리 (재고 검증만)
+     * OrderCreatedEvent 처리 (재고 검증 + 포인트 차감)
      *
      * ## 처리 내용
-     * 1. 모든 주문 항목의 재고 검증 (차감 안함!)
-     * 2. 성공: OrderStockReservedEvent 발행
-     * 3. 실패: OrderStockValidationFailedEvent 발행
+     * 1. 모든 주문 항목의 재고 검증
+     * 2. 포인트 사용 요청 시 잔액 검증 및 차감
+     * 3. cashAmount 계산 (= totalPrice - couponDiscount - pointsToUse)
+     * 4. 성공: OrderStockReservedEvent 발행 (cashAmount 포함)
+     * 5. 실패: OrderStockValidationFailedEvent 발행
      *
      * ## 트랜잭션
      * - MANDATORY: BaseKafkaConsumer의 트랜잭션에 참여
@@ -232,6 +237,8 @@ class ProductService(
      * @param orderNumber 주문 번호
      * @param userPublicId User Public ID (Snowflake Base62)
      * @param totalPrice 총 주문 금액
+     * @param couponDiscount 쿠폰 할인 금액 (ecommerce가 계산한 값, 신뢰)
+     * @param pointsToUse 사용할 포인트 금액
      * @param items 주문 항목 리스트
      */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -240,6 +247,8 @@ class ProductService(
         orderNumber: String,
         userPublicId: String,
         totalPrice: BigDecimal,
+        couponDiscount: BigDecimal,
+        pointsToUse: BigDecimal,
         items: List<OrderItemDto>
     ) {
         // Phase 1: ID 정렬 후 락 획득 + 검증 (Deadlock 방지)
@@ -271,8 +280,6 @@ class ProductService(
 
         // Phase 2: 검증 결과 처리
         if (insufficientProducts.isNotEmpty()) {
-            // 실패: OrderStockValidationFailedEvent 발행
-            // 트랜잭션 롤백 안함 (이벤트만 발행, 락은 트랜잭션 종료 시 자동 해제)
             val failureReason = "재고 부족: ${insufficientProducts.size}개 상품"
             val failureEvent = OrderStockValidationFailedEvent(
                 orderPublicId = orderPublicId,
@@ -281,45 +288,76 @@ class ProductService(
                 insufficientProducts = insufficientProducts
             )
             eventPublisher.publishEvent(failureEvent)
-        } else {
-            // Phase 3: 모든 재고 차감 (선차감)
-            lockedProducts.forEach { (product, quantity) ->
-                val delta = -quantity
-                val reason = "[주문 차감] orderPublicId=$orderPublicId"
-                val adjusted = product.updateStockByDelta(delta, reason)
-                productRepository.saveAndPublish(adjusted)
+            return
+        }
+
+        // Phase 3: 포인트 검증 및 차감
+        var actualPointsUsed = BigDecimal.ZERO
+        if (pointsToUse.compareTo(BigDecimal.ZERO) > 0) {
+            val account = accountService.findAccountByUserPublicIdAndType(userPublicId, AccountType.CONSUMER)
+
+            if (account == null || account.balance < pointsToUse) {
+                val availableBalance = account?.balance ?: BigDecimal.ZERO
+                log.warn("[포인트 부족] orderPublicId={}, 요청={}, 잔액={}", orderPublicId, pointsToUse, availableBalance)
+                val failureEvent = OrderStockValidationFailedEvent(
+                    orderPublicId = orderPublicId,
+                    orderNumber = orderNumber,
+                    failureReason = "포인트 잔액 부족: 요청=${pointsToUse}, 잔액=${availableBalance}",
+                    insufficientProducts = emptyList()
+                )
+                eventPublisher.publishEvent(failureEvent)
+                return
             }
 
-            // Phase 4: OrderSnapshot 생성 및 저장
-            // - OrderSnapshot.createCompleted()가 OrderStockReservedEvent 등록
-            // - JPA save() 시 자동으로 이벤트 발행 → Cash Gateway로 전달
-            val snapshot = OrderSnapshot.createCompleted(
-                orderPublicId = orderPublicId,
-                orderNumber = orderNumber,
+            // 포인트 차감 (Event Sourcing)
+            accountService.updateBalanceFromEvent(
                 userPublicId = userPublicId,
-                totalPrice = totalPrice,
-                items = items
+                accountType = AccountType.CONSUMER,
+                delta = pointsToUse.negate(),
+                reason = "[주문 포인트 사용] orderPublicId=$orderPublicId"
             )
-
-            // OrderSnapshot 저장 (JPA save 시 자동으로 도메인 이벤트 발행)
-            orderSnapshotRepository.save(snapshot, items)
+            actualPointsUsed = pointsToUse
+            log.info("[포인트 차감 완료] orderPublicId={}, userPublicId={}, amount={}", orderPublicId, userPublicId, pointsToUse)
         }
+
+        // Phase 4: cashAmount 계산
+        val cashAmount = totalPrice.subtract(couponDiscount).subtract(actualPointsUsed)
+        log.info("[결제 금액 계산] orderPublicId={}, totalPrice={}, couponDiscount={}, pointsUsed={}, cashAmount={}",
+            orderPublicId, totalPrice, couponDiscount, actualPointsUsed, cashAmount)
+
+        // Phase 5: 모든 재고 차감 (선차감)
+        lockedProducts.forEach { (product, quantity) ->
+            val delta = -quantity
+            val reason = "[주문 차감] orderPublicId=$orderPublicId"
+            val adjusted = product.updateStockByDelta(delta, reason)
+            productRepository.saveAndPublish(adjusted)
+        }
+
+        // Phase 6: OrderSnapshot 생성 및 저장
+        val snapshot = OrderSnapshot.createCompleted(
+            orderPublicId = orderPublicId,
+            orderNumber = orderNumber,
+            userPublicId = userPublicId,
+            totalPrice = totalPrice,
+            couponDiscount = couponDiscount,
+            pointsUsed = actualPointsUsed,
+            cashAmount = cashAmount,
+            items = items
+        )
+
+        orderSnapshotRepository.save(snapshot, items)
     }
 
     /**
-     * PaymentCancelledEvent 처리 (재고 복원)
+     * PaymentCancelledEvent / PaymentFailedEvent 처리 (재고 복원 + 포인트 환원)
      *
      * ## 처리 내용
-     * 1. orderPublicId로 주문 항목 조회
-     * 2. 재고 복원 (ProductRecord 생성: delta = +quantity)
+     * 1. 재고 복원 (ProductRecord 생성: delta = +quantity)
+     * 2. 포인트 환원 (OrderSnapshot.pointsUsed > 0이면 AccountRecord 생성: delta = +pointsUsed)
      * 3. ProductStockChangedEvent 발행 → E-commerce Service 동기화
      *
      * ## 트랜잭션
      * - MANDATORY: BaseKafkaConsumer의 트랜잭션에 참여
-     *
-     * ## TODO
-     * - 현재는 items를 파라미터로 받음
-     * - 추후 orderPublicId로 원본 주문 조회 로직 추가 가능
      *
      * @param orderPublicId E-commerce Service의 Order Public ID (Snowflake Base62)
      * @param items 주문 항목 리스트 (복원할 재고)
@@ -331,20 +369,29 @@ class ProductService(
         items: List<OrderItemDto>,
         reason: String = "[결제 취소 복원] orderPublicId=$orderPublicId"
     ) {
-        // Phase 1: ID 정렬 후 락 획득 (Deadlock 방지)
+        // Phase 1: 재고 복원 (ID 정렬 후 락 획득 - Deadlock 방지)
         val sortedItems = items.sortedBy { it.productPublicId }
 
         sortedItems.forEach { item ->
-            // ecommerceProductPublicId로 Product 조회
             val product = productRepository.findByEcommerceProductId(item.productPublicId)
-
-            // 비관 락 획득 + 재집계
             val lockedProduct = recordRepository.writeRecord(product.id!!)
 
-            // 재고 복원 (delta = +quantity)
             val delta = +item.quantity
             val adjusted = lockedProduct.updateStockByDelta(delta, reason)
             productRepository.saveAndPublish(adjusted)
+        }
+
+        // Phase 2: 포인트 환원 (OrderSnapshot에서 pointsUsed 조회)
+        val snapshot = orderSnapshotRepository.findByOrderPublicId(orderPublicId)
+        if (snapshot != null && snapshot.pointsUsed.compareTo(BigDecimal.ZERO) > 0) {
+            accountService.updateBalanceFromEvent(
+                userPublicId = snapshot.userPublicId,
+                accountType = AccountType.CONSUMER,
+                delta = snapshot.pointsUsed,  // 양수: 환원
+                reason = "[결제 취소 포인트 환원] orderPublicId=$orderPublicId"
+            )
+            log.info("[포인트 환원 완료] orderPublicId={}, userPublicId={}, amount={}",
+                orderPublicId, snapshot.userPublicId, snapshot.pointsUsed)
         }
     }
 }

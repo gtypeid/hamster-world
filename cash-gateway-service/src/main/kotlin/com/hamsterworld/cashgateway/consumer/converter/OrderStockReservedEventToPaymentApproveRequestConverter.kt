@@ -34,7 +34,7 @@ class OrderStockReservedEventToPaymentApproveRequestConverter : DomainConverter<
             orderPublicId = source.orderPublicId,
             userPublicId = source.userPublicId,
             orderNumber = source.orderNumber,
-            amount = source.totalPrice,
+            amount = source.cashAmount,
             provider = provider,
             cashGatewayMid = cashGatewayMid
         )

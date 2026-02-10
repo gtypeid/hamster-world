@@ -1,4 +1,5 @@
 import type { TopologyResponse, TraceContext } from '@/types/topology'
+import type { TopologyTraceContext } from '@/types/topologyTraceContext'
 import { TopologyWorldItem } from './items/TopologyWorldItem.tsx'
 import { ServiceItem } from './items/ServiceItem.tsx'
 import { PublisherItem } from './items/PublisherItem.tsx'
@@ -6,6 +7,10 @@ import { ConsumerItem } from './items/ConsumerItem.tsx'
 import { TopicItem } from './items/TopicItem.tsx'
 import { EventItem } from './items/EventItem.tsx'
 import { EdgeRelationItem } from './items/EdgeRelationItem.tsx'
+import { RootEntryPointItem } from './items/RootEntryPointItem.tsx'
+import { StatusIndicatorItem } from './items/StatusIndicatorItem.tsx'
+import { EventSuccessIndicatorItem } from './items/EventSuccessIndicatorItem.tsx'
+import { EventFailureIndicatorItem } from './items/EventFailureIndicatorItem.tsx'
 
 /**
  * 토폴로지 월드
@@ -15,9 +20,16 @@ import { EdgeRelationItem } from './items/EdgeRelationItem.tsx'
 export class TopologyWorld {
   private items: TopologyWorldItem[] = []
   private eventMode: 'single' | 'multi' = 'multi'
+  private topologyTraceContext?: TopologyTraceContext
 
-  constructor(topology: TopologyResponse, eventMode: 'single' | 'multi' = 'multi', traceContext?: TraceContext) {
+  constructor(
+    topology: TopologyResponse,
+    eventMode: 'single' | 'multi' = 'multi',
+    traceContext?: TraceContext,
+    topologyTraceContext?: TopologyTraceContext
+  ) {
     this.eventMode = eventMode
+    this.topologyTraceContext = topologyTraceContext
     this.buildItems(topology, traceContext)
   }
 
@@ -231,6 +243,85 @@ export class TopologyWorld {
           new EdgeRelationItem('event-consumer', (consumerEventItem as any).parentId, canonicalEventId, traceContext)
         )
       })
+    }
+
+    // TopologyTraceContext 기반 마커 아이템 추가
+    // - Root Entry Point 커서 (시작점)
+    // - Status Indicator 커서 (서비스 단위 성공/실패)
+    // - Event Status Indicator 마커 (이벤트 단위 성공/실패)
+    if (this.topologyTraceContext) {
+      items.push(
+        new RootEntryPointItem(this.topologyTraceContext.rootService, traceContext)
+      )
+
+      // 실패한 이벤트가 있으면 해당 서비스의 상태 표시
+      let failedService: string | undefined
+      if (this.topologyTraceContext.traceEventIds && this.topologyTraceContext.traceEventIds.length > 0) {
+        const lastEventId = this.topologyTraceContext.traceEventIds[this.topologyTraceContext.traceEventIds.length - 1]
+
+        // 마지막 이벤트 아이템 찾기
+        const lastEventItem = items.find(
+          (item) => item instanceof EventItem && item.getId() === lastEventId
+        ) as EventItem | undefined
+
+        if (lastEventItem) {
+          // EventItem의 parentId에서 Consumer/Publisher 아이템을 찾아 serviceName 추출
+          const parentId = (lastEventItem as any).parentId
+
+          // Consumer 또는 Publisher 아이템 찾기
+          const parentItem = items.find((item) => {
+            if (item instanceof ConsumerItem && item.getId() === parentId) return true
+            if (item instanceof PublisherItem && item.getId() === parentId) return true
+            return false
+          })
+
+          if (parentItem instanceof ConsumerItem) {
+            failedService = (parentItem as any).serviceName
+          } else if (parentItem instanceof PublisherItem) {
+            failedService = (parentItem as any).serviceName
+          }
+        }
+      }
+
+      // Status Indicator 커서 (성공/실패)
+      if (failedService) {
+        items.push(
+          new StatusIndicatorItem('failed', failedService, traceContext)
+        )
+      } else {
+        items.push(
+          new StatusIndicatorItem('success', 'All Services', traceContext)
+        )
+      }
+
+      // 이벤트 단위 성공/실패 마커
+      // traceEventIds 배열 기반으로 마커 표시
+      // - 배열의 마지막 이벤트: 실패 (큰 ❌)
+      // - 그 전까지: 성공 (작은 ✅)
+      // - 리스트에 없는 이벤트: 마커 없음 (트레이스와 무관)
+      if (this.topologyTraceContext.traceEventIds && this.topologyTraceContext.traceEventIds.length > 0) {
+        const traceEventIds = this.topologyTraceContext.traceEventIds
+        const lastEventId = traceEventIds[traceEventIds.length - 1] // 마지막 = 실패
+        const successEventIds = traceEventIds.slice(0, -1) // 그 전까지 = 성공
+
+        // 성공한 이벤트들 (마지막 제외)
+        successEventIds.forEach((eventId) => {
+          const eventItem = items.find((item) => item instanceof EventItem && item.getId() === eventId)
+          if (eventItem) {
+            items.push(
+              new EventSuccessIndicatorItem(eventId, traceContext)
+            )
+          }
+        })
+
+        // 실패한 이벤트 (마지막)
+        const failedEventItem = items.find((item) => item instanceof EventItem && item.getId() === lastEventId)
+        if (failedEventItem) {
+          items.push(
+            new EventFailureIndicatorItem(lastEventId, traceContext)
+          )
+        }
+      }
     }
 
     this.items = items

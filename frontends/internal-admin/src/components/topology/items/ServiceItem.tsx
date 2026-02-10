@@ -20,7 +20,7 @@ export class ServiceItem extends TopologyWorldItem {
 
   render(): { nodes: Node[] } {
     const isInactive = this.isInactive(this.serviceName)
-    const bgColor = isInactive ? '#f3f4f6' : (this.color ? this.getColor(this.color) : '#3b82f6')
+    const bgColor = isInactive ? '#f9fafb' : (this.color ? this.getColor(this.color) : '#3b82f6')
 
     const node: Node = {
       id: `service-${this.serviceName}`,
@@ -28,24 +28,27 @@ export class ServiceItem extends TopologyWorldItem {
       data: {
         label: (
           <div className="text-center">
-            <div className="text-[9px] font-bold text-white bg-black bg-opacity-30 px-2 py-0.5 rounded-t mb-2">
+            <div className={`text-[9px] font-bold px-2 py-0.5 rounded-t mb-2 ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-white bg-black bg-opacity-30'
+            }`}>
               SERVICE
             </div>
-            <div className="text-2xl mb-2">{this.icon || '📦'}</div>
-            <div className="text-sm font-bold text-white">{this.serviceName}</div>
+            <div className={`text-2xl mb-2 ${isInactive ? 'opacity-30' : ''}`}>{this.icon || '📦'}</div>
+            <div className={`text-sm font-bold ${isInactive ? 'text-gray-400' : 'text-white'}`}>{this.serviceName}</div>
           </div>
         ),
       },
       position: { x: 0, y: 0 },
       style: {
         background: bgColor,
-        color: 'white',
-        border: '3px solid #1f2937',
+        color: isInactive ? '#9ca3af' : 'white',
+        border: isInactive ? '1px solid #d1d5db' : '4px solid #1f2937',
         borderRadius: '12px',
         padding: '0',
         width: SERVICE_NODE_WIDTH,
         height: SERVICE_NODE_HEIGHT,
-        opacity: isInactive ? 0.3 : 1,
+        opacity: isInactive ? 0.4 : 1,
+        boxShadow: isInactive ? 'none' : '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
       },
     }
 

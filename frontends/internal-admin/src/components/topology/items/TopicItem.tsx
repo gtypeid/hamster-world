@@ -34,24 +34,27 @@ export class TopicItem extends TopologyWorldItem {
       data: {
         label: (
           <div className="text-center">
-            <div className="text-[9px] font-bold text-yellow-900 bg-yellow-200 px-2 py-0.5 rounded-t mb-1">
+            <div className={`text-[9px] font-bold px-2 py-0.5 rounded-t mb-1 ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-yellow-900 bg-yellow-200'
+            }`}>
               TOPIC
             </div>
-            <div className="text-lg mb-1">📨</div>
-            <div className="text-xs font-bold text-yellow-900">{this.topic}</div>
+            <div className={`text-lg mb-1 ${isInactive ? 'opacity-30' : ''}`}>📨</div>
+            <div className={`text-xs font-bold ${isInactive ? 'text-gray-400' : 'text-yellow-900'}`}>{this.topic}</div>
           </div>
         ),
       },
       position: { x: 0, y: 0 },
       style: {
-        background: isInactive ? '#f9fafb' : '#fef3c7',
-        color: '#92400e',
-        border: '2px solid #d97706',
+        background: isInactive ? '#fafafa' : '#fef3c7',
+        color: isInactive ? '#9ca3af' : '#92400e',
+        border: isInactive ? '1px solid #d1d5db' : '3px solid #d97706',
         borderRadius: '8px',
         padding: '0',
         width: TOPIC_NODE_WIDTH,
         height: TOPIC_NODE_HEIGHT,
-        opacity: isInactive ? 0.3 : 1,
+        opacity: isInactive ? 0.4 : 1,
+        boxShadow: isInactive ? 'none' : '0 4px 15px -3px rgba(217, 119, 6, 0.3)',
       },
     }
 

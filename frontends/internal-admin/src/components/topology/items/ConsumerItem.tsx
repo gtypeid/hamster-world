@@ -33,11 +33,15 @@ export class ConsumerItem extends TopologyWorldItem {
       data: {
         label: (
           <div className="text-center">
-            <div className="text-[8px] font-bold text-blue-900 bg-blue-200 px-1 py-0.5 rounded-t mb-1">
+            <div className={`text-[8px] font-bold px-1 py-0.5 rounded-t mb-1 ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-blue-900 bg-blue-200'
+            }`}>
               CONSUMER
             </div>
-            <div className="text-[10px] font-bold text-blue-900 mb-1">{this.topic}</div>
-            <div className="text-[8px] text-blue-700 bg-blue-100 px-1 py-0.5 rounded">
+            <div className={`text-[10px] font-bold mb-1 ${isInactive ? 'text-gray-400' : 'text-blue-900'}`}>{this.topic}</div>
+            <div className={`text-[8px] px-1 py-0.5 rounded ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-blue-700 bg-blue-100'
+            }`}>
               📦 {this.serviceName}
             </div>
           </div>
@@ -45,14 +49,15 @@ export class ConsumerItem extends TopologyWorldItem {
       },
       position: { x: 0, y: 0 },
       style: {
-        background: isInactive ? '#eff6ff' : '#dbeafe',
-        color: '#1e3a8a',
-        border: '2px solid #2563eb',
+        background: isInactive ? '#fafafa' : '#dbeafe',
+        color: isInactive ? '#9ca3af' : '#1e3a8a',
+        border: isInactive ? '1px solid #d1d5db' : '3px solid #2563eb',
         borderRadius: '6px',
         padding: '0',
         width: CONSUMER_NODE_WIDTH,
         height: CONSUMER_NODE_HEIGHT,
-        opacity: isInactive ? 0.3 : 1,
+        opacity: isInactive ? 0.4 : 1,
+        boxShadow: isInactive ? 'none' : '0 4px 15px -3px rgba(37, 99, 235, 0.3)',
       },
     }
 

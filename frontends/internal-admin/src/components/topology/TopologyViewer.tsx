@@ -11,6 +11,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { fetchTopology } from '@/api/topologyService'
 import type { TopologyResponse, TraceContext } from '@/types/topology'
+import type { TopologyTraceContext } from '@/types/topologyTraceContext'
 import { TopologyWorld } from './TopologyWorld'
 import { TopologyRenderer } from './TopologyRenderer'
 import { ServiceItem } from './items/ServiceItem.tsx'
@@ -20,9 +21,25 @@ import { TopicItem } from './items/TopicItem.tsx'
 import { EventItem } from './items/EventItem.tsx'
 import { EdgeRelationItem } from './items/EdgeRelationItem.tsx'
 import type { EdgeRelationType } from './items/EdgeRelationItem.tsx'
+import { ALL_MOCK_TRACE_CONTEXTS } from '@/features/notification/mockTopologyTraceContext'
 
 interface TopologyViewerProps {
   traceContext?: TraceContext
+}
+
+/**
+ * TODO: TopologyTraceContext를 TraceContext로 변환하는 어댑터 작성
+ * - 현재는 mock 데이터로 테스트만 진행
+ * - 실제 네비게이션 연동 시 제거 필요
+ */
+function topologyTraceContextToTraceContext(
+  topologyContext: TopologyTraceContext
+): TraceContext {
+  return {
+    traceId: topologyContext.traceId,
+    involvedServices: topologyContext.involvedServices,
+    involvedTopics: topologyContext.involvedTopics,
+  }
 }
 
 export function TopologyViewer({ traceContext }: TopologyViewerProps) {
@@ -59,7 +76,18 @@ export function TopologyViewer({ traceContext }: TopologyViewerProps) {
     'event-consumer': true,
   })
 
+  // TODO: 실제 네비게이션 연동 시 제거
+  // TopologyTraceContext 데이터 (mock 또는 실제)
+  const [topologyTraceContextData, setTopologyTraceContextData] = useState<TopologyTraceContext | undefined>(undefined)
+
   const renderer = useMemo(() => new TopologyRenderer(), [])
+
+  // TODO: 실제 트레이스 컨텍스트는 props에서 받아오기
+  // 현재는 목 데이터 사용
+  const effectiveTraceContext = useMemo(
+    () => traceContext || (topologyTraceContextData ? topologyTraceContextToTraceContext(topologyTraceContextData) : undefined),
+    [traceContext, topologyTraceContextData]
+  )
 
   // API 호출
   useEffect(() => {
@@ -84,9 +112,10 @@ export function TopologyViewer({ traceContext }: TopologyViewerProps) {
   useEffect(() => {
     if (!topology) return
 
-    const newWorld = new TopologyWorld(topology, eventMode, traceContext)
+    // TODO: 실제 네비게이션 연동 시 traceContext 사용
+    const newWorld = new TopologyWorld(topology, eventMode, effectiveTraceContext, topologyTraceContextData)
     setWorld(newWorld)
-  }, [topology, eventMode, traceContext])
+  }, [topology, eventMode, effectiveTraceContext, topologyTraceContextData])
 
   // World → React Flow 그래프 렌더링 (필터 적용)
   useEffect(() => {
@@ -186,13 +215,36 @@ export function TopologyViewer({ traceContext }: TopologyViewerProps) {
     })
   }
 
+  const handleRandomScenario = () => {
+    const randomIndex = Math.floor(Math.random() * ALL_MOCK_TRACE_CONTEXTS.length)
+    setTopologyTraceContextData(ALL_MOCK_TRACE_CONTEXTS[randomIndex].context)
+  }
+
   return (
     <div className="w-full h-full relative">
       {/* Control Panel */}
       <div className="absolute bottom-4 right-4 z-10 bg-white rounded-lg shadow-lg p-4 max-w-sm">
         <h2 className="text-lg font-bold text-gray-800 mb-2">
-          {traceContext ? `Trace: ${traceContext.traceId}` : '전체 Kafka 토폴로지'}
+          {/* TODO: 실제 네비게이션 연동 시 props traceContext 사용 */}
+          {effectiveTraceContext ? `Trace: ${effectiveTraceContext.traceId}` : '전체 Kafka 토폴로지'}
         </h2>
+
+        {/* 최초 시작점 표시 */}
+        {topologyTraceContextData && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-xs space-y-1">
+            <div className="text-blue-900 font-semibold mb-2">📍 최초 진입점</div>
+            <div className="text-blue-800">
+              <span className="font-mono bg-white px-1 rounded">{topologyTraceContextData.rootService}</span>
+            </div>
+            <div className="text-blue-800">
+              Event: <span className="font-mono bg-white px-1 rounded">{topologyTraceContextData.rootEventType}</span>
+            </div>
+            <div className="text-blue-800">
+              Topic: <span className="font-mono bg-white px-1 rounded">{topologyTraceContextData.rootTopic}</span>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-3">
           <button
             onClick={() => onLayout('TB')}
@@ -387,6 +439,15 @@ export function TopologyViewer({ traceContext }: TopologyViewerProps) {
           </div>
         </div>
       </div>
+
+      {/* TODO: 랜덤 트레이스 버튼 (실제 네비게이션 연동 시 제거) */}
+      <button
+        onClick={handleRandomScenario}
+        className="absolute bottom-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-lg"
+        title="DLQ 메시지 시나리오를 랜덤으로 선택하여 토폴로지 필터링 테스트"
+      >
+        🎲 랜덤 트레이스
+      </button>
 
       {/* React Flow */}
       <ReactFlow

@@ -33,23 +33,26 @@ export class PublisherItem extends TopologyWorldItem {
       data: {
         label: (
           <div className="text-center">
-            <div className="text-[8px] font-bold text-red-900 bg-red-200 px-1 py-0.5 rounded-t mb-1">
+            <div className={`text-[8px] font-bold px-1 py-0.5 rounded-t mb-1 ${
+              isInactive ? 'text-gray-400 bg-gray-100' : 'text-red-900 bg-red-200'
+            }`}>
               PUBLISHER
             </div>
-            <div className="text-[11px] font-bold text-red-900">{this.topic}</div>
+            <div className={`text-[11px] font-bold ${isInactive ? 'text-gray-400' : 'text-red-900'}`}>{this.topic}</div>
           </div>
         ),
       },
       position: { x: 0, y: 0 },
       style: {
-        background: isInactive ? '#fef2f2' : '#fee2e2',
-        color: '#7f1d1d',
-        border: '2px solid #dc2626',
+        background: isInactive ? '#fafafa' : '#fee2e2',
+        color: isInactive ? '#9ca3af' : '#7f1d1d',
+        border: isInactive ? '1px solid #d1d5db' : '3px solid #dc2626',
         borderRadius: '6px',
         padding: '0',
         width: PUBLISHER_NODE_WIDTH,
         height: PUBLISHER_NODE_HEIGHT,
-        opacity: isInactive ? 0.3 : 1,
+        opacity: isInactive ? 0.4 : 1,
+        boxShadow: isInactive ? 'none' : '0 4px 15px -3px rgba(220, 38, 38, 0.3)',
       },
     }
 

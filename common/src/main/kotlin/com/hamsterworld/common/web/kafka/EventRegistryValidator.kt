@@ -17,6 +17,14 @@ import org.springframework.stereotype.Component
  * 2. **토픽 검증**: kafka-event-registry.yml의 모든 토픽이 kafka-topology.yml에 정의되어 있는지
  * 3. **이벤트 등록 검증**: 토픽별로 최소 1개 이상의 이벤트가 등록되어 있는지
  *
+ * ## 구독 vs 발행 검증 수준
+ * - **구독 (subscribes)**: 엄격 검증 (System.exit). 구독은 이벤트 기반으로 파생 로직이 존재하므로,
+ *   처리할 이벤트 목록이 명시적으로 관리되어야 합니다.
+ * - **발행 (publishes)**: 토픽 존재 여부만 검증 (경고 수준). 개별 이벤트 목록은 강제하지 않습니다.
+ *   발행은 도메인 이벤트(BaseDomainEvent 상속)를 통해 코드에서 결정되는 비즈니스 로직이며,
+ *   Outbox 패턴에 의해 자동으로 Kafka에 전송됩니다.
+ *   코드가 곧 진실(source of truth)이므로, registry의 publishes는 문서(documentation) 역할입니다.
+ *
  * ## 실행 시점
  * - ApplicationReadyEvent: 모든 Bean 초기화 완료 후 실행
  * - 검증 실패 시 System.exit(1)로 즉시 종료
@@ -141,10 +149,15 @@ class EventRegistryValidator(
     }
 
     /**
-     * 발행 이벤트 검증
+     * 발행 이벤트 검증 (토픽 존재 여부만 검증, 개별 이벤트는 강제하지 않음)
      *
      * kafka-event-registry.yml의 publishes 설정을 검증합니다.
      * - 모든 토픽이 kafka-topology.yml에 정의되어 있어야 함
+     * - 개별 이벤트 목록은 문서(documentation) 용도이며, 누락되어도 앱 종료하지 않음
+     *
+     * 발행은 도메인 이벤트 코드(BaseDomainEvent 상속)가 source of truth이며,
+     * Outbox 패턴에 의해 자동으로 Kafka에 전송됩니다.
+     * 구독과 달리 이벤트 목록을 강제할 실익이 없으므로 경고 수준으로만 검증합니다.
      */
     private fun validatePublications() {
         val publications = eventRegistryProperties.event.publishes
