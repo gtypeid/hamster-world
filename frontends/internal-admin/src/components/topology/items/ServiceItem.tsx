@@ -18,7 +18,7 @@ export class ServiceItem extends TopologyWorldItem {
     super(traceContext)
   }
 
-  render(): { nodes: Node[]; edges: Edge[] } {
+  render(): { nodes: Node[] } {
     const isInactive = this.isInactive(this.serviceName)
     const bgColor = isInactive ? '#f3f4f6' : (this.color ? this.getColor(this.color) : '#3b82f6')
 
@@ -49,7 +49,7 @@ export class ServiceItem extends TopologyWorldItem {
       },
     }
 
-    return { nodes: [node], edges: [] }
+    return { nodes: [node] }
   }
 
   static fromTopologyData(

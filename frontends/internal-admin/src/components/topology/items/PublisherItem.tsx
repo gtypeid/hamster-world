@@ -23,7 +23,7 @@ export class PublisherItem extends TopologyWorldItem {
     return `publisher-${this.serviceName}-${this.topic}`
   }
 
-  render(): { nodes: Node[]; edges: Edge[] } {
+  render(): { nodes: Node[] } {
     const isInactive = this.isInactive(undefined, this.topic)
     const publisherId = this.getId()
 
@@ -53,23 +53,6 @@ export class PublisherItem extends TopologyWorldItem {
       },
     }
 
-    // Service → Publisher 엣지 (빨간색)
-    const edge: Edge = {
-      id: `edge-service-publisher-${this.serviceName}-${this.topic}`,
-      source: `service-${this.serviceName}`,
-      target: publisherId,
-      animated: !isInactive,
-      style: {
-        stroke: isInactive ? '#d1d5db' : '#dc2626',
-        strokeWidth: 2,
-        opacity: isInactive ? 0.3 : 1,
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: isInactive ? '#d1d5db' : '#dc2626',
-      },
-    }
-
-    return { nodes: [node], edges: [edge] }
+    return { nodes: [node] }
   }
 }

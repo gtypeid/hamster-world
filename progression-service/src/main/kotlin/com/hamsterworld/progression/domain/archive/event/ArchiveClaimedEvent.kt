@@ -21,7 +21,8 @@ data class ArchiveClaimedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : ProgressionDomainEvent(
-    aggregateId = userPublicId,  // User가 aggregate
+    aggregateId = userPublicId,
+    aggregateType = "User",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

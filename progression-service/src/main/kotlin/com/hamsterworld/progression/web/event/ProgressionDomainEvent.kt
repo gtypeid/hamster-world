@@ -16,12 +16,14 @@ import java.util.UUID
  */
 abstract class ProgressionDomainEvent(
     aggregateId: String,
+    aggregateType: String,
     eventId: String = UUID.randomUUID().toString(),
     traceId: String? = null,
     spanId: String? = null,
     occurredAt: LocalDateTime = LocalDateTime.now()
 ) : BaseDomainEvent(
     aggregateId = aggregateId,
+    aggregateType = aggregateType,
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

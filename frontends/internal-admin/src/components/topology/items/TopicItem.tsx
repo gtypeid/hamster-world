@@ -24,7 +24,7 @@ export class TopicItem extends TopologyWorldItem {
     return `topic-${this.topic}`
   }
 
-  render(): { nodes: Node[]; edges: Edge[] } {
+  render(): { nodes: Node[] } {
     const isInactive = this.isInactive(undefined, this.topic)
     const topicId = this.getId()
 
@@ -55,66 +55,6 @@ export class TopicItem extends TopologyWorldItem {
       },
     }
 
-    const edges: Edge[] = []
-
-    // Publisher → Topic 엣지들
-    this.publishers.forEach(({ publisherId }) => {
-      edges.push({
-        id: `edge-publisher-topic-${publisherId}-${this.topic}`,
-        source: publisherId,
-        target: topicId,
-        label: 'publishes',
-        animated: !isInactive,
-        style: {
-          stroke: isInactive ? '#d1d5db' : '#10b981',
-          strokeWidth: 3,
-          opacity: isInactive ? 0.3 : 1,
-        },
-        labelStyle: {
-          fill: '#059669',
-          fontSize: 10,
-          fontWeight: 700,
-        },
-        labelBgStyle: {
-          fill: '#d1fae5',
-          fillOpacity: 0.9,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isInactive ? '#d1d5db' : '#10b981',
-        },
-      })
-    })
-
-    // Topic → Consumer 엣지들
-    this.consumers.forEach(({ consumerId }) => {
-      edges.push({
-        id: `edge-topic-consumer-${this.topic}-${consumerId}`,
-        source: topicId,
-        target: consumerId,
-        label: 'consumed',
-        animated: !isInactive,
-        style: {
-          stroke: isInactive ? '#d1d5db' : '#3b82f6',
-          strokeWidth: 3,
-          opacity: isInactive ? 0.3 : 1,
-        },
-        labelStyle: {
-          fill: '#2563eb',
-          fontSize: 10,
-          fontWeight: 700,
-        },
-        labelBgStyle: {
-          fill: '#dbeafe',
-          fillOpacity: 0.9,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isInactive ? '#d1d5db' : '#3b82f6',
-        },
-      })
-    })
-
-    return { nodes: [node], edges }
+    return { nodes: [node] }
   }
 }

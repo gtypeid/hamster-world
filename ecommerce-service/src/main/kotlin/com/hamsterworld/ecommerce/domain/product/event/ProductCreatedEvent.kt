@@ -28,6 +28,7 @@ data class ProductCreatedEvent(
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : EcommerceDomainEvent(
     aggregateId = productPublicId,
+    aggregateType = "Product",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

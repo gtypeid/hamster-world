@@ -48,6 +48,7 @@ import java.time.LocalDateTime
  *     event_id VARCHAR(255) NOT NULL UNIQUE,      -- Kafka Event ID (UUID)
  *     event_type VARCHAR(255) NOT NULL,           -- 이벤트 타입
  *     aggregate_id VARCHAR(255) NOT NULL,         -- Aggregate ID (파티션 키)
+ *     aggregate_type VARCHAR(100) NOT NULL,       -- Aggregate 타입 (Order, Product 등)
  *     topic VARCHAR(255) NOT NULL,                -- Kafka 토픽
  *     payload MEDIUMTEXT NOT NULL,                -- JSON payload
  *     status VARCHAR(50) NOT NULL,                -- PENDING/PUBLISHED/FAILED
@@ -92,6 +93,9 @@ class OutboxEvent(
 
     @Column(name = "aggregate_id", nullable = false, length = 255)
     var aggregateId: String = "",
+
+    @Column(name = "aggregate_type", nullable = false, length = 100)
+    var aggregateType: String = "",
 
     @Column(name = "topic", nullable = false, length = 255)
     var topic: String = "",

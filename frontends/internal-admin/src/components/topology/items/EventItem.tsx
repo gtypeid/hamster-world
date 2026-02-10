@@ -1,4 +1,5 @@
-import type { Node, Edge } from 'reactflow'
+import type { Node } from 'reactflow'
+import type { Edge } from 'reactflow'
 import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 
 const EVENT_NODE_WIDTH = 180
@@ -14,14 +15,22 @@ export type EventRenderMode = 'single' | 'multi'
  * - 복수 모드: 모든 이벤트를 각자 노드로 생성
  */
 export class EventItem extends TopologyWorldItem {
+  private subscribingConsumerIds: string[] = []
+
   constructor(
     private eventName: string,
     private parentId: string, // publisher-xxx 또는 consumer-xxx
     private topic: string,
     private ownerService: string, // 이벤트를 발행하는 서비스명
+    subscribingConsumerIds: string[] = [],
     traceContext?: any
   ) {
     super(traceContext)
+    this.subscribingConsumerIds = subscribingConsumerIds
+  }
+
+  setSubscribingConsumerIds(ids: string[]): void {
+    this.subscribingConsumerIds = ids
   }
 
   getId(): string {
@@ -45,35 +54,19 @@ export class EventItem extends TopologyWorldItem {
   render(mode: EventRenderMode = 'multi'): { nodes: Node[]; edges: Edge[] } {
     const isInactive = this.isInactive(undefined, this.topic)
 
-    // 단일 모드: Publisher만 노드 생성, Consumer는 참조만
+    // 단일 모드: Publisher Event만 노드 생성
     if (mode === 'single') {
-      if (this.isOwnedByPublisher()) {
-        // Publisher 이벤트: 노드 + 엣지 생성
-        return this.createNodeAndEdge(isInactive)
-      } else {
-        // Consumer: Publisher 이벤트를 참조하는 엣지만 생성
-        const canonicalEventId = this.getCanonicalEventId()
-        const edge: Edge = {
-          id: `edge-consumer-ref-${this.parentId}-${this.eventName}`,
-          source: this.parentId,
-          target: canonicalEventId, // Publisher의 이벤트 노드 참조
-          animated: false,
-          style: {
-            stroke: isInactive ? '#e5e7eb' : '#c084fc',
-            strokeWidth: 1,
-            strokeDasharray: '5,5',
-            opacity: isInactive ? 0.3 : 0.6,
-          },
-        }
-        return { nodes: [], edges: [edge] }
+      if (!this.isOwnedByPublisher()) {
+        // Consumer Event는 노드 생성 안 함 (단일 모드에서는 Publisher Event만 표시)
+        return { nodes: [], edges: [] }
       }
     }
 
-    // 복수 모드: 모든 이벤트를 각자 노드로 생성
-    return this.createNodeAndEdge(isInactive)
+    // 복수 모드 또는 Publisher Event: 노드 생성 (엣지는 TopologyWorld에서 EdgeRelationItem으로 생성)
+    return this.createNode(isInactive)
   }
 
-  private createNodeAndEdge(isInactive: boolean): { nodes: Node[]; edges: Edge[] } {
+  private createNode(isInactive: boolean): { nodes: Node[]; edges: Edge[] } {
     const eventId = this.getId()
 
     const node: Node = {
@@ -102,19 +95,7 @@ export class EventItem extends TopologyWorldItem {
       },
     }
 
-    const edge: Edge = {
-      id: `edge-parent-event-${this.parentId}-${this.eventName}`,
-      source: this.parentId,
-      target: eventId,
-      animated: false,
-      style: {
-        stroke: isInactive ? '#e5e7eb' : '#c084fc',
-        strokeWidth: 1,
-        strokeDasharray: '5,5',
-        opacity: isInactive ? 0.3 : 0.6,
-      },
-    }
-
-    return { nodes: [node], edges: [edge] }
+    return { nodes: [node], edges: [] }
   }
+
 }

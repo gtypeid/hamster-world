@@ -37,7 +37,8 @@ data class PaymentConfirmedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
-    aggregateId = orderPublicId,  // Order Public ID를 aggregateId로 사용
+    aggregateId = orderPublicId,
+    aggregateType = "Order",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

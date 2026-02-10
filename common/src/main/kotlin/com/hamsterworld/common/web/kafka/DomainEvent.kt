@@ -12,10 +12,10 @@ import java.util.UUID
  * 예시:
  * ```kotlin
  * // ecommerce-service/domain/product/event/ProductEvents.kt
- * data class ProductCreatedEvent(...) : EcommerceDomainEvent(aggregateId = product.publicId)  // ← Public ID 사용
- *
- * // payment-service/domain/product/event/ProductEvents.kt
- * data class ProductStockChangedEvent(...) : PaymentDomainEvent(aggregateId = product.publicId)  // ← Public ID 사용
+ * data class ProductCreatedEvent(...) : EcommerceDomainEvent(
+ *     aggregateId = product.publicId,
+ *     aggregateType = "Product"   // AbsDomain 하위 클래스의 simpleName
+ * )
  * ```
  */
 interface DomainEvent {
@@ -31,6 +31,16 @@ interface DomainEvent {
      * - 이벤트 순서 보장 및 파티셔닝에 사용
      */
     val aggregateId: String
+
+    /**
+     * Aggregate 타입 (AbsDomain 하위 클래스의 simpleName)
+     *
+     * aggregateId만으로는 어떤 엔티티의 ID인지 알 수 없으므로,
+     * 해당 ID가 속한 도메인 엔티티 타입을 명시합니다.
+     *
+     * 예시: "Order", "Product", "Payment", "User"
+     */
+    val aggregateType: String
 
     /**
      * 분산 추적 ID (OpenTelemetry Trace ID)
@@ -62,6 +72,7 @@ interface DomainEvent {
  * 일반적으로는 서비스별 Base 클래스(EcommerceDomainEvent, PaymentDomainEvent 등)를 사용하는 것을 권장합니다.
  *
  * @param aggregateId 이벤트가 발생한 Aggregate의 Public ID (필수, NOT Internal ID)
+ * @param aggregateType Aggregate 타입 (AbsDomain 하위 클래스의 simpleName, 예: "Order", "Product")
  * @param eventId 이벤트 고유 ID (자동 생성)
  * @param traceId OpenTelemetry Trace ID (32자 hex)
  * @param spanId OpenTelemetry Span ID (16자 hex)
@@ -70,6 +81,7 @@ interface DomainEvent {
  */
 abstract class BaseDomainEvent(
     override val aggregateId: String,
+    override val aggregateType: String,
     override val eventId: String = UUID.randomUUID().toString(),
     override val traceId: String? = null,
     override val spanId: String? = null,

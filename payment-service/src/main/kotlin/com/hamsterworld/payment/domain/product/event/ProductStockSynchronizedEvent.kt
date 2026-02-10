@@ -38,7 +38,8 @@ data class ProductStockSynchronizedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
-    aggregateId = ecommerceProductId,  // E-commerce Product의 Public ID
+    aggregateId = ecommerceProductId,
+    aggregateType = "Product",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

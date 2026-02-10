@@ -89,6 +89,7 @@ class OutboxEventRecorder(
             val topic = event.topic
             val eventId = event.eventId
             val aggregateId = event.aggregateId
+            val aggregateType = event.aggregateType
 
             // 멱등성 보장: DB UNIQUE 제약조건에 위임
             // - event_id 컬럼에 UNIQUE 제약조건 있음
@@ -103,6 +104,7 @@ class OutboxEventRecorder(
                 eventId = eventId,
                 eventType = eventType,
                 aggregateId = aggregateId,
+                aggregateType = aggregateType,
                 topic = topic,
                 payload = payload,
                 traceId = event.traceId,
@@ -125,20 +127,28 @@ class OutboxEventRecorder(
     }
 
     /**
-     * 이벤트 직렬화 (DomainEventPublisher와 동일한 형식)
+     * 이벤트 직렬화
      *
      * payload에는 비즈니스 데이터만 포함
      * metadata는 이벤트의 인프라 필드에서 추출
      *
-     * 메시지 구조:
+     * ## Kafka 메시지 구조 (2026-02-10, Claude Opus 4 / claude-opus-4-6)
+     *
+     * traceId는 outer envelope + metadata 양쪽에 존재합니다.
+     * - outer: Consumer가 파싱 없이 바로 접근 (aggregateId, aggregateType과 동일 레벨)
+     * - metadata: 하위 호환성 유지
+     *
      * ```json
      * {
      *   "eventType": "OrderCreatedEvent",
      *   "aggregateId": "order-123",
+     *   "aggregateType": "Order",
+     *   "traceId": "abc123...",
      *   "payload": { ...business data only... },
      *   "metadata": {
      *     "eventId": "...",
-     *     "traceId": "...",
+     *     "traceId": "abc123...",
+     *     "spanId": "...",
      *     "occurredAt": "..."
      *   }
      * }
@@ -155,18 +165,20 @@ class OutboxEventRecorder(
         @Suppress("UNCHECKED_CAST")
         val eventMap = objectMapper.convertValue(event, Map::class.java) as Map<String, Any?>
         val payloadMap = eventMap.filterKeys {
-            it !in setOf("aggregateId", "topic", "eventId", "traceId", "spanId", "occurredAt")
+            it !in setOf("aggregateId", "aggregateType", "topic", "eventId", "traceId", "spanId", "occurredAt")
         }
 
         return objectMapper.writeValueAsString(
             mapOf(
                 "eventType" to eventType,
                 "aggregateId" to event.aggregateId,
+                "aggregateType" to event.aggregateType,
+                "traceId" to traceId,  // outer envelope (Consumer가 metadata 파싱 없이 바로 접근)
                 "payload" to payloadMap,
                 "metadata" to mapOf(
                     "eventId" to eventId,
-                    "traceId" to traceId,
-                    "spanId" to spanId,  // spanId 추가
+                    "traceId" to traceId,  // 하위 호환성 유지
+                    "spanId" to spanId,
                     "occurredAt" to occurredAt
                 )
             )

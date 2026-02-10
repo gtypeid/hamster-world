@@ -38,7 +38,9 @@ data class PaymentCancelledEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : CashGatewayDomainEvent(
-    aggregateId = orderPublicId ?: paymentPublicId,  // orderPublicId가 있으면 사용, 없으면 paymentPublicId
+    aggregateId = orderPublicId ?: paymentPublicId,
+    // 내부 거래(주문 기반): Order / 외부 거래(독립 결제): PaymentProcess — CashGatewayDomainEvent KDoc 참고
+    aggregateType = if (orderPublicId != null) "Order" else "PaymentProcess",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

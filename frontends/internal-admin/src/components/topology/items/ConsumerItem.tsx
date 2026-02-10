@@ -3,7 +3,7 @@ import { MarkerType } from 'reactflow'
 import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 
 const CONSUMER_NODE_WIDTH = 200
-const CONSUMER_NODE_HEIGHT = 70
+const CONSUMER_NODE_HEIGHT = 90
 
 /**
  * Consumer 노드 아이템
@@ -23,7 +23,7 @@ export class ConsumerItem extends TopologyWorldItem {
     return `consumer-${this.serviceName}-${this.topic}`
   }
 
-  render(): { nodes: Node[]; edges: Edge[] } {
+  render(): { nodes: Node[] } {
     const isInactive = this.isInactive(undefined, this.topic)
     const consumerId = this.getId()
 
@@ -36,7 +36,10 @@ export class ConsumerItem extends TopologyWorldItem {
             <div className="text-[8px] font-bold text-blue-900 bg-blue-200 px-1 py-0.5 rounded-t mb-1">
               CONSUMER
             </div>
-            <div className="text-[11px] font-bold text-blue-900">{this.topic}</div>
+            <div className="text-[10px] font-bold text-blue-900 mb-1">{this.topic}</div>
+            <div className="text-[8px] text-blue-700 bg-blue-100 px-1 py-0.5 rounded">
+              📦 {this.serviceName}
+            </div>
           </div>
         ),
       },
@@ -53,23 +56,6 @@ export class ConsumerItem extends TopologyWorldItem {
       },
     }
 
-    // Consumer → Service 엣지 (파란색)
-    const edge: Edge = {
-      id: `edge-consumer-service-${consumerId}-${this.serviceName}`,
-      source: consumerId,
-      target: `service-${this.serviceName}`,
-      animated: !isInactive,
-      style: {
-        stroke: isInactive ? '#d1d5db' : '#2563eb',
-        strokeWidth: 2,
-        opacity: isInactive ? 0.3 : 1,
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: isInactive ? '#d1d5db' : '#2563eb',
-      },
-    }
-
-    return { nodes: [node], edges: [edge] }
+    return { nodes: [node] }
   }
 }

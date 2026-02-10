@@ -116,9 +116,12 @@ abstract class BaseKafkaConsumer(
         val aggregateId = eventData["aggregateId"] as? String
             ?: throw IllegalArgumentException("Missing aggregateId in event")
 
+        val aggregateType = eventData["aggregateType"] as? String
+
         val metadata = eventData["metadata"] as? Map<*, *>
         val eventId = metadata?.get("eventId") as? String
-        val traceId = metadata?.get("traceId") as? String
+        // traceId: outer envelope 우선, 없으면 metadata fallback (하위 호환성)
+        val traceId = (eventData["traceId"] as? String) ?: (metadata?.get("traceId") as? String)
         val spanId = metadata?.get("spanId") as? String
         val timestamp = (metadata?.get("occurredAt") as? String)?.let {
             // ISO 8601 문자열을 timestamp로 변환하거나 그냥 사용
@@ -144,6 +147,7 @@ abstract class BaseKafkaConsumer(
             timestamp = timestamp,
             traceId = traceId,
             aggregateId = aggregateId,
+            aggregateType = aggregateType,
             payload = payload
         )
     }
@@ -194,8 +198,8 @@ abstract class BaseKafkaConsumer(
         try {
             val parsedEvent = parseEvent(message)
             logger.debug(
-                "Processing event: type={}, aggregateId={}, eventId={}, traceId={}",
-                parsedEvent.eventType, parsedEvent.aggregateId, parsedEvent.eventId, parsedEvent.traceId
+                "Processing event: type={}, aggregateType={}, aggregateId={}, eventId={}, traceId={}",
+                parsedEvent.eventType, parsedEvent.aggregateType, parsedEvent.aggregateId, parsedEvent.eventId, parsedEvent.traceId
             )
 
             // ✅ YML 기반 이벤트 필터링 (등록되지 않은 이벤트는 즉시 스킵)
@@ -213,9 +217,9 @@ abstract class BaseKafkaConsumer(
                 return
             }
 
-            // 멱등성 체크 (eventId 기반, 무조건 수행)
+            // 멱등성 체크 (발행자의 eventId 기반, 무조건 수행)
             if (parsedEvent.eventId != null) {
-                if (processedEventRepository.existsByEventId(parsedEvent.eventId)) {
+                if (processedEventRepository.existsByOriginEventId(parsedEvent.eventId)) {
                     logger.info(
                         "EVENT_ALREADY_PROCESSED | traceId={} | eventType={} | eventId={} | consumer={} | action=SKIP",
                         parsedEvent.traceId ?: "N/A",
@@ -232,10 +236,14 @@ abstract class BaseKafkaConsumer(
             handleEvent(parsedEvent)
 
             // 처리 이력 저장 (멱등성 보장)
+            // 발행자(origin)의 eventId, aggregateId, aggregateType, traceId를 모두 기록
             if (parsedEvent.eventId != null) {
                 val processedEvent = ProcessedEvent(
-                    eventId = parsedEvent.eventId,
+                    originEventId = parsedEvent.eventId,
                     eventType = parsedEvent.eventType,
+                    originAggregateId = parsedEvent.aggregateId,
+                    originAggregateType = parsedEvent.aggregateType,
+                    traceId = parsedEvent.traceId,
                     consumedBy = this.javaClass.simpleName
                 )
                 processedEventRepository.save(processedEvent)
@@ -245,9 +253,10 @@ abstract class BaseKafkaConsumer(
 
             // 성공 로그
             logger.info(
-                "EVENT_CONSUMED_SUCCESS | traceId={} | eventType={} | aggregateId={} | eventId={} | consumer={}",
+                "EVENT_CONSUMED_SUCCESS | traceId={} | eventType={} | aggregateType={} | aggregateId={} | eventId={} | consumer={}",
                 parsedEvent.traceId ?: "N/A",
                 parsedEvent.eventType,
+                parsedEvent.aggregateType ?: "N/A",
                 parsedEvent.aggregateId,
                 parsedEvent.eventId ?: "N/A",
                 this.javaClass.simpleName
@@ -282,30 +291,40 @@ abstract class BaseKafkaConsumer(
  *
  * Kafka 메시지를 파싱한 결과
  *
- * ## 메시지 구조
+ * ## Kafka 메시지 구조 (2026-02-10, Claude Opus 4 / claude-opus-4-6)
  * ```json
  * {
  *   "eventType": "ProductCreatedEvent",
  *   "aggregateId": "product-123",
- *   "payload": { ... },
+ *   "aggregateType": "Product",
+ *   "traceId": "abc123...",
+ *   "payload": { ...business data only... },
  *   "metadata": {
  *     "eventId": "550e8400-e29b-41d4-a716-446655440000",
- *     "traceId": "trace-123",
- *     "occurredAt": "2024-01-30T12:00:00Z"
+ *     "traceId": "abc123...",
+ *     "spanId": "def456...",
+ *     "occurredAt": "2024-01-30T12:00:00"
  *   }
  * }
  * ```
  *
+ * ## 필드 출처
+ * - outer envelope: eventType, aggregateId, aggregateType, traceId — 모두 발행자(origin) 정보
+ * - metadata: eventId, traceId(중복), spanId, occurredAt — 인프라 메타데이터
+ * - payload: 순수 비즈니스 데이터
+ *
  * @property eventType 이벤트 타입 (필수) - Consumer가 when 분기에 사용
- * @property aggregateId Aggregate ID (필수) - Kafka 파티셔닝 키, 순서 보장
- * @property eventId 이벤트 ID (선택) - 멱등성 체크용
- * @property traceId 분산 추적 ID (선택) - 로깅/추적용
+ * @property aggregateId 발행자의 Aggregate ID (필수) - Kafka 파티셔닝 키, 순서 보장
+ * @property aggregateType 발행자의 Aggregate 타입 (선택) - "Order", "Product" 등
+ * @property eventId 발행자의 이벤트 ID (선택) - 멱등성 체크용 (ProcessedEvent.originEventId로 저장)
+ * @property traceId 분산 추적 ID (선택) - outer envelope 우선, metadata fallback
  * @property timestamp 이벤트 발생 시각 (선택)
  * @property payload 페이로드 객체 (필수) - 비즈니스 데이터
  */
 data class ParsedEvent(
     val eventType: String,
     val aggregateId: String,
+    val aggregateType: String?,
     val eventId: String?,
     val traceId: String?,
     val timestamp: Long?,

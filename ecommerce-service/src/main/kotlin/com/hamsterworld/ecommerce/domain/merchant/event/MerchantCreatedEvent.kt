@@ -30,6 +30,7 @@ data class MerchantCreatedEvent(
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : EcommerceDomainEvent(
     aggregateId = merchantPublicId,
+    aggregateType = "Merchant",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

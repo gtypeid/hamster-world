@@ -16,7 +16,7 @@ const NODE_WIDTHS: Record<string, number> = {
 const NODE_HEIGHTS: Record<string, number> = {
   service: 120,
   publisher: 70,
-  consumer: 70,
+  consumer: 90,
   topic: 80,
   event: 60,
 }
@@ -36,9 +36,13 @@ export class TopologyRenderer {
 
     // 각 아이템의 render() 호출 (EventItem에만 mode 전달)
     items.forEach((item) => {
-      const { nodes, edges } = item.render(eventMode)
-      allNodes.push(...nodes)
-      allEdges.push(...edges)
+      const result = item.render(eventMode)
+      allNodes.push(...result.nodes)
+      // EdgeRelationItem: edges 항상 반환
+      // EventItem: Consumer 참조 엣지만 반환 (PublisherEvent는 엣지 없음)
+      if ('edges' in result && result.edges) {
+        allEdges.push(...result.edges)
+      }
     })
 
     return { nodes: allNodes, edges: allEdges }

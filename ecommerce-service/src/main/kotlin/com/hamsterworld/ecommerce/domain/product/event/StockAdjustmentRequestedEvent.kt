@@ -24,7 +24,8 @@ data class StockAdjustmentRequestedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : EcommerceDomainEvent(
-    aggregateId = productPublicId,  // Already a String (Public ID)
+    aggregateId = productPublicId,
+    aggregateType = "Product",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

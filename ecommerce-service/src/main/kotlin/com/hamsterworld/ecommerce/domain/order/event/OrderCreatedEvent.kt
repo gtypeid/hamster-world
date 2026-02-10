@@ -30,7 +30,8 @@ data class OrderCreatedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : EcommerceDomainEvent(
-    aggregateId = orderPublicId,  // Already a String (Public ID)
+    aggregateId = orderPublicId,
+    aggregateType = "Order",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,

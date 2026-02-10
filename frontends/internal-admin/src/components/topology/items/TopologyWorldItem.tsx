@@ -13,9 +13,11 @@ export abstract class TopologyWorldItem {
 
   /**
    * 이 아이템의 노드와 엣지를 렌더링
+   * - EventItem/EdgeRelationItem: edges 반환
+   * - 나머지: edges는 optional (또는 빈 배열)
    * @param mode - 이벤트 렌더링 모드 (single | multi), EventItem만 사용
    */
-  abstract render(mode?: any): { nodes: Node[]; edges: Edge[] }
+  abstract render(mode?: any): { nodes: Node[]; edges?: Edge[] }
 
   /**
    * TraceContext에 따라 비활성화 여부 판단

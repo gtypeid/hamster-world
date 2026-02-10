@@ -39,7 +39,8 @@ data class OrderStockReservedEvent(
     override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
     override val occurredAt: LocalDateTime = LocalDateTime.now()
 ) : PaymentDomainEvent(
-    aggregateId = orderPublicId,  // Already a String (Public ID)
+    aggregateId = orderPublicId,
+    aggregateType = "Order",
     eventId = eventId,
     traceId = traceId,
     spanId = spanId,
