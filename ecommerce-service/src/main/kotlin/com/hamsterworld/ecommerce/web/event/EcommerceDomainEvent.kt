@@ -1,8 +1,7 @@
 package com.hamsterworld.ecommerce.web.event
 
 import com.hamsterworld.common.web.kafka.BaseDomainEvent
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.stereotype.Component
+import com.hamsterworld.common.web.kafka.KafkaTopics
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -28,23 +27,5 @@ abstract class EcommerceDomainEvent(
     traceId = traceId,
     spanId = spanId,
     occurredAt = occurredAt,
-    topic = EcommerceDomainEventTopicProvider.topic
+    topic = KafkaTopics.ECOMMERCE_EVENTS
 )
-
-/**
- * Spring Property를 사용하여 토픽 이름을 제공하는 컴포넌트
- *
- * kafka-topology.yml에 정의된 토픽을 자동으로 주입받아 사용합니다.
- */
-@Component
-class EcommerceDomainEventTopicProvider {
-    companion object {
-        lateinit var topic: String
-            private set
-    }
-
-    @Value("\${kafka.service.ecommerce-service.topic}")
-    fun setTopic(topicName: String) {
-        topic = topicName
-    }
-}
