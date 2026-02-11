@@ -4,17 +4,24 @@ import { useCart, useUpdateCartQuantity, useRemoveFromCart, useClearCart } from 
 import { useAuth } from '../contexts/AuthContext'
 import { useAlert } from '../contexts/AlertContext'
 import { useCreateOrder } from '../hooks/useOrders'
+import { useMyAvailableCoupons } from '../hooks/useCoupon'
+import { CouponModal } from '../components/CouponModal'
+import type { UserCouponDto } from '../types/coupon'
 
 export function CartPage() {
   const navigate = useNavigate()
   const { token } = useAuth()
   const { showAlert, showConfirm } = useAlert()
   const { data: cartItems = [], isLoading, error } = useCart()
+  const { data: availableCoupons = [] } = useMyAvailableCoupons()
   const updateQuantity = useUpdateCartQuantity()
   const removeItem = useRemoveFromCart()
   const clearCart = useClearCart()
   const createOrder = useCreateOrder()
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [showCouponModal, setShowCouponModal] = useState(false)
+  const [selectedCoupon, setSelectedCoupon] = useState<UserCouponDto | null>(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
 
   const handleQuantityChange = (itemId: string, currentQuantity: number, delta: number, maxStock: number) => {
     const newQuantity = currentQuantity + delta
@@ -80,9 +87,21 @@ export function CartPage() {
     }
   }
 
+  const handleSelectCoupon = (coupon: UserCouponDto, discount: number) => {
+    setSelectedCoupon(coupon)
+    setDiscountAmount(discount)
+  }
+
+  const handleRemoveCoupon = () => {
+    setSelectedCoupon(null)
+    setDiscountAmount(0)
+  }
+
   const totalPrice = cartItems.reduce((sum, item) =>
     sum + (item.product.price * item.cartItem.quantity), 0
   )
+
+  const finalPrice = totalPrice - discountAmount
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.cartItem.quantity, 0)
 
@@ -193,7 +212,7 @@ export function CartPage() {
                         >
                           {product.name}
                         </Link>
-                        <p className="text-sm text-gray-500">{product.vendor}</p>
+                        <p className="text-sm text-gray-500">{product.merchant}</p>
                       </div>
                       <button
                         onClick={() => handleRemoveItem(cartItem.id)}
@@ -260,14 +279,69 @@ export function CartPage() {
                   <span>상품 금액</span>
                   <span>{totalPrice.toLocaleString()}원</span>
                 </div>
+
+                {/* 쿠폰 할인 섹션 */}
+                <div className="border-t border-b border-gray-200 py-3 my-2">
+                  {selectedCoupon ? (
+                    // 쿠폰 적용됨
+                    <div className="bg-amber-50 rounded-lg p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🎫</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">
+                              {selectedCoupon.couponName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {selectedCoupon.couponCode}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleRemoveCoupon}
+                          className="text-xs text-gray-500 hover:text-gray-700 underline"
+                        >
+                          변경
+                        </button>
+                      </div>
+                      <p className="text-right text-red-600 font-bold">
+                        -{discountAmount.toLocaleString()}원
+                      </p>
+                    </div>
+                  ) : (
+                    // 쿠폰 미적용
+                    <button
+                      onClick={() => setShowCouponModal(true)}
+                      className="w-full py-3 border-2 border-dashed border-amber-300 rounded-lg
+                                 text-amber-600 hover:bg-amber-50 transition-colors
+                                 flex items-center justify-center gap-2"
+                    >
+                      <span className="text-xl">🎫</span>
+                      <span className="font-medium">쿠폰 선택하기</span>
+                      {availableCoupons.length > 0 && (
+                        <span className="text-xs bg-amber-100 px-2 py-1 rounded">
+                          {availableCoupons.length}개 사용가능
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+
                 <div className="flex justify-between text-gray-700">
                   <span>배송비</span>
                   <span className="text-green-600 font-medium">무료</span>
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between text-lg font-bold">
                   <span>총 결제 금액</span>
-                  <span className="text-hamster-orange">{totalPrice.toLocaleString()}원</span>
+                  <span className="text-hamster-orange">{finalPrice.toLocaleString()}원</span>
                 </div>
+
+                {/* 할인 금액 강조 */}
+                {discountAmount > 0 && (
+                  <div className="text-center text-sm text-green-600 font-medium">
+                    💰 {discountAmount.toLocaleString()}원 할인!
+                  </div>
+                )}
               </div>
 
               <button
@@ -303,6 +377,14 @@ export function CartPage() {
             </div>
           </div>
         </div>
+
+        {/* 쿠폰 선택 모달 */}
+        <CouponModal
+          isOpen={showCouponModal}
+          onClose={() => setShowCouponModal(false)}
+          totalPrice={totalPrice}
+          onSelectCoupon={handleSelectCoupon}
+        />
       </div>
     </div>
   )

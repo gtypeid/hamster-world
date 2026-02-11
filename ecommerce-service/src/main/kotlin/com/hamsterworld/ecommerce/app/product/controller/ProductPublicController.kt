@@ -38,15 +38,7 @@ class ProductPublicController(
     ): ResponseEntity<ProductDetailResponse> {
         log.info("Getting product detail: publicId=$publicId")
 
-        val (product, merchant, reviewStats) = productService.getProductDetailWithReviewStatsByPublicId(publicId)
-        val response = ProductDetailResponse.from(
-            product,
-            merchant,
-            reviewStats.averageRating,
-            reviewStats.reviewCount
-        )
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(productService.getProductDetailResponseByPublicId(publicId))
     }
 
     @Operation(summary = "상품 목록 조회", description = "검색 조건에 맞는 상품 목록을 조회합니다 (리뷰 통계 포함)")
@@ -59,10 +51,7 @@ class ProductPublicController(
             search.sku, search.name, search.category, search.onlyAvailable
         )
 
-        val productsWithStats = productService.searchProducts(search)
-        val responses = productsWithStats.map {
-            ProductResponse.from(it.product, it.averageRating, it.reviewCount)
-        }
+        val responses = productService.searchProductsAsDtoList(search)
 
         log.info("Found ${responses.size} products")
 
@@ -76,12 +65,9 @@ class ProductPublicController(
     ): ResponseEntity<Page<ProductResponse>> {
         log.info("Searching products (page): page=${search.page}, size=${search.size}")
 
-        val pageWithStats = productService.searchProductsPage(search)
-        val responses = pageWithStats.map {
-            ProductResponse.from(it.product, it.averageRating, it.reviewCount)
-        }
+        val responses = productService.searchProductsAsDtoPage(search)
 
-        log.info("Found ${pageWithStats.totalElements} products (page ${pageWithStats.number}/${pageWithStats.totalPages})")
+        log.info("Found ${responses.totalElements} products (page ${responses.number}/${responses.totalPages})")
 
         return ResponseEntity.ok(responses)
     }

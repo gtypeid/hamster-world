@@ -29,9 +29,9 @@ class UserController(
             throw CustomRuntimeException("본인의 정보만 조회할 수 있습니다")
         }
 
-        val targetUser = userService.findByKeycloakUserId(keycloakUserId)
+        val response = userService.getUserResponseByKeycloakUserId(keycloakUserId)
             ?: return ResponseEntity.notFound().build()
 
-        return ResponseEntity.ok(UserResponse.from(targetUser))
+        return ResponseEntity.ok(response)
     }
 }

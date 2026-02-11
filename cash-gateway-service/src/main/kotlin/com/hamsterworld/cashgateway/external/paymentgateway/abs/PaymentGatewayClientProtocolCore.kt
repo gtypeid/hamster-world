@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus
 import com.hamsterworld.common.domain.converter.DomainConverterAdapter
 import com.hamsterworld.common.web.exception.CustomRuntimeException
+import com.hamsterworld.common.tracing.TraceContextHolder
 import org.slf4j.LoggerFactory
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -42,7 +43,7 @@ abstract class PaymentGatewayClientProtocolCore(
     private val domainConverterAdapter: DomainConverterAdapter,
     private val paymentGatewayCoreService: PaymentGatewayCoreService,
     private val provider: PaymentGatewayProvider,
-    private val traceContextHolder: com.hamsterworld.common.tracing.TraceContextHolder
+    private val traceContextHolder: TraceContextHolder
 ) : PaymentGatewayClientProtocol {
 
     private val log = LoggerFactory.getLogger(PaymentGatewayClientProtocolCore::class.java)
@@ -290,7 +291,7 @@ abstract class PaymentGatewayClientProtocolCore(
             provider.getProvider().name, existingProcess.id, existingProcess.status)
 
         // PENDING 상태 검증
-        if (existingProcess.status != com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus.PENDING) {
+        if (existingProcess.status != PaymentProcessStatus.PENDING) {
             log.warn("[{}] PENDING 상태가 아닌 거래에 Webhook 수신 | processId={}, status={}",
                 provider.getProvider().name, existingProcess.id, existingProcess.status)
             return  // 이미 처리됨 or 잘못된 상태

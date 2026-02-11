@@ -6,6 +6,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import com.hamsterworld.notification.domain.topology.dto.EventRegistryDto
 import com.hamsterworld.notification.domain.topology.dto.TopicPublicationDto
 import com.hamsterworld.notification.domain.topology.dto.TopicSubscriptionDto
+import com.hamsterworld.notification.app.topology.response.EventRegistryResponse
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.ClassPathResource
@@ -55,6 +56,17 @@ class EventRegistryReader(
             logger.error("Failed to read kafka-event-registry.yml", e)
             throw IllegalStateException("Failed to read kafka-event-registry.yml", e)
         }
+    }
+
+    /**
+     * kafka-event-registry.yml 읽기 (Response DTO 반환)
+     *
+     * @return EventRegistryResponse
+     * @throws IllegalStateException kafka-event-registry.yml이 없거나 파싱 실패 시
+     */
+    fun readEventRegistryResponse(): EventRegistryResponse {
+        val dto = readEventRegistry()
+        return EventRegistryResponse.from(dto)
     }
 
     /**

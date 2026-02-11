@@ -35,10 +35,9 @@ class UserAdminController(
     ): ResponseEntity<UserResponse> {
         log.info("[Admin] Getting user by keycloakUserId: $keycloakUserId")
 
-        val user = userService.findByKeycloakUserId(keycloakUserId)
+        val response = userService.getUserResponseByKeycloakUserId(keycloakUserId)
             ?: return ResponseEntity.notFound().build()
 
-        val response = UserResponse.from(user)
         return ResponseEntity.ok(response)
     }
 
@@ -52,9 +51,7 @@ class UserAdminController(
     ): ResponseEntity<UserResponse> {
         log.info("[Admin] Getting user by publicId: $publicId")
 
-        val user = userService.findByPublicId(publicId)
-        val response = UserResponse.from(user)
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(userService.getUserResponseByPublicId(publicId))
     }
 
     @Operation(
@@ -67,8 +64,7 @@ class UserAdminController(
     ): ResponseEntity<List<UserResponse>> {
         log.info("[Admin] Searching users (list): userId=${search.userId}, username=${search.username}, role=${search.role}")
 
-        val users = userService.searchUsers(search)
-        val responses = users.map { UserResponse.from(it) }
+        val responses = userService.searchUserResponses(search)
 
         log.info("[Admin] Found ${responses.size} users")
 
@@ -85,10 +81,9 @@ class UserAdminController(
     ): ResponseEntity<Page<UserResponse>> {
         log.info("[Admin] Searching users (page): page=${search.page}, size=${search.size}")
 
-        val page = userService.searchUsersPage(search)
-        val responses = page.map { UserResponse.from(it) }
+        val responses = userService.searchUserResponsesPage(search)
 
-        log.info("[Admin] Found ${page.totalElements} users (page ${page.number}/${page.totalPages})")
+        log.info("[Admin] Found ${responses.totalElements} users (page ${responses.number}/${responses.totalPages})")
 
         return ResponseEntity.ok(responses)
     }

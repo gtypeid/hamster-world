@@ -24,8 +24,7 @@ class PgMidController(
     ): ResponseEntity<MidResponse> {
         log.info("Creating MID: merchantName=${request.merchantName}")
 
-        val pgMid = pgMidService.createMid(request.merchantName)
-        val response = MidResponse.from(pgMid)
+        val response = pgMidService.createMidResponse(request.merchantName)
 
         log.info("MID created successfully: midId=${response.midId}, apiKey=${response.apiKey}")
 
@@ -38,10 +37,7 @@ class PgMidController(
     ): ResponseEntity<MidResponse> {
         log.info("Getting MID: midId=$midId")
 
-        val pgMid = pgMidService.getMid(midId)
-        val response = MidResponse.from(pgMid)
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(pgMidService.getMidResponse(midId))
     }
 
     @GetMapping("/list")
@@ -50,8 +46,7 @@ class PgMidController(
     ): ResponseEntity<List<MidResponse>> {
         log.info("Searching MIDs (list): midId=${search.midId}, merchantName=${search.merchantName}, isActive=${search.isActive}")
 
-        val pgMids = pgMidService.searchMids(search)
-        val responses = pgMids.map { MidResponse.from(it) }
+        val responses = pgMidService.searchMidsResponseList(search)
 
         log.info("Found ${responses.size} MIDs")
 
@@ -64,10 +59,9 @@ class PgMidController(
     ): ResponseEntity<Page<MidResponse>> {
         log.info("Searching MIDs (page): page=${search.page}, size=${search.size}")
 
-        val page = pgMidService.searchMidsPage(search)
-        val responses = page.map { MidResponse.from(it) }
+        val responses = pgMidService.searchMidsResponsePage(search)
 
-        log.info("Found ${page.totalElements} MIDs (page ${page.number}/${page.totalPages})")
+        log.info("Found ${responses.totalElements} MIDs (page ${responses.number}/${responses.totalPages})")
 
         return ResponseEntity.ok(responses)
     }
@@ -78,8 +72,7 @@ class PgMidController(
     ): ResponseEntity<MidResponse> {
         log.info("Deactivating MID: midId=$midId")
 
-        val pgMid = pgMidService.deactivateMid(midId)
-        val response = MidResponse.from(pgMid)
+        val response = pgMidService.deactivateMidResponse(midId)
 
         log.info("MID deactivated: midId=$midId")
 
@@ -92,8 +85,7 @@ class PgMidController(
     ): ResponseEntity<MidResponse> {
         log.info("Activating MID: midId=$midId")
 
-        val pgMid = pgMidService.activateMid(midId)
-        val response = MidResponse.from(pgMid)
+        val response = pgMidService.activateMidResponse(midId)
 
         log.info("MID activated: midId=$midId")
 

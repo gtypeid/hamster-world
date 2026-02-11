@@ -41,13 +41,33 @@ export interface ProductDetailResponse {
   price: number
   stock: number
   isSoldOut: boolean
+  averageRating: number // 평균 평점
+  reviewCount: number // 리뷰 개수
   lastStockSyncedAt: string | null
   merchant: {
     publicId: string
     storeName: string
   }
+  coupons: ProductCouponInfo[] // 해당 상품에 적용 가능한 쿠폰 목록
   createdAt: string | null
   modifiedAt: string | null
+}
+
+/**
+ * 상품 상세에 부착되는 발급 가능 쿠폰 정보 (ProductCouponInfo.kt)
+ *
+ * 백엔드에서 제공하는 경량 쿠폰 정보
+ * - 발급 상태 정보는 포함되지 않음 (발급 가능한 쿠폰만 필터링되어 옴)
+ */
+export interface ProductCouponInfo {
+  couponPolicyPublicId: string
+  couponCode: string
+  name: string
+  discountType: 'FIXED' | 'PERCENTAGE'
+  discountValue: number
+  maxDiscountAmount: number | null
+  minOrderAmount: number
+  validUntil: string // ISO DateTime
 }
 
 /**
@@ -58,7 +78,7 @@ export interface Product {
   name: string
   price: number
   images: string[]
-  vendor: string
+  merchant: string
   rating: number
   soldCount: number
   description: string

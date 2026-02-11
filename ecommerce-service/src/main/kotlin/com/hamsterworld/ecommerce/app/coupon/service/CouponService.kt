@@ -11,8 +11,10 @@ import com.hamsterworld.ecommerce.domain.coupon.constant.CouponIssuerType
 import com.hamsterworld.ecommerce.domain.coupon.constant.CouponStatus
 import com.hamsterworld.ecommerce.domain.coupon.model.CouponPolicy
 import com.hamsterworld.ecommerce.domain.coupon.model.CouponUsage
+import com.hamsterworld.ecommerce.domain.coupon.repository.CouponPolicyProductRepository
 import com.hamsterworld.ecommerce.domain.coupon.repository.CouponPolicyRepository
 import com.hamsterworld.ecommerce.domain.coupon.repository.CouponUsageRepository
+import com.hamsterworld.ecommerce.domain.coupon.repository.UserCouponRepository
 import com.hamsterworld.ecommerce.domain.merchant.model.Merchant
 import com.hamsterworld.ecommerce.domain.merchant.repository.MerchantRepository
 import com.hamsterworld.ecommerce.domain.order.model.Order
@@ -31,7 +33,9 @@ import java.math.BigDecimal
 @Service
 class CouponService(
     private val couponPolicyRepository: CouponPolicyRepository,
+    private val couponPolicyProductRepository: CouponPolicyProductRepository,
     private val couponUsageRepository: CouponUsageRepository,
+    private val userCouponRepository: UserCouponRepository,
     private val merchantRepository: MerchantRepository,
     private val orderRepository: OrderRepository,
     private val orderItemJpaRepository: OrderItemJpaRepository,
@@ -59,8 +63,9 @@ class CouponService(
             description = request.description,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
+            couponDays = request.couponDays ?: 10,
             usageCondition = CouponUsageConditionFilter(
-                minOrderAmount = request.minOrderAmount,
+                minOrderAmount = request.minOrderAmount ?: BigDecimal.ZERO,
                 filtersJson = request.conditionFiltersJson
             ),
             discountEmitter = DiscountConditionEmitter(
@@ -101,10 +106,17 @@ class CouponService(
     }
 
     /**
-     * 판매자 쿠폰 목록 조회
+     * 판매자 쿠폰 목록 조회 (대상 상품 정보 포함)
+     *
+     * 배치 조회 패턴:
+     * 1. 쿠폰 정책 목록 조회 (루트)
+     * 2. 정책 ID IN 쿼리로 CouponPolicyProduct 일괄 조회
+     * 3. 상품 ID IN 쿼리로 Product 일괄 조회
+     * 4. groupBy로 조합
      */
     fun getMerchantCoupons(merchant: Merchant): List<CouponPolicyDto> {
-        val coupons = couponPolicyRepository.searchCouponPolicies(
+        // 1. 쿠폰 정책 목록 (루트)
+        val policies = couponPolicyRepository.searchCouponPolicies(
             issuerType = CouponIssuerType.MERCHANT,
             merchantId = merchant.id!!,
             status = null,
@@ -112,7 +124,42 @@ class CouponService(
             to = null
         )
 
-        return coupons.map { CouponPolicyDto.from(it, merchant.publicId) }
+        if (policies.isEmpty()) return emptyList()
+
+        // 2. 정책 ID 기반 CouponPolicyProduct 배치 조회
+        val policyIds = policies.map { it.id!! }
+        val policyProducts = couponPolicyProductRepository.findByCouponPolicyIds(policyIds)
+
+        // 3. 상품 ID 기반 Product 배치 조회
+        val productIds = policyProducts.map { it.productId }.distinct()
+        val productMap = if (productIds.isNotEmpty()) {
+            productJpaRepository.findAllById(productIds).associateBy { it.id!! }
+        } else {
+            emptyMap()
+        }
+
+        // 4. couponPolicyId → List<TargetProductInfo> 그룹화
+        val targetProductsMap = policyProducts
+            .groupBy { it.couponPolicyId }
+            .mapValues { (_, cpps) ->
+                cpps.mapNotNull { cpp ->
+                    productMap[cpp.productId]?.let { product ->
+                        CouponPolicyDto.TargetProductInfo(
+                            productPublicId = product.publicId,
+                            productName = product.name
+                        )
+                    }
+                }
+            }
+
+        // 5. 조합
+        return policies.map { policy ->
+            CouponPolicyDto.from(
+                couponPolicy = policy,
+                merchantPublicId = merchant.publicId,
+                targetProducts = targetProductsMap[policy.id] ?: emptyList()
+            )
+        }
     }
 
     /**
@@ -197,40 +244,51 @@ class CouponService(
     }
 
     /**
-     * 쿠폰 적용 (Internal - OrderService에서 호출)
+     * [DEPRECATED] 쿠폰 적용 — 단독 호출 금지
      *
-     * 주문 생성 시 쿠폰 코드가 제공되면 이 메서드를 호출하여 쿠폰을 적용합니다.
+     * 쿠폰 적용은 이제 Cart→Order 파이프라인 내에서 처리됩니다.
+     * - CartToOrderCouponValidator: 사전 검증
+     * - CartToOrderConverter: 할인 계산 + CouponApplyResult 생성
+     * - OrderRepository.saveOrderRecord(): CouponUsage 생성 + UserCoupon USED 전환
      *
-     * @param userId 사용자 ID
-     * @param couponCode 쿠폰 코드
-     * @param orderId 주문 ID
-     * @return 할인 금액
+     * 이 메서드는 하위 호환을 위해 유지되나, 신규 코드에서는 사용하지 마십시오.
      */
+    @Deprecated("Cart→Order 파이프라인으로 이전됨. CartToOrderConverter 참조")
     @Transactional
     fun applyCouponInternal(userId: Long, couponCode: String, orderId: Long): BigDecimal {
         // 1. 쿠폰 정책 조회
         val couponPolicy = couponPolicyRepository.findByCouponCodeOrThrow(couponCode)
 
-        // 2. 쿠폰 사용 가능 여부 확인
+        // 2. 쿠폰 정책 유효성 확인 (ACTIVE + 기간)
         if (!couponPolicy.isUsable()) {
             throw CustomRuntimeException("사용할 수 없는 쿠폰입니다. 상태: ${couponPolicy.status}")
         }
 
-        // 3. 중복 사용 체크
+        // 3. UserCoupon 수령 여부 + 사용 가능 상태 확인
+        val userCoupon = userCouponRepository.findByUserIdAndCouponCode(userId, couponCode)
+            ?: throw CustomRuntimeException("수령하지 않은 쿠폰입니다. 먼저 쿠폰을 수령해주세요: $couponCode")
+
+        if (!userCoupon.isUsable()) {
+            throw CustomRuntimeException(
+                "사용할 수 없는 쿠폰입니다. status=${userCoupon.status}, expiresAt=${userCoupon.expiresAt}"
+            )
+        }
+
+        // 4. 중복 사용 체크 (CouponUsage 레벨)
         if (couponUsageRepository.existsByUserIdAndCouponCode(userId, couponCode)) {
             throw CustomRuntimeException("이미 사용한 쿠폰입니다: $couponCode")
         }
 
-        // 4. 주문 조회
+        // 5. 주문 조회
         val order = orderRepository.findById(orderId)
 
-        // 5. 사용 조건 검증
+        // 6. 사용 조건 검증
         validateCouponUsage(couponPolicy, order, userId)
 
-        // 6. 할인 금액 계산
+        // 7. 할인 금액 계산
         val discountAmount = calculateDiscount(couponPolicy, order)
 
-        // 7. CouponUsage 저장 (DDD 팩토리 메서드)
+        // 8. CouponUsage 저장 (DDD 팩토리 메서드)
         val couponUsage = CouponUsage.create(
             userId = userId,
             couponPolicyId = couponPolicy.id!!,
@@ -239,8 +297,11 @@ class CouponService(
             orderPublicId = order.publicId,
             discountAmount = discountAmount
         )
-
         couponUsageRepository.save(couponUsage)
+
+        // 9. UserCoupon 상태 → USED
+        val used = userCoupon.markUsed()
+        userCouponRepository.save(used)
 
         return discountAmount
     }

@@ -75,7 +75,7 @@ export function AdminProductsPage() {
                       <p className="text-xs text-gray-500">ID: {product.id}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {product.vendor}
+                      {product.merchant}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {product.category}

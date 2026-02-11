@@ -53,7 +53,7 @@ class ProductMerchantController(
         @AuthenticatedMerchant merchant: Merchant,
         @RequestBody request: CreateProductRequest
     ): ResponseEntity<ProductResponse> {
-        val product = productService.createProduct(
+        val response = productService.createProductAndReturnDto(
             merchantId = merchant.id!!,
             sku = request.sku,
             name = request.name,
@@ -64,8 +64,7 @@ class ProductMerchantController(
             initialStock = request.initialStock
         )
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ProductResponse.from(product, 0.0, 0))
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
     /**
@@ -89,16 +88,16 @@ class ProductMerchantController(
         @PathVariable publicId: String,
         @RequestBody request: UpdateProductRequest
     ): ResponseEntity<ProductResponse> {
-        val product = productService.updateProductMetadataByPublicId(
-            publicId = publicId,
-            name = request.name,
-            description = request.description,
-            imageUrl = request.imageUrl,
-            category = request.category,
-            price = request.price
+        return ResponseEntity.ok(
+            productService.updateProductMetadataByPublicIdAndReturnDto(
+                publicId = publicId,
+                name = request.name,
+                description = request.description,
+                imageUrl = request.imageUrl,
+                category = request.category,
+                price = request.price
+            )
         )
-
-        return ResponseEntity.ok(ProductResponse.from(product, 0.0, 0))
     }
 
     /**

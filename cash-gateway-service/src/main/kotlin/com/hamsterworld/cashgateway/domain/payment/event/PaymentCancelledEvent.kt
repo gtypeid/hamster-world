@@ -2,6 +2,7 @@ package com.hamsterworld.cashgateway.domain.payment.event
 
 import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
 import com.hamsterworld.common.tracing.TraceContextHolder
+import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -61,8 +62,8 @@ data class PaymentCancelledEvent(
          * @return PaymentCancelledEvent
          */
         fun from(
-            cancelProcess: com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess,
-            originProcess: com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
+            cancelProcess: PaymentProcess,
+            originProcess: PaymentProcess
         ): PaymentCancelledEvent {
             return PaymentCancelledEvent(
                 paymentPublicId = cancelProcess.publicId,  // 취소 PaymentProcess의 Public ID

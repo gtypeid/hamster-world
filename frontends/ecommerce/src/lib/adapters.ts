@@ -14,7 +14,7 @@ import type { BackendProduct, CartItemWithProduct } from '../types/api'
  * - publicId, sku, name, description, imageUrl, category, price, stock, isSoldOut
  *
  * 프론트엔드 형식:
- * - id(=publicId), name, price, images[], vendor, rating, soldCount, description, details, stock, category
+ * - id(=publicId), name, price, images[], merchant, rating, soldCount, description, details, stock, category
  */
 export function adaptProduct(backendProduct: BackendProduct): Product {
   // imageUrl을 배열로 변환 (없으면 기본 이모지)
@@ -31,7 +31,7 @@ export function adaptProduct(backendProduct: BackendProduct): Product {
     name: backendProduct.name,
     price: backendProduct.price,
     images: images,
-    vendor: '햄스터 월드', // TODO: 백엔드에 vendor 필드 추가 필요
+    merchant: '햄스터 월드', // TODO: 백엔드에 merchant 필드 추가 필요
     averageRating: backendProduct.averageRating ?? 0, // 실제 평균 평점
     reviewCount: backendProduct.reviewCount ?? 0, // 실제 리뷰 개수
     description: backendProduct.description || '',
@@ -65,7 +65,7 @@ export interface FrontendCartItemWithProduct {
     name: string
     price: number
     images: string[]
-    vendor: string
+    merchant: string
     stock: number
   }
 }
@@ -82,7 +82,7 @@ export function adaptCartItem(data: CartItemWithProduct): FrontendCartItemWithPr
       name: data.product.name,
       price: data.product.price,
       images: data.product.imageUrl ? [data.product.imageUrl] : ['📦'],
-      vendor: '햄스터 상점',
+      merchant: '햄스터 상점',
       stock: data.product.stock
     }
   }

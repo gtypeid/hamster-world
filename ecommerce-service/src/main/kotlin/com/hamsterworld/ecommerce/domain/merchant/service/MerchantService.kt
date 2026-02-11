@@ -2,11 +2,14 @@ package com.hamsterworld.ecommerce.domain.merchant.service
 
 import com.hamsterworld.common.external.keycloak.client.KeycloakAdminClient
 import com.hamsterworld.common.web.exception.CustomRuntimeException
+import com.hamsterworld.ecommerce.app.merchant.response.MerchantResponse
+import com.hamsterworld.ecommerce.app.merchant.response.MerchantSellerInfoResponse
 import com.hamsterworld.ecommerce.domain.merchant.model.BusinessInfo
 import com.hamsterworld.ecommerce.domain.merchant.model.Merchant
 import com.hamsterworld.ecommerce.domain.merchant.model.SettlementInfo
 import com.hamsterworld.ecommerce.domain.merchant.model.StoreInfo
 import com.hamsterworld.ecommerce.domain.merchant.repository.MerchantRepository
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
 import com.hamsterworld.common.domain.auth.UserRole
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -15,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class MerchantService(
     private val merchantRepository: MerchantRepository,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository,
+    private val userRepository: UserRepository,
     private val keycloakAdminClient: KeycloakAdminClient
 ) {
     private val log = LoggerFactory.getLogger(MerchantService::class.java)
@@ -127,5 +130,55 @@ class MerchantService(
         )
 
         return updatedMerchant
+    }
+
+    // DTO-returning methods for Controllers
+
+    /**
+     * Merchant 생성 후 MerchantResponse 반환
+     */
+    @Transactional
+    fun createMerchantResponse(
+        userId: Long,
+        userPublicId: String,
+        businessInfo: BusinessInfo,
+        storeInfo: StoreInfo,
+        settlementInfo: SettlementInfo
+    ): MerchantResponse {
+        val merchant = createMerchant(userId, businessInfo, storeInfo, settlementInfo)
+        return MerchantResponse.from(merchant, userPublicId)
+    }
+
+    /**
+     * Merchant 조회 (by userId) 후 MerchantResponse 반환
+     */
+    @Transactional(readOnly = true)
+    fun getMerchantResponseByUserId(userId: Long, userPublicId: String): MerchantResponse? {
+        val merchant = merchantRepository.findByUserId(userId)
+        return merchant?.let { MerchantResponse.from(it, userPublicId) }
+    }
+
+    /**
+     * Merchant 조회 (by publicId) 후 MerchantSellerInfoResponse 반환
+     */
+    @Transactional(readOnly = true)
+    fun getMerchantSellerInfoByPublicId(publicId: String): MerchantSellerInfoResponse {
+        val merchant = merchantRepository.findByPublicId(publicId)
+        return MerchantSellerInfoResponse.from(merchant)
+    }
+
+    /**
+     * Merchant 정보 수정 후 MerchantResponse 반환
+     */
+    @Transactional
+    fun updateMerchantResponse(
+        merchantId: Long,
+        userPublicId: String,
+        businessInfo: BusinessInfo?,
+        storeInfo: StoreInfo?,
+        settlementInfo: SettlementInfo?
+    ): MerchantResponse {
+        val merchant = updateMerchant(merchantId, businessInfo, storeInfo, settlementInfo)
+        return MerchantResponse.from(merchant, userPublicId)
     }
 }

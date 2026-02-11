@@ -1,6 +1,7 @@
 package com.hamsterworld.hamsterpg.domain.pgmid.service
 
 import com.hamsterworld.hamsterpg.app.pgmid.request.PgMidSearchRequest
+import com.hamsterworld.hamsterpg.app.pgmid.response.MidResponse
 import com.hamsterworld.hamsterpg.domain.pgmid.model.PgMid
 import com.hamsterworld.hamsterpg.domain.pgmid.repository.PgMidRepository
 import org.springframework.data.domain.Page
@@ -55,5 +56,39 @@ class PgMidService(
 
     fun searchMidsPage(request: PgMidSearchRequest): Page<PgMid> {
         return repository.searchPage(request)
+    }
+
+    // DTO conversion methods (used by controllers)
+    @Transactional
+    fun createMidResponse(merchantName: String): MidResponse {
+        val pgMid = createMid(merchantName)
+        return MidResponse.from(pgMid)
+    }
+
+    fun getMidResponse(midId: String): MidResponse {
+        val pgMid = getMid(midId)
+        return MidResponse.from(pgMid)
+    }
+
+    fun searchMidsResponseList(request: PgMidSearchRequest): List<MidResponse> {
+        val pgMids = searchMids(request)
+        return pgMids.map { MidResponse.from(it) }
+    }
+
+    fun searchMidsResponsePage(request: PgMidSearchRequest): Page<MidResponse> {
+        val page = searchMidsPage(request)
+        return page.map { MidResponse.from(it) }
+    }
+
+    @Transactional
+    fun deactivateMidResponse(midId: String): MidResponse {
+        val pgMid = deactivateMid(midId)
+        return MidResponse.from(pgMid)
+    }
+
+    @Transactional
+    fun activateMidResponse(midId: String): MidResponse {
+        val pgMid = activateMid(midId)
+        return MidResponse.from(pgMid)
     }
 }

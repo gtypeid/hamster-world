@@ -4,6 +4,7 @@ import com.hamsterworld.notification.app.dlq.request.DLQSearchRequest
 import com.hamsterworld.notification.domain.dlq.model.DLQMessage
 import com.hamsterworld.notification.domain.dlq.service.DLQService
 import com.hamsterworld.notification.domain.dlq.service.DLQStatistics
+import com.hamsterworld.notification.domain.dlq.service.ReprocessResponse
 import org.springframework.data.domain.Page
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -109,7 +110,7 @@ class DLQController(
      */
     @GetMapping("/pending-count")
     fun getPendingCount(): ResponseEntity<Map<String, Long>> {
-        return ResponseEntity.ok(mapOf("count" to dlqService.getPendingCount()))
+        return ResponseEntity.ok(dlqService.getPendingCountDto())
     }
 
     /**
@@ -117,7 +118,7 @@ class DLQController(
      */
     @GetMapping("/topic/{topic}/pending-count")
     fun getPendingCountByTopic(@PathVariable topic: String): ResponseEntity<Map<String, Long>> {
-        return ResponseEntity.ok(mapOf("count" to dlqService.getPendingCountByTopic(topic)))
+        return ResponseEntity.ok(dlqService.getPendingCountByTopicDto(topic))
     }
 
     /**
@@ -138,21 +139,11 @@ class DLQController(
         @PathVariable id: String,
         @RequestBody request: ReprocessRequest
     ): ResponseEntity<ReprocessResponse> {
-        return try {
-            val success = dlqService.reprocessMessage(id, request.adminId)
-            ResponseEntity.ok(
-                ReprocessResponse(
-                    success = success,
-                    message = if (success) "Message reprocessed successfully" else "Failed to reprocess message"
-                )
-            )
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(
-                ReprocessResponse(
-                    success = false,
-                    message = e.message ?: "Unknown error"
-                )
-            )
+        val response = dlqService.reprocessMessageDto(id, request.adminId)
+        return if (response.success) {
+            ResponseEntity.ok(response)
+        } else {
+            ResponseEntity.badRequest().body(response)
         }
     }
 
@@ -198,9 +189,4 @@ data class ResolveRequest(
 data class IgnoreRequest(
     val adminId: String,
     val reason: String
-)
-
-data class ReprocessResponse(
-    val success: Boolean,
-    val message: String
 )

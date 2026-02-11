@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
+import com.hamsterworld.payment.app.payment.response.PaymentResponse
 
 @Repository
 class PaymentRepository(
@@ -98,12 +99,12 @@ class PaymentRepository(
     /**
      * Payment 검색 (Response 형태로 반환)
      */
-    fun findAllWithOriginPublicIds(search: PaymentSearchRequest): List<com.hamsterworld.payment.app.payment.response.PaymentResponse> {
+    fun findAllWithOriginPublicIds(search: PaymentSearchRequest): List<PaymentResponse> {
         val payments = findAll(search)
         val originPaymentPublicIdMap = buildOriginPaymentPublicIdMap(payments)
 
         return payments.map { payment ->
-            com.hamsterworld.payment.app.payment.response.PaymentResponse.from(
+            PaymentResponse.from(
                 payment,
                 payment.originPaymentId?.let { originPaymentPublicIdMap[it] }
             )
@@ -113,12 +114,12 @@ class PaymentRepository(
     /**
      * Payment 검색 (Page, Response 형태로 반환)
      */
-    fun findAllPageWithOriginPublicIds(search: PaymentSearchRequest): Page<com.hamsterworld.payment.app.payment.response.PaymentResponse> {
+    fun findAllPageWithOriginPublicIds(search: PaymentSearchRequest): Page<PaymentResponse> {
         val paymentsPage = findAllPage(search)
         val originPaymentPublicIdMap = buildOriginPaymentPublicIdMap(paymentsPage.content)
 
         val content = paymentsPage.content.map { payment ->
-            com.hamsterworld.payment.app.payment.response.PaymentResponse.from(
+            PaymentResponse.from(
                 payment,
                 payment.originPaymentId?.let { originPaymentPublicIdMap[it] }
             )

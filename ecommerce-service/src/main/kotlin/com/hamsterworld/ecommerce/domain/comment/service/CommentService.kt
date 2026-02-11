@@ -3,16 +3,19 @@ package com.hamsterworld.ecommerce.domain.comment.service
 import com.hamsterworld.common.web.exception.CustomRuntimeException
 import com.hamsterworld.ecommerce.app.comment.request.CommentCreateRequest
 import com.hamsterworld.ecommerce.app.comment.request.CommentUpdateRequest
+import com.hamsterworld.ecommerce.app.comment.response.CommentResponse
 import com.hamsterworld.ecommerce.domain.comment.model.Comment
 import com.hamsterworld.ecommerce.domain.comment.repository.CommentRepository
+import com.hamsterworld.ecommerce.domain.board.repository.BoardRepository
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CommentService(
     private val commentRepository: CommentRepository,
-    private val boardRepository: com.hamsterworld.ecommerce.domain.board.repository.BoardRepository,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+    private val boardRepository: BoardRepository,
+    private val userRepository: UserRepository
 ) {
 
     /**
@@ -120,6 +123,43 @@ class CommentService(
                 parentPublicId = parentPublicId
             )
         }
+    }
+
+    // ==================== DTO 반환 메서드 ====================
+
+    /**
+     * 댓글 작성 (DTO 반환)
+     */
+    @Transactional
+    fun createAndReturnDto(
+        boardPublicId: String,
+        request: CommentCreateRequest,
+        authorPublicId: String,
+        authorName: String
+    ): CommentResponse {
+        val comment = create(boardPublicId, request, authorPublicId, authorName)
+        val commentWithIds = getByPublicIdWithPublicIds(comment.publicId)
+        return CommentResponse.from(
+            commentWithIds.comment,
+            commentWithIds.boardPublicId,
+            commentWithIds.authorPublicId,
+            commentWithIds.parentPublicId
+        )
+    }
+
+    /**
+     * 댓글 수정 (DTO 반환)
+     */
+    @Transactional
+    fun updateAndReturnDto(publicId: String, request: CommentUpdateRequest, userPublicId: String): CommentResponse {
+        val comment = update(publicId, request, userPublicId)
+        val commentWithIds = getByPublicIdWithPublicIds(comment.publicId)
+        return CommentResponse.from(
+            commentWithIds.comment,
+            commentWithIds.boardPublicId,
+            commentWithIds.authorPublicId,
+            commentWithIds.parentPublicId
+        )
     }
 
     /**

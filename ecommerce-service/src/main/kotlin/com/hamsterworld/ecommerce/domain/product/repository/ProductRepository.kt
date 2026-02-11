@@ -68,6 +68,16 @@ class ProductRepository(
             .fetch()
     }
 
+    fun findByPublicIds(publicIds: List<String>): List<Product> {
+        if (publicIds.isEmpty()) {
+            return emptyList()
+        }
+        return jpaQueryFactory
+            .selectFrom(product)
+            .where(product.publicId.`in`(publicIds))
+            .fetch()
+    }
+
     fun existsById(id: Long): Boolean {
         return productJpaRepository.existsById(id)
     }

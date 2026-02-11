@@ -1,5 +1,8 @@
 package com.hamsterworld.payment.domain.product.service
 
+import com.hamsterworld.payment.app.product.response.ProductDetailResponse
+import com.hamsterworld.payment.app.product.response.ProductRecordResponse
+import com.hamsterworld.payment.app.product.response.ProductResponse
 import com.hamsterworld.payment.domain.product.constant.ProductCategory
 import com.hamsterworld.payment.domain.product.event.InsufficientProductDto
 import com.hamsterworld.payment.domain.product.event.OrderStockValidationFailedEvent
@@ -10,6 +13,7 @@ import com.hamsterworld.payment.consumer.OrderItemDto
 import com.hamsterworld.payment.domain.account.constant.AccountType
 import com.hamsterworld.payment.domain.account.service.AccountService
 import com.hamsterworld.payment.domain.ordersnapshot.model.OrderSnapshot
+import com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository
 import com.hamsterworld.payment.domain.product.dto.ProductSearchRequest
 import com.hamsterworld.payment.domain.product.repository.ProductRepository
 import com.hamsterworld.payment.domain.productrecord.repository.ProductRecordRepository
@@ -31,7 +35,7 @@ class ProductService(
     private val productRecordRepository: ProductRecordRepository,
     private val recordRepository: RecordRepository<Product>,
     private val eventPublisher: ApplicationEventPublisher,
-    private val orderSnapshotRepository: com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository,
+    private val orderSnapshotRepository: OrderSnapshotRepository,
     private val accountService: AccountService
 ) {
     private val log = LoggerFactory.getLogger(ProductService::class.java)
@@ -126,6 +130,57 @@ class ProductService(
         val product: Product,
         val records: List<ProductRecord>
     )
+
+    // ===== DTO Conversion Methods (for Controller) =====
+
+    /**
+     * Product 목록 조회 (List) - DTO 변환 포함
+     *
+     * @param search 검색 조건
+     * @return ProductResponse 목록
+     */
+    @Transactional(readOnly = true)
+    fun searchProductResponses(search: ProductSearchRequest): List<ProductResponse> {
+        val products = productRepository.findAll(search)
+        return products.map { ProductResponse.from(it) }
+    }
+
+    /**
+     * Product 목록 조회 (Page) - DTO 변환 포함
+     *
+     * @param search 검색 조건
+     * @return ProductResponse 페이지
+     */
+    @Transactional(readOnly = true)
+    fun searchProductResponsePage(search: ProductSearchRequest): Page<ProductResponse> {
+        val pagedSearch = search.copy(paged = true)
+        val productsPage = productRepository.findAllPage(pagedSearch)
+        return productsPage.map { ProductResponse.from(it) }
+    }
+
+    /**
+     * Product 상세 조회 (Public ID로 조회) - DTO 변환 포함
+     *
+     * @param publicId Product Public ID
+     * @return ProductDetailResponse (Product + ProductRecord 목록)
+     */
+    @Transactional(readOnly = true)
+    fun findProductDetailResponseByPublicId(publicId: String): ProductDetailResponse {
+        val detailData = findProductDetailByPublicId(publicId)
+
+        // ProductRecord 변환 시 productPublicId 전달 필요
+        val recordResponses = detailData.records.map { record ->
+            ProductRecordResponse.from(
+                record = record,
+                productPublicId = detailData.product.publicId
+            )
+        }
+
+        return ProductDetailResponse.from(
+            product = detailData.product,
+            records = recordResponses
+        )
+    }
 
     @Transactional
     fun deleteProduct(id: Long) {

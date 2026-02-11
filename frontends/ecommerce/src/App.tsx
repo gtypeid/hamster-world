@@ -9,15 +9,15 @@ import { ProductDetailPage } from './pages/ProductDetailPage'
 import { CartPage } from './pages/CartPage'
 import { MyPage } from './pages/MyPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
-import { VendorStorePage } from './pages/VendorStorePage'
+import { MerchantStorePage } from './pages/MerchantStorePage'
 import { MerchantSellerInfoPage } from './pages/MerchantSellerInfoPage'
-import { VendorDashboardPage } from './pages/vendor/VendorDashboardPage'
-import { VendorProductsPage } from './pages/vendor/VendorProductsPage'
-import { VendorProductDetailPage } from './pages/vendor/VendorProductDetailPage'
-import { VendorOrdersPage } from './pages/vendor/VendorOrdersPage'
-import { VendorCouponsPage } from './pages/vendor/VendorCouponsPage'
-import { VendorSettlementPage } from './pages/vendor/VendorSettlementPage'
-import { VendorSettingsPage } from './pages/vendor/VendorSettingsPage'
+import { MerchantDashboardPage } from './pages/merchant/MerchantDashboardPage'
+import { MerchantProductsPage } from './pages/merchant/MerchantProductsPage'
+import { MerchantProductDetailPage } from './pages/merchant/MerchantProductDetailPage'
+import { MerchantOrdersPage } from './pages/merchant/MerchantOrdersPage'
+import { MerchantCouponsPage } from './pages/merchant/MerchantCouponsPage'
+import { MerchantSettlementPage } from './pages/merchant/MerchantSettlementPage'
+import { MerchantSettingsPage } from './pages/merchant/MerchantSettingsPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminVendorsPage } from './pages/admin/AdminVendorsPage'
 import { AdminProductsPage } from './pages/admin/AdminProductsPage'
@@ -74,10 +74,10 @@ function App() {
             <OrderDetailPage />
           </div>
         } />
-        <Route path="/store/:vendorName" element={
+        <Route path="/store/:merchantName" element={
           <div className="min-h-screen bg-white">
             <Header />
-            <VendorStorePage />
+            <MerchantStorePage />
           </div>
         } />
         <Route path="/merchants/:merchantId" element={
@@ -88,13 +88,13 @@ function App() {
         } />
 
         {/* Merchant Routes (without shop header, has its own layout) */}
-        <Route path="/merchant" element={<VendorDashboardPage />} />
-        <Route path="/merchant/products" element={<VendorProductsPage />} />
-        <Route path="/merchant/products/:id" element={<VendorProductDetailPage />} />
-        <Route path="/merchant/orders" element={<VendorOrdersPage />} />
-        <Route path="/merchant/coupons" element={<VendorCouponsPage />} />
-        <Route path="/merchant/settlement" element={<VendorSettlementPage />} />
-        <Route path="/merchant/settings" element={<VendorSettingsPage />} />
+        <Route path="/merchant" element={<MerchantDashboardPage />} />
+        <Route path="/merchant/products" element={<MerchantProductsPage />} />
+        <Route path="/merchant/products/:id" element={<MerchantProductDetailPage />} />
+        <Route path="/merchant/orders" element={<MerchantOrdersPage />} />
+        <Route path="/merchant/coupons" element={<MerchantCouponsPage />} />
+        <Route path="/merchant/settlement" element={<MerchantSettlementPage />} />
+        <Route path="/merchant/settings" element={<MerchantSettingsPage />} />
 
         {/* Admin Routes (without shop header, has its own layout) */}
         <Route path="/admin" element={<AdminDashboardPage />} />

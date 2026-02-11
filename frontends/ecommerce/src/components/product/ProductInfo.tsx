@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAddToCart } from '../../hooks/useCart'
+import { useClaimCoupon, useMyCoupons } from '../../hooks/useCoupon'
 import { useAlert } from '../../contexts/AlertContext'
 import { useAuth } from '../../contexts/AuthContext'
 import type { ProductDetailResponse } from '../../types/api'
 import { requireAuth } from '../../utils/auth'
+import { ProductCouponSection } from './ProductCouponSection'
 
 interface ProductInfoProps {
   productDetail: ProductDetailResponse
@@ -13,9 +15,20 @@ interface ProductInfoProps {
 export function ProductInfo({ productDetail }: ProductInfoProps) {
   const [quantity, setQuantity] = useState(1)
   const addToCart = useAddToCart()
+  const claimCoupon = useClaimCoupon()
   const navigate = useNavigate()
   const { showConfirm, showAlert } = useAlert()
   const { user } = useAuth()
+
+  // 내가 발급받은 쿠폰 목록 조회 (로그인 시에만)
+  const { data: myCoupons = [] } = useMyCoupons({
+    enabled: !!user // 로그인 시에만 조회
+  })
+
+  // 발급받은 쿠폰 코드 Set 생성 (빠른 검색을 위해)
+  const issuedCouponCodes = useMemo(() => {
+    return new Set(myCoupons.map(coupon => coupon.couponCode))
+  }, [myCoupons])
 
   const handleQuantityChange = (delta: number) => {
     const newQuantity = quantity + delta
@@ -62,6 +75,45 @@ export function ProductInfo({ productDetail }: ProductInfoProps) {
         },
       }
     )
+  }
+
+  const handleIssueCoupon = async (couponCode: string) => {
+    // 로그인 체크
+    if (!user) {
+      showAlert('쿠폰을 발급받으려면 로그인이 필요합니다.')
+      return
+    }
+
+    try {
+      await claimCoupon.mutateAsync(couponCode)
+      showAlert('🎉 쿠폰이 발급되었습니다!\n\n장바구니에서 사용할 수 있습니다.')
+    } catch (error: any) {
+      console.error('Failed to claim coupon:', error)
+
+      // 백엔드 에러 메시지 파싱
+      let errorMessage = '쿠폰 발급에 실패했습니다.'
+
+      if (error?.response?.data?.message) {
+        const backendMessage = error.response.data.message
+
+        // 이미 수령한 쿠폰인 경우
+        if (backendMessage.includes('이미 수령한 쿠폰')) {
+          errorMessage = '이미 발급받은 쿠폰입니다.\n\n발급받은 쿠폰은 장바구니에서 확인할 수 있습니다.'
+        }
+        // 발급 기간이 아닌 경우
+        else if (backendMessage.includes('발급 기간')) {
+          errorMessage = '쿠폰 발급 기간이 아닙니다.'
+        }
+        // 기타 백엔드 메시지
+        else {
+          errorMessage = backendMessage
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
+      showAlert(errorMessage)
+    }
   }
 
   return (
@@ -112,6 +164,15 @@ export function ProductInfo({ productDetail }: ProductInfoProps) {
           </span>
         )}
       </div>
+
+      {/* Coupon Section */}
+      {productDetail.coupons && productDetail.coupons.length > 0 && (
+        <ProductCouponSection
+          coupons={productDetail.coupons}
+          issuedCouponCodes={issuedCouponCodes}
+          onIssueCoupon={handleIssueCoupon}
+        />
+      )}
 
       {/* Quantity Selector */}
       <div className="space-y-2">

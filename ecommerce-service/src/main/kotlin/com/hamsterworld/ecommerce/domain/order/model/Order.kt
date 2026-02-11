@@ -23,6 +23,27 @@ class Order(
 
     var price: BigDecimal? = null,
 
+    /**
+     * 할인 금액 (쿠폰 등 적용 시)
+     * null이면 할인 없음
+     */
+    @Column(name = "discount_amount", precision = 15, scale = 3)
+    var discountAmount: BigDecimal? = null,
+
+    /**
+     * 적용된 쿠폰 코드 (할인 적용 시 추적용)
+     * null이면 쿠폰 미적용
+     */
+    @Column(name = "coupon_code", length = 50)
+    var couponCode: String? = null,
+
+    /**
+     * 최종 결제 금액 (price - discountAmount)
+     * 할인이 없으면 price와 동일
+     */
+    @Column(name = "final_price", precision = 15, scale = 3)
+    var finalPrice: BigDecimal? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: OrderStatus = OrderStatus.CREATED
@@ -36,6 +57,9 @@ class Order(
         orderNumber: String? = this.orderNumber,
         gatewayPaymentPublicId: String? = this.gatewayPaymentPublicId,
         price: BigDecimal? = this.price,
+        discountAmount: BigDecimal? = this.discountAmount,
+        couponCode: String? = this.couponCode,
+        finalPrice: BigDecimal? = this.finalPrice,
         status: OrderStatus = this.status
     ): Order {
         val copied = Order(
@@ -43,6 +67,9 @@ class Order(
             orderNumber = orderNumber,
             gatewayPaymentPublicId = gatewayPaymentPublicId,
             price = price,
+            discountAmount = discountAmount,
+            couponCode = couponCode,
+            finalPrice = finalPrice,
             status = status
         )
         copied.id = this.id
@@ -78,18 +105,30 @@ class Order(
          * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
          *
          * @param userId 사용자 ID
-         * @param price 주문 금액
+         * @param price 상품 총액 (할인 전)
+         * @param discountAmount 할인 금액 (null이면 할인 없음)
+         * @param couponCode 적용된 쿠폰 코드 (null이면 쿠폰 미적용)
          * @return 생성된 Order
          */
         fun create(
             userId: Long,
-            price: BigDecimal
+            price: BigDecimal,
+            discountAmount: BigDecimal? = null,
+            couponCode: String? = null
         ): Order {
             val orderNumber = generateOrderNumber()
+            val finalPrice = if (discountAmount != null) {
+                price.subtract(discountAmount).coerceAtLeast(BigDecimal.ZERO)
+            } else {
+                price
+            }
             return Order(
                 userId = userId,
                 orderNumber = orderNumber,
                 price = price,
+                discountAmount = discountAmount,
+                couponCode = couponCode,
+                finalPrice = finalPrice,
                 status = OrderStatus.CREATED
             )
         }

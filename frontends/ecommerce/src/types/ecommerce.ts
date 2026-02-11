@@ -36,6 +36,7 @@ export interface MerchantCoupon {
   status: CouponStatus
   validFrom: string // ISO DateTime
   validUntil: string // ISO DateTime
+  couponDays: number // 발급 후 사용 가능 일수
   // usageCondition (Embeddable)
   minOrderAmount?: number // 최소 주문 금액
   filtersJson?: string // JSON string: { categories?, productIds?, merchantIds? }
@@ -43,6 +44,7 @@ export interface MerchantCoupon {
   discountType: CouponDiscountType
   discountValue: number // FIXED: 금액, PERCENTAGE: 퍼센트
   maxDiscountAmount?: number // PERCENTAGE일 때 최대 할인 금액
+  targetProducts: Array<{ productPublicId: string; productName: string }> // 대상 상품 목록
   createdAt: string
   updatedAt: string
   // Note: 1유저 1쿠폰 1회 사용 제약은 백엔드에서 UNIQUE(user_id, coupon_code)로 관리됨
@@ -57,8 +59,9 @@ export interface MerchantCouponFormData {
   maxDiscountAmount?: number
   minOrderAmount?: number
   filters?: CouponFilters // 프론트에서 사용할 구조화된 객체
-  validFrom: string
-  validUntil: string
+  validFrom: string  // 쿠폰 발급 시작 일시
+  validUntil: string  // 쿠폰 발급 종료 일시
+  couponDays?: number  // 발급 후 사용 가능 일수 (기본 10일)
 }
 
 // ============================================

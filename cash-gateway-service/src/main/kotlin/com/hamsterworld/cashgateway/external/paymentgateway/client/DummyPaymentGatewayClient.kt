@@ -5,6 +5,7 @@ import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayCo
 import com.hamsterworld.cashgateway.external.paymentgateway.provider.DummyPaymentGatewayProvider
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.common.domain.converter.DomainConverterAdapter
+import com.hamsterworld.common.tracing.TraceContextHolder
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
@@ -26,7 +27,7 @@ class DummyPaymentGatewayClient(
     domainConverterAdapter: DomainConverterAdapter,
     paymentGatewayCoreService: PaymentGatewayCoreService,
     provider: DummyPaymentGatewayProvider,
-    traceContextHolder: com.hamsterworld.common.tracing.TraceContextHolder  // [2026-02-09] Claude Opus 4 추가
+    traceContextHolder: TraceContextHolder  // [2026-02-09] Claude Opus 4 추가
 ) : PaymentGatewayClientProtocolCore(
     pgRestTemplate,
     objectMapper,

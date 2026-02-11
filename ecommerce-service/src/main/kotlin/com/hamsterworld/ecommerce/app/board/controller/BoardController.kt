@@ -61,13 +61,8 @@ class BoardController(
             request.productPublicId, request.category, user.publicId
         )
 
-        val board = boardService.create(request, user.publicId, user.name)
-
-        // 생성된 Board의 productId, authorId로 Public ID 조회
-        val boardWithIds = boardService.getByPublicIdWithPublicIds(board.publicId)
-        val response = BoardResponse.from(boardWithIds.board, boardWithIds.productPublicId, boardWithIds.authorPublicId, boardWithIds.commentCount)
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(boardService.createAndReturnDto(request, user.publicId, user.name))
     }
 
     @Operation(summary = "게시글 수정", description = "본인이 작성한 게시글을 수정합니다")
@@ -79,13 +74,7 @@ class BoardController(
     ): ResponseEntity<BoardResponse> {
         log.info("Updating board: publicId={}, author={}", publicId, user.publicId)
 
-        val board = boardService.update(publicId, request, user.publicId)
-
-        // 수정된 Board의 productId, authorId로 Public ID 조회
-        val boardWithIds = boardService.getByPublicIdWithPublicIds(board.publicId)
-        val response = BoardResponse.from(boardWithIds.board, boardWithIds.productPublicId, boardWithIds.authorPublicId, boardWithIds.commentCount)
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(boardService.updateAndReturnDto(publicId, request, user.publicId))
     }
 
     @Operation(summary = "게시글 삭제", description = "본인이 작성한 게시글을 삭제합니다")
@@ -115,16 +104,8 @@ class BoardController(
             boardPublicId, user.publicId
         )
 
-        val comment = commentService.create(boardPublicId, request, user.publicId, user.name)
-        val commentWithIds = commentService.getByPublicIdWithPublicIds(comment.publicId)
-        val response = CommentResponse.from(
-            commentWithIds.comment,
-            commentWithIds.boardPublicId,
-            commentWithIds.authorPublicId,
-            commentWithIds.parentPublicId
-        )
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(commentService.createAndReturnDto(boardPublicId, request, user.publicId, user.name))
     }
 
     @Operation(summary = "댓글 수정", description = "본인이 작성한 댓글을 수정합니다")
@@ -137,16 +118,7 @@ class BoardController(
     ): ResponseEntity<CommentResponse> {
         log.info("Updating comment: boardPublicId={}, commentPublicId={}, author={}", boardPublicId, commentPublicId, user.publicId)
 
-        val comment = commentService.update(commentPublicId, request, user.publicId)
-        val commentWithIds = commentService.getByPublicIdWithPublicIds(comment.publicId)
-        val response = CommentResponse.from(
-            commentWithIds.comment,
-            commentWithIds.boardPublicId,
-            commentWithIds.authorPublicId,
-            commentWithIds.parentPublicId
-        )
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(commentService.updateAndReturnDto(commentPublicId, request, user.publicId))
     }
 
     @Operation(summary = "댓글 삭제", description = "본인이 작성한 댓글을 삭제합니다")

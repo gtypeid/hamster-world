@@ -11,6 +11,7 @@ import com.hamsterworld.common.web.exception.CustomRuntimeException
 import com.hamsterworld.ecommerce.domain.cart.model.Cart
 import com.hamsterworld.ecommerce.domain.cartitem.model.CartItem
 import com.hamsterworld.ecommerce.domain.product.service.ProductService
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
 import org.springframework.data.domain.Page
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,7 +21,7 @@ class CartService(
     private val cartRepository: CartRepository,
     private val cartItemRepository: CartItemRepository,
     private val productService: ProductService,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+    private val userRepository: UserRepository
 ) {
 
     @Transactional

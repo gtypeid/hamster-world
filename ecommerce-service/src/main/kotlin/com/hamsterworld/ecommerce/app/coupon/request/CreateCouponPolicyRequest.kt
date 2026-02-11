@@ -26,6 +26,7 @@ data class CreateCouponPolicyRequest(
     val description: String?,
     val validFrom: LocalDateTime,
     val validUntil: LocalDateTime,
+    val couponDays: Int? = null,  // 발급 후 사용 가능 일수 (null이면 기본 10일)
     val minOrderAmount: BigDecimal?,
     val conditionFiltersJson: String?,  // filtersJson
     val discountType: DiscountType,

@@ -12,6 +12,14 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
 import java.util.Optional
+import com.hamsterworld.cashgateway.app.paymentprocess.response.PaymentProcessResponse
+import com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest
+import com.hamsterworld.common.web.QuerydslExtension
+import com.querydsl.core.types.dsl.BooleanExpression
+import com.querydsl.jpa.JPQLQuery
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 
 @Repository
 class PaymentProcessRepository(
@@ -223,12 +231,12 @@ class PaymentProcessRepository(
     /**
      * PaymentProcess 검색 (Response 형태로 반환)
      */
-    fun findAllWithOriginPublicIds(search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest): List<com.hamsterworld.cashgateway.app.paymentprocess.response.PaymentProcessResponse> {
+    fun findAllWithOriginPublicIds(search: PaymentProcessSearchRequest): List<PaymentProcessResponse> {
         val processes = findAll(search)
         val originProcessPublicIdMap = buildOriginProcessPublicIdMap(processes)
 
         return processes.map { process ->
-            com.hamsterworld.cashgateway.app.paymentprocess.response.PaymentProcessResponse.from(
+            PaymentProcessResponse.from(
                 process,
                 process.originProcessId?.let { originProcessPublicIdMap[it] }
             )
@@ -236,20 +244,20 @@ class PaymentProcessRepository(
     }
 
     /**
-     * PaymentProcess 검색 (Page, Response 형태로 반환)
+     * PaymentProcess 检索 (Page, Response 形態로 반환)
      */
-    fun findAllPageWithOriginPublicIds(search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest): org.springframework.data.domain.Page<com.hamsterworld.cashgateway.app.paymentprocess.response.PaymentProcessResponse> {
+    fun findAllPageWithOriginPublicIds(search: PaymentProcessSearchRequest): Page<PaymentProcessResponse> {
         val processesPage = findAllPage(search)
         val originProcessPublicIdMap = buildOriginProcessPublicIdMap(processesPage.content)
 
         val content = processesPage.content.map { process ->
-            com.hamsterworld.cashgateway.app.paymentprocess.response.PaymentProcessResponse.from(
+            PaymentProcessResponse.from(
                 process,
                 process.originProcessId?.let { originProcessPublicIdMap[it] }
             )
         }
 
-        return org.springframework.data.domain.PageImpl(content, processesPage.pageable, processesPage.totalElements)
+        return PageImpl(content, processesPage.pageable, processesPage.totalElements)
     }
 
     private fun buildOriginProcessPublicIdMap(processes: List<PaymentProcess>): Map<Long, String> {
@@ -275,13 +283,13 @@ class PaymentProcessRepository(
             }
     }
 
-    fun findAll(search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest): List<PaymentProcess> {
+    fun findAll(search: PaymentProcessSearchRequest): List<PaymentProcess> {
         val query = baseQuery(search)
-        return com.hamsterworld.common.web.QuerydslExtension.applySorts(query, paymentProcess.createdAt, search.sort)
+        return QuerydslExtension.applySorts(query, paymentProcess.createdAt, search.sort)
             .fetch()
     }
 
-    fun findAllPage(search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest): org.springframework.data.domain.Page<PaymentProcess> {
+    fun findAllPage(search: PaymentProcessSearchRequest): Page<PaymentProcess> {
         val baseQuery = baseQuery(search)
 
         // Count query
@@ -295,33 +303,33 @@ class PaymentProcessRepository(
             .offset(search.getOffset())
             .limit(search.size.toLong())
 
-        val processes = com.hamsterworld.common.web.QuerydslExtension.applySorts(pagedQuery, paymentProcess.createdAt, search.sort)
+        val processes = QuerydslExtension.applySorts(pagedQuery, paymentProcess.createdAt, search.sort)
             .fetch()
 
-        return org.springframework.data.domain.PageImpl(processes, org.springframework.data.domain.PageRequest.of(search.page, search.size), total)
+        return PageImpl(processes, PageRequest.of(search.page, search.size), total)
     }
 
     private fun baseQuery(
-        search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest
-    ): com.querydsl.jpa.JPQLQuery<PaymentProcess> {
+        search: PaymentProcessSearchRequest
+    ): JPQLQuery<PaymentProcess> {
         return jpaQueryFactory
             .selectFrom(paymentProcess)
             .where(*searchListConditions(search).toTypedArray())
     }
 
     private fun searchListConditions(
-        search: com.hamsterworld.cashgateway.domain.paymentprocess.dto.PaymentProcessSearchRequest
-    ): List<com.querydsl.core.types.dsl.BooleanExpression> {
+        search: PaymentProcessSearchRequest
+    ): List<BooleanExpression> {
         return listOfNotNull(
-            com.hamsterworld.common.web.QuerydslExtension.between(paymentProcess.createdAt, search.from, search.to),
-            com.hamsterworld.common.web.QuerydslExtension.inOrNullSafe(paymentProcess.publicId, search.publicIds),
-            com.hamsterworld.common.web.QuerydslExtension.eqOrNull(paymentProcess.orderPublicId, search.orderPublicId),
-            com.hamsterworld.common.web.QuerydslExtension.eqOrNull(paymentProcess.userPublicId, search.userPublicId),
-            com.hamsterworld.common.web.QuerydslExtension.eqOrNull(paymentProcess.provider, search.provider),
-            com.hamsterworld.common.web.QuerydslExtension.eqOrNull(paymentProcess.mid, search.mid),
-            com.hamsterworld.common.web.QuerydslExtension.between(paymentProcess.amount, search.minAmount, search.maxAmount),
-            com.hamsterworld.common.web.QuerydslExtension.inOrNullSafe(paymentProcess.status, search.statuses),
-            com.hamsterworld.common.web.QuerydslExtension.eqOrNull(paymentProcess.pgTransaction, search.pgTransaction)
+            QuerydslExtension.between(paymentProcess.createdAt, search.from, search.to),
+            QuerydslExtension.inOrNullSafe(paymentProcess.publicId, search.publicIds),
+            QuerydslExtension.eqOrNull(paymentProcess.orderPublicId, search.orderPublicId),
+            QuerydslExtension.eqOrNull(paymentProcess.userPublicId, search.userPublicId),
+            QuerydslExtension.eqOrNull(paymentProcess.provider, search.provider),
+            QuerydslExtension.eqOrNull(paymentProcess.mid, search.mid),
+            QuerydslExtension.between(paymentProcess.amount, search.minAmount, search.maxAmount),
+            QuerydslExtension.inOrNullSafe(paymentProcess.status, search.statuses),
+            QuerydslExtension.eqOrNull(paymentProcess.pgTransaction, search.pgTransaction)
         )
     }
 }

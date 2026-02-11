@@ -2,6 +2,7 @@ package com.hamsterworld.hamsterpg.domain.paymentprocess.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.hamsterpg.app.paymentprocess.request.ProcessPaymentRequest
+import com.hamsterworld.hamsterpg.app.paymentprocess.response.PaymentProcessDetailsResponse
 import com.hamsterworld.hamsterpg.app.paymentprocess.response.ProcessPaymentResponse
 import com.hamsterworld.hamsterpg.domain.paymentprocess.constant.PaymentProcessStatus
 import com.hamsterworld.hamsterpg.domain.paymentprocess.model.PaymentProcess
@@ -85,5 +86,14 @@ class PaymentProcessService(
     @Transactional(readOnly = true)
     fun findByTid(tid: String): PaymentProcess? {
         return paymentProcessRepository.findByTid(tid)
+    }
+
+    /**
+     * TID로 조회하여 DTO 반환 (디버깅용)
+     */
+    @Transactional(readOnly = true)
+    fun findByTidResponse(tid: String): PaymentProcessDetailsResponse? {
+        val process = findByTid(tid) ?: return null
+        return PaymentProcessDetailsResponse.from(process)
     }
 }

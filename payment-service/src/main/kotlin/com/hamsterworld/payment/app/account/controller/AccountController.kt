@@ -1,7 +1,6 @@
 package com.hamsterworld.payment.app.account.controller
 
 import com.hamsterworld.payment.app.account.response.AccountDetailResponse
-import com.hamsterworld.payment.app.account.response.AccountRecordResponse
 import com.hamsterworld.payment.app.account.response.AccountResponse
 import com.hamsterworld.payment.domain.account.dto.AccountSearchRequest
 import com.hamsterworld.payment.domain.account.service.AccountService
@@ -29,9 +28,7 @@ class AccountController(
     fun getAccountList(
         request: AccountSearchRequest
     ): ResponseEntity<List<AccountResponse>> {
-        val accounts = accountService.searchAccounts(request)
-        val responses = accounts.map { AccountResponse.from(it) }
-        return ResponseEntity.ok(responses)
+        return ResponseEntity.ok(accountService.searchAccountResponses(request))
     }
 
     /**
@@ -43,9 +40,7 @@ class AccountController(
     fun getAccountPage(
         request: AccountSearchRequest
     ): ResponseEntity<Page<AccountResponse>> {
-        val accountsPage = accountService.searchAccountPage(request)
-        val responses = accountsPage.map { AccountResponse.from(it) }
-        return ResponseEntity.ok(responses)
+        return ResponseEntity.ok(accountService.searchAccountResponsePage(request))
     }
 
     /**
@@ -60,21 +55,7 @@ class AccountController(
     fun getAccountDetail(
         @PathVariable publicId: String
     ): ResponseEntity<AccountDetailResponse> {
-        val detailData = accountService.findAccountDetailByPublicId(publicId)
-
-        val recordResponses = detailData.records.map { record ->
-            AccountRecordResponse.from(
-                record = record,
-                accountPublicId = detailData.account.publicId
-            )
-        }
-
-        val response = AccountDetailResponse.from(
-            account = detailData.account,
-            records = recordResponses
-        )
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(accountService.findAccountDetailResponseByPublicId(publicId))
     }
 
     /**
@@ -86,8 +67,6 @@ class AccountController(
     fun getAccountsByUser(
         @PathVariable userPublicId: String
     ): ResponseEntity<List<AccountResponse>> {
-        val accounts = accountService.findAccountsByUserPublicId(userPublicId)
-        val responses = accounts.map { AccountResponse.from(it) }
-        return ResponseEntity.ok(responses)
+        return ResponseEntity.ok(accountService.findAccountResponsesByUserPublicId(userPublicId))
     }
 }

@@ -6,6 +6,7 @@ import com.hamsterworld.progression.domain.quota.dto.QuotaSearchRequest
 import com.hamsterworld.progression.domain.quota.model.Quota
 import com.hamsterworld.progression.domain.quota.model.QuotaMaster
 import com.hamsterworld.progression.domain.quota.repository.QuotaRepository
+import com.hamsterworld.progression.app.quota.response.ClaimQuotaResponse
 import com.hamsterworld.progression.web.csv.QuotaMasterLoader
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -84,6 +85,22 @@ class QuotaService(
 
         quota.claim(quotaMaster)
         return quotaRepository.save(quota)
+    }
+
+    /**
+     * Quota 보상 클레임 (DTO 반환)
+     */
+    @Transactional
+    fun claimRewardDto(
+        userPublicId: String,
+        quotaKey: String
+    ): ClaimQuotaResponse {
+        claimReward(userPublicId, quotaKey)
+
+        return ClaimQuotaResponse(
+            success = true,
+            message = "Quota claimed successfully"
+        )
     }
 
     // ==================== Internal/Consumer용 ====================

@@ -10,6 +10,9 @@ import com.hamsterworld.ecommerce.domain.order.model.Order
 import com.hamsterworld.ecommerce.domain.order.model.QOrder.order as qOrder
 import com.hamsterworld.ecommerce.domain.orderitem.model.OrderItem
 import com.hamsterworld.common.web.exception.CustomRuntimeException
+import com.hamsterworld.ecommerce.domain.coupon.model.CouponUsage
+import com.hamsterworld.ecommerce.domain.coupon.repository.CouponUsageRepository
+import com.hamsterworld.ecommerce.domain.coupon.repository.UserCouponRepository
 import com.hamsterworld.ecommerce.domain.orderitem.repository.OrderItemJpaRepository
 import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.jpa.impl.JPAQuery
@@ -21,6 +24,9 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+import com.hamsterworld.ecommerce.domain.orderitem.model.QOrderItem
+import com.hamsterworld.ecommerce.domain.product.model.QProduct
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -29,7 +35,9 @@ class OrderRepository(
     private val orderJpaRepository: OrderJpaRepository,
     private val orderItemJpaRepository: OrderItemJpaRepository,
     private val jpaQueryFactory: JPAQueryFactory,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+    private val userRepository: UserRepository,
+    private val couponUsageRepository: CouponUsageRepository,
+    private val userCouponRepository: UserCouponRepository
 ) {
     private val log = LoggerFactory.getLogger(OrderRepository::class.java)
 
@@ -60,6 +68,30 @@ class OrderRepository(
             item.copy(orderId = savedOrder.id!!)
         }
         val savedItems: List<OrderItem> = orderItemJpaRepository.saveAll(itemEntities)
+
+        // 2.5. 쿠폰 적용 처리 (CouponApplyResult가 있으면)
+        orderWithItems.couponApply?.let { couponApply ->
+            // CouponUsage 생성
+            val couponUsage = CouponUsage.create(
+                userId = couponApply.userId,
+                couponPolicyId = couponApply.couponPolicyId,
+                couponCode = couponApply.couponCode,
+                orderId = savedOrder.id!!,
+                orderPublicId = savedOrder.publicId,
+                discountAmount = couponApply.discountAmount
+            )
+            couponUsageRepository.save(couponUsage)
+
+            // UserCoupon → USED 처리
+            val userCoupon = userCouponRepository.findById(couponApply.userCouponId)
+            val used = userCoupon.markUsed()
+            userCouponRepository.save(used)
+
+            log.info(
+                "[쿠폰 사용 처리] orderId={}, couponCode={}, discountAmount={}, userCouponId={}",
+                savedOrder.id, couponApply.couponCode, couponApply.discountAmount, couponApply.userCouponId
+            )
+        }
 
         // 3. OrderCreatedEvent 등록
         // userId(Long) → userPublicId(String) 변환
@@ -251,14 +283,14 @@ class OrderRepository(
     fun searchMerchantOrdersPage(
         merchantId: Long,
         status: OrderStatus?,
-        from: java.time.LocalDate?,
-        to: java.time.LocalDate?,
-        sort: com.hamsterworld.common.app.SortDirection = com.hamsterworld.common.app.SortDirection.DESC,
+        from: LocalDate?,
+        to: LocalDate?,
+        sort: SortDirection = SortDirection.DESC,
         page: Int,
         size: Int
-    ): org.springframework.data.domain.Page<Order> {
-        val qOrderItem = com.hamsterworld.ecommerce.domain.orderitem.model.QOrderItem.orderItem
-        val qProduct = com.hamsterworld.ecommerce.domain.product.model.QProduct.product
+    ): Page<Order> {
+        val qOrderItem = QOrderItem.orderItem
+        val qProduct = QProduct.product
 
         val baseQuery = baseMerchantOrderQuery(merchantId, status, from, to)
 
@@ -278,9 +310,9 @@ class OrderRepository(
         val entities = QuerydslExtension.applySorts(pagedQuery, qOrder.createdAt, sort)
             .fetch()
 
-        return org.springframework.data.domain.PageImpl(
+        return PageImpl(
             entities,
-            org.springframework.data.domain.PageRequest.of(page, size),
+            PageRequest.of(page, size),
             total
         )
     }
@@ -299,11 +331,11 @@ class OrderRepository(
     private fun baseMerchantOrderQuery(
         merchantId: Long,
         status: OrderStatus?,
-        from: java.time.LocalDate?,
-        to: java.time.LocalDate?
-    ): com.querydsl.jpa.impl.JPAQuery<Order> {
-        val qOrderItem = com.hamsterworld.ecommerce.domain.orderitem.model.QOrderItem.orderItem
-        val qProduct = com.hamsterworld.ecommerce.domain.product.model.QProduct.product
+        from: LocalDate?,
+        to: LocalDate?
+    ): JPAQuery<Order> {
+        val qOrderItem = QOrderItem.orderItem
+        val qProduct = QProduct.product
 
         return jpaQueryFactory
             .selectDistinct(qOrder)
@@ -329,10 +361,10 @@ class OrderRepository(
     private fun searchMerchantOrderConditions(
         merchantId: Long,
         status: OrderStatus?,
-        from: java.time.LocalDate?,
-        to: java.time.LocalDate?
+        from: LocalDate?,
+        to: LocalDate?
     ): List<BooleanExpression> {
-        val qProduct = com.hamsterworld.ecommerce.domain.product.model.QProduct.product
+        val qProduct = QProduct.product
 
         return listOfNotNull(
             QuerydslExtension.eqOrNull(qProduct.merchantId, merchantId),

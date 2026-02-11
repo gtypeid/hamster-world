@@ -32,14 +32,13 @@ class MerchantController(
             user.id, request.storeName, request.businessNumber
         )
 
-        val merchant = merchantService.createMerchant(
+        val response = merchantService.createMerchantResponse(
             userId = user.id!!,
+            userPublicId = user.publicId,
             businessInfo = request.toBusinessInfo(),
             storeInfo = request.toStoreInfo(),
             settlementInfo = request.toSettlementInfo()
         )
-
-        val response = MerchantResponse.from(merchant, user.publicId)
 
         log.info(
             "[머천트 등록 완료] merchantPublicId={}, userPublicId={}, storeName={}",
@@ -56,10 +55,8 @@ class MerchantController(
     ): ResponseEntity<MerchantResponse> {
         log.info("[내 머천트 조회 요청] userId={}", user.id)
 
-        val merchant = merchantService.findByUserId(user.id!!)
+        val response = merchantService.getMerchantResponseByUserId(user.id!!, user.publicId)
             ?: return ResponseEntity.notFound().build()
-
-        val response = MerchantResponse.from(merchant, user.publicId)
 
         log.info("[내 머천트 조회 완료] merchantPublicId={}, storeName={}", response.merchantPublicId, response.storeName)
 
@@ -96,14 +93,13 @@ class MerchantController(
             request.toSettlementInfo(existingMerchant.settlementInfo)
         } else null
 
-        val updatedMerchant = merchantService.updateMerchant(
+        val response = merchantService.updateMerchantResponse(
             merchantId = existingMerchant.id!!,
+            userPublicId = user.publicId,
             businessInfo = businessInfo,
             storeInfo = storeInfo,
             settlementInfo = settlementInfo
         )
-
-        val response = MerchantResponse.from(updatedMerchant, user.publicId)
 
         log.info("[머천트 수정 완료] merchantPublicId={}, storeName={}", response.merchantPublicId, response.storeName)
 

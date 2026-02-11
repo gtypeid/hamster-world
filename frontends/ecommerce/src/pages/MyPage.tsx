@@ -5,6 +5,7 @@ import { useAlert } from '../contexts/AlertContext'
 import { userService } from '../services/userService'
 import { useMyOrders } from '../hooks/useOrders'
 import { useCreateMerchant } from '../hooks/useMerchant'
+import { useMyCoupons } from '../hooks/useCoupon'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../types/order'
 import type { User } from '../types/user'
 
@@ -13,7 +14,7 @@ export function MyPage() {
   const { isAuthenticated, user: authUser, token, login } = useAuth()
   const { showAlert, showConfirm } = useAlert()
   const createMerchant = useCreateMerchant()
-  const [activeTab, setActiveTab] = useState<'orders' | 'info' | 'wishlist' | 'merchant'>('info')
+  const [activeTab, setActiveTab] = useState<'orders' | 'info' | 'coupons' | 'merchant'>('info')
   const [userData, setUserData] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +56,11 @@ export function MyPage() {
     },
     activeTab === 'orders' // enabled 조건 추가
   )
+
+  // 쿠폰 목록 조회 - 'coupons' 탭이 활성화될 때만 실행
+  const { data: coupons = [], isLoading: couponsLoading } = useMyCoupons({
+    enabled: activeTab === 'coupons'
+  })
 
   // 로그인 안 되어 있으면 홈으로 리다이렉트
   if (!isAuthenticated) {
@@ -198,17 +204,17 @@ export function MyPage() {
                 주문 내역
               </button>
             )}
-            {/* 찜한 상품 - USER 역할일 때만 표시 */}
+            {/* 내 쿠폰 - USER 역할일 때만 표시 */}
             {userData.role === 'USER' && (
               <button
-                onClick={() => setActiveTab('wishlist')}
+                onClick={() => setActiveTab('coupons')}
                 className={`flex-1 py-4 font-bold transition-colors ${
-                  activeTab === 'wishlist'
+                  activeTab === 'coupons'
                     ? 'text-amber-600 border-b-2 border-amber-600'
                     : 'text-gray-500 hover:text-amber-500'
                 }`}
               >
-                찜한 상품
+                내 쿠폰
               </button>
             )}
             {/* 판매자 신청 탭 - USER 역할일 때만 표시 */}
@@ -394,20 +400,81 @@ export function MyPage() {
           </div>
         )}
 
-        {activeTab === 'wishlist' && (
+        {activeTab === 'coupons' && (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-amber-900 mb-4">찜한 상품</h2>
+            <h2 className="text-2xl font-bold text-amber-900 mb-4">내 쿠폰</h2>
 
-            <div className="bg-white rounded-2xl shadow-md p-12 text-center">
-              <span className="text-7xl block mb-4">❤️</span>
-              <p className="text-xl text-gray-600 mb-4">찜한 상품이 없습니다</p>
-              <Link
-                to="/"
-                className="inline-block bg-amber-500 text-white px-6 py-3 rounded-full font-bold hover:bg-amber-600 transition-colors"
-              >
-                상품 둘러보기
-              </Link>
-            </div>
+            {couponsLoading ? (
+              <div className="bg-white rounded-2xl shadow-md p-12 text-center">
+                <span className="text-7xl animate-bounce block mb-4">🎫</span>
+                <p className="text-xl text-gray-600">쿠폰을 불러오는 중...</p>
+              </div>
+            ) : coupons.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-md p-12 text-center">
+                <span className="text-7xl block mb-4">🎫</span>
+                <p className="text-xl text-gray-600 mb-4">보유한 쿠폰이 없습니다</p>
+                <Link
+                  to="/"
+                  className="inline-block bg-amber-500 text-white px-6 py-3 rounded-full font-bold hover:bg-amber-600 transition-colors"
+                >
+                  쿠폰 받으러 가기
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {coupons.map((coupon) => {
+                  const isExpired = coupon.status === 'EXPIRED'
+                  const isUsed = coupon.status === 'USED'
+                  const isAvailable = coupon.status === 'AVAILABLE'
+
+                  return (
+                    <div
+                      key={coupon.publicId}
+                      className={`bg-white rounded-xl shadow-md p-4 border-2 ${
+                        isExpired ? 'border-gray-200 opacity-60' :
+                        isUsed ? 'border-green-200 bg-green-50' :
+                        'border-amber-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">{isExpired ? '⏰' : isUsed ? '✓' : '🎫'}</span>
+                            <div>
+                              <h3 className="font-bold text-lg text-hamster-brown">
+                                {coupon.couponName || '쿠폰'}
+                              </h3>
+                              <p className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded inline-block">
+                                {coupon.couponCode}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1 ml-8">
+                            <p>• 발급일: {new Date(coupon.issuedAt).toLocaleDateString('ko-KR')}</p>
+                            <p>• 만료일: {new Date(coupon.expiresAt).toLocaleDateString('ko-KR')}</p>
+                            {isUsed && coupon.usedAt && (
+                              <p className="text-green-700 font-medium">
+                                • 사용일: {new Date(coupon.usedAt).toLocaleDateString('ko-KR')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            isExpired ? 'bg-gray-200 text-gray-600' :
+                            isUsed ? 'bg-green-200 text-green-800' :
+                            'bg-amber-200 text-amber-800'
+                          }`}>
+                            {isExpired ? '만료' : isUsed ? '사용완료' : '사용가능'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

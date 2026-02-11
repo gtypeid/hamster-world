@@ -49,11 +49,6 @@ class QuotaController(
         @PathVariable quotaKey: String,
         @RequestBody request: ClaimQuotaRequest
     ): ClaimQuotaResponse {
-        quotaService.claimReward(request.userPublicId, quotaKey)
-
-        return ClaimQuotaResponse(
-            success = true,
-            message = "Quota claimed successfully"
-        )
+        return quotaService.claimRewardDto(request.userPublicId, quotaKey)
     }
 }

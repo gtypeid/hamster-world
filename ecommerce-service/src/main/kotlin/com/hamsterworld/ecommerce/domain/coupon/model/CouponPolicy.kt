@@ -5,6 +5,7 @@ import com.hamsterworld.ecommerce.domain.coupon.condition.CouponUsageConditionFi
 import com.hamsterworld.ecommerce.domain.coupon.condition.DiscountConditionEmitter
 import com.hamsterworld.ecommerce.domain.coupon.constant.CouponIssuerType
 import com.hamsterworld.ecommerce.domain.coupon.constant.CouponStatus
+import com.hamsterworld.ecommerce.domain.coupon.event.InternalCouponPolicyCreatedEvent
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -105,10 +106,19 @@ class CouponPolicy(
     var validFrom: LocalDateTime = LocalDateTime.now(),
 
     /**
-     * 유효 종료 시간
+     * 유효 종료 시간 (캠페인 종료일, 이후 발급 불가)
      */
     @Column(name = "valid_until", nullable = false)
     var validUntil: LocalDateTime = LocalDateTime.now().plusDays(30),
+
+    /**
+     * 발급 후 사용 가능 일수 (기본 10일)
+     *
+     * 사용자가 쿠폰을 수령하면 issuedAt + couponDays 까지 사용 가능.
+     * 예: couponDays=7, 2/20 수령 → 2/27까지 사용 가능
+     */
+    @Column(name = "coupon_days", nullable = false)
+    var couponDays: Int = 10,
 
     /**
      * 사용 조건 (Embeddable)
@@ -124,6 +134,27 @@ class CouponPolicy(
 ) : AbsDomain() {
 
     /**
+     * Hibernate @PostLoad: Embedded 객체가 모든 컬럼 null일 때 null로 설정되는 문제 방지
+     *
+     * Hibernate는 @Embedded 객체의 모든 컬럼이 DB에서 null이면 객체 자체를 null로 만듦.
+     * 예: discountType=null, discountValue=null → discountEmitter=null
+     * 이 콜백으로 기본 인스턴스를 복원하여 NPE 방지.
+     *
+     * Note: usageCondition은 min_order_amount가 NOT NULL이므로 Hibernate null 이슈 없음.
+     * discountEmitter는 모든 컬럼이 nullable할 수 있어 보호 필요.
+     */
+    @Suppress("SENSELESS_COMPARISON")
+    @jakarta.persistence.PostLoad
+    fun onPostLoad() {
+        if (usageCondition == null) {
+            usageCondition = CouponUsageConditionFilter()
+        }
+        if (discountEmitter == null) {
+            discountEmitter = DiscountConditionEmitter()
+        }
+    }
+
+    /**
      * Entity 복사 (copy 메서드)
      */
     fun copy(
@@ -135,6 +166,7 @@ class CouponPolicy(
         status: CouponStatus = this.status,
         validFrom: LocalDateTime = this.validFrom,
         validUntil: LocalDateTime = this.validUntil,
+        couponDays: Int = this.couponDays,
         usageCondition: CouponUsageConditionFilter = this.usageCondition,
         discountEmitter: DiscountConditionEmitter = this.discountEmitter
     ): CouponPolicy {
@@ -147,6 +179,7 @@ class CouponPolicy(
             status = status,
             validFrom = validFrom,
             validUntil = validUntil,
+            couponDays = couponDays,
             usageCondition = usageCondition,
             discountEmitter = discountEmitter
         )
@@ -207,6 +240,7 @@ class CouponPolicy(
          * @param description 설명
          * @param validFrom 유효 시작 시간
          * @param validUntil 유효 종료 시간
+         * @param couponDays 발급 후 사용 가능 일수 (기본 10일)
          * @param usageCondition 사용 조건
          * @param discountEmitter 할인 계산 로직
          * @return 생성된 CouponPolicy
@@ -218,13 +252,14 @@ class CouponPolicy(
             description: String?,
             validFrom: LocalDateTime,
             validUntil: LocalDateTime,
+            couponDays: Int = 10,
             usageCondition: CouponUsageConditionFilter,
             discountEmitter: DiscountConditionEmitter
         ): CouponPolicy {
             // 쿠폰 코드 자동 생성 (Domain 책임)
             val couponCode = generateCouponCode()
 
-            return CouponPolicy(
+            val policy = CouponPolicy(
                 couponCode = couponCode,
                 name = name,
                 description = description,
@@ -233,9 +268,15 @@ class CouponPolicy(
                 status = CouponStatus.ACTIVE,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                couponDays = couponDays,
                 usageCondition = usageCondition,
                 discountEmitter = discountEmitter
             )
+
+            // 도메인 이벤트 등록 (save() 시 발행 → CouponPolicyEventHandler에서 처리)
+            policy.registerEvent(InternalCouponPolicyCreatedEvent(couponPolicy = policy))
+
+            return policy
         }
 
         /**

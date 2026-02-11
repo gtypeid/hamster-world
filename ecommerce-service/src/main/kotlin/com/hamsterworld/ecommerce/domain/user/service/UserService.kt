@@ -1,6 +1,7 @@
 package com.hamsterworld.ecommerce.domain.user.service
 
 import com.hamsterworld.ecommerce.app.user.request.UserSearchRequest
+import com.hamsterworld.ecommerce.app.user.response.UserResponse
 import com.hamsterworld.ecommerce.domain.user.model.User
 import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
 import org.springframework.data.domain.Page
@@ -50,5 +51,31 @@ class UserService(
     @Transactional(readOnly = true)
     fun searchUsersPage(search: UserSearchRequest): Page<User> {
         return userRepository.searchPage(search)
+    }
+
+    // DTO-returning methods for Controllers
+
+    @Transactional(readOnly = true)
+    fun getUserResponseByKeycloakUserId(keycloakUserId: String): UserResponse? {
+        val user = userRepository.findByKeycloakUserIdOrNull(keycloakUserId)
+        return user?.let { UserResponse.from(it) }
+    }
+
+    @Transactional(readOnly = true)
+    fun getUserResponseByPublicId(publicId: String): UserResponse {
+        val user = userRepository.findByPublicId(publicId)
+        return UserResponse.from(user)
+    }
+
+    @Transactional(readOnly = true)
+    fun searchUserResponses(search: UserSearchRequest): List<UserResponse> {
+        val users = userRepository.search(search)
+        return users.map { UserResponse.from(it) }
+    }
+
+    @Transactional(readOnly = true)
+    fun searchUserResponsesPage(search: UserSearchRequest): Page<UserResponse> {
+        val page = userRepository.searchPage(search)
+        return page.map { UserResponse.from(it) }
     }
 }

@@ -1,6 +1,7 @@
 package com.hamsterworld.notification.domain.topology.service
 
 import com.hamsterworld.notification.domain.topology.dto.EventRegistryDto
+import com.hamsterworld.notification.app.topology.response.EventRegistryResponse
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Component
@@ -65,6 +66,19 @@ class TopologyAggregator(
                 null
             }
         }
+    }
+
+    /**
+     * 전체 토폴로지 수집 (Response DTO 반환)
+     *
+     * kafka-topology.yml의 서비스 목록을 기반으로 각 서비스의 Event Registry를 수집합니다.
+     * 일부 서비스 호출 실패 시에도 나머지는 반환합니다.
+     *
+     * @return List<EventRegistryResponse>
+     */
+    fun collectTopologyResponse(): List<EventRegistryResponse> {
+        val allRegistries = collectTopology()
+        return allRegistries.map { EventRegistryResponse.from(it) }
     }
 
     /**

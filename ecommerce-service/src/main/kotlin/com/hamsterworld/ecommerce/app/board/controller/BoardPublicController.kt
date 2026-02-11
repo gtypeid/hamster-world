@@ -4,7 +4,6 @@ import com.hamsterworld.ecommerce.app.board.request.BoardSearchRequest
 import com.hamsterworld.ecommerce.app.board.response.BoardResponse
 import com.hamsterworld.ecommerce.app.board.response.BoardWithCommentsResponse
 import com.hamsterworld.ecommerce.domain.board.service.BoardService
-import com.hamsterworld.ecommerce.domain.comment.service.CommentService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
@@ -28,8 +27,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/public/boards")
 @Tag(name = "게시판 (Public)", description = "리뷰/문의 게시판 Public API")
 class BoardPublicController(
-    private val boardService: BoardService,
-    private val commentService: CommentService
+    private val boardService: BoardService
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -43,8 +41,7 @@ class BoardPublicController(
             search.productPublicId, search.category
         )
 
-        val boards = boardService.searchList(search)
-        val responses = boards.map { BoardResponse.from(it.board, it.productPublicId, it.authorPublicId, it.commentCount) }
+        val responses = boardService.searchListAsDto(search)
 
         log.info("Found {} boards", responses.size)
 
@@ -61,8 +58,7 @@ class BoardPublicController(
             search.productPublicId, search.category, search.page, search.size
         )
 
-        val boards = boardService.searchPage(search)
-        val responses = boards.map { BoardResponse.from(it.board, it.productPublicId, it.authorPublicId, it.commentCount) }
+        val responses = boardService.searchPageAsDto(search)
 
         log.info("Found {} boards (page {}/{})", responses.totalElements, responses.number, responses.totalPages)
 
@@ -76,11 +72,6 @@ class BoardPublicController(
     ): ResponseEntity<BoardWithCommentsResponse> {
         log.info("Getting board: publicId={}", publicId)
 
-        val boardWithIds = boardService.getByPublicIdWithPublicIds(publicId)
-        val commentsWithIds = commentService.getCommentsByBoardPublicIdWithPublicIds(publicId)
-
-        val response = BoardWithCommentsResponse.from(boardWithIds, commentsWithIds)
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(boardService.getBoardWithCommentsAsDto(publicId))
     }
 }

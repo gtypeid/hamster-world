@@ -36,8 +36,7 @@ class MerchantPublicController(
     ): ResponseEntity<MerchantSellerInfoResponse> {
         log.info("[판매자 공개 정보 조회 요청] merchantId={}", merchantId)
 
-        val merchant = merchantService.findByPublicId(merchantId)
-        val response = MerchantSellerInfoResponse.from(merchant)
+        val response = merchantService.getMerchantSellerInfoByPublicId(merchantId)
 
         log.info("[판매자 공개 정보 조회 완료] merchantPublicId={}, storeName={}", response.merchantPublicId, response.storeName)
 

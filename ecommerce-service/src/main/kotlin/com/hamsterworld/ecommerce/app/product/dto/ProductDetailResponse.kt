@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 /**
  * 상품 상세 응답 DTO
  *
- * 판매자(Merchant) 정보 + 리뷰 통계 포함
+ * 판매자(Merchant) 정보 + 리뷰 통계 + 발급 가능 쿠폰 포함
  */
 data class ProductDetailResponse(
     val publicId: String,
@@ -20,10 +20,11 @@ data class ProductDetailResponse(
     val price: BigDecimal,
     val stock: Int,
     val isSoldOut: Boolean,
-    val averageRating: Double,      // 평균 평점 (0.0 ~ 5.0)
-    val reviewCount: Int,            // 리뷰 개수
+    val averageRating: Double,
+    val reviewCount: Int,
     val lastStockSyncedAt: LocalDateTime?,
     val merchant: MerchantInfo,
+    val coupons: List<ProductCouponInfo>,
     val createdAt: LocalDateTime?,
     val modifiedAt: LocalDateTime?
 ) {
@@ -33,7 +34,13 @@ data class ProductDetailResponse(
     )
 
     companion object {
-        fun from(product: Product, merchant: Merchant, averageRating: Double, reviewCount: Int): ProductDetailResponse {
+        fun from(
+            product: Product,
+            merchant: Merchant,
+            averageRating: Double,
+            reviewCount: Int,
+            coupons: List<ProductCouponInfo> = emptyList()
+        ): ProductDetailResponse {
             return ProductDetailResponse(
                 publicId = product.publicId,
                 sku = product.sku,
@@ -51,6 +58,7 @@ data class ProductDetailResponse(
                     publicId = merchant.publicId,
                     storeName = merchant.storeInfo.storeName
                 ),
+                coupons = coupons,
                 createdAt = product.createdAt,
                 modifiedAt = product.modifiedAt
             )

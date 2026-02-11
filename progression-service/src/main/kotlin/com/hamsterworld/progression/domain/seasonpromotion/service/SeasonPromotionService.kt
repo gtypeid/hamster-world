@@ -1,6 +1,7 @@
 package com.hamsterworld.progression.domain.seasonpromotion.service
 
 import com.hamsterworld.progression.app.seasonpromotion.response.UserSeasonPromotionDto
+import com.hamsterworld.progression.app.seasonpromotion.response.ClaimSeasonPromotionRewardResponse
 import com.hamsterworld.progression.domain.seasonpromotion.dto.SeasonPromotionSearchRequest
 import com.hamsterworld.progression.domain.seasonpromotion.model.SeasonPromotion
 import com.hamsterworld.progression.domain.seasonpromotion.model.SeasonPromotionMaster
@@ -93,6 +94,27 @@ class SeasonPromotionService(
 
         promotion.claimReward(step, master)
         return seasonPromotionRepository.save(promotion)
+    }
+
+    /**
+     * 보상 클레임 (DTO 반환)
+     *
+     * @param userPublicId 유저 PublicID
+     * @param promotionId 프로모션 ID
+     * @param step 클레임할 스텝
+     */
+    @Transactional
+    fun claimRewardDto(
+        userPublicId: String,
+        promotionId: String,
+        step: Int
+    ): ClaimSeasonPromotionRewardResponse {
+        claimReward(userPublicId, promotionId, step)
+
+        return ClaimSeasonPromotionRewardResponse(
+            success = true,
+            message = "Season promotion reward claimed successfully"
+        )
     }
 
     // ==================== Internal/Consumer용 ====================

@@ -3,7 +3,7 @@ export interface Product {
   name: string
   price: number
   images: string[]
-  vendor: string
+  merchant: string
   rating?: number  // 더미 (레거시)
   soldCount?: number  // 더미 (레거시)
   averageRating?: number  // 실제 평균 평점 (백엔드)
@@ -22,7 +22,7 @@ export const products: Product[] = [
     name: '프리미엄 도토리 세트',
     price: 15000,
     images: ['🌰', '🌰', '🌰', '🌰'],
-    vendor: '도토리 장수 함돌이',
+    merchant: '도토리 장수 함돌이',
     rating: 4.9,
     soldCount: 1234,
     category: '간식',
@@ -46,7 +46,7 @@ export const products: Product[] = [
     name: '유기농 해바라기씨 1kg',
     price: 12000,
     images: ['🌻', '🌻', '🌻'],
-    vendor: '해바라기 농장 함순이',
+    merchant: '해바라기 농장 함순이',
     rating: 4.8,
     soldCount: 987,
     category: '간식',
@@ -67,7 +67,7 @@ export const products: Product[] = [
     name: '럭셔리 쳇바퀴 (소음 제로)',
     price: 35000,
     images: ['🎡', '🎡', '🎡', '🎡', '🎡'],
-    vendor: '운동기구 함피트',
+    merchant: '운동기구 함피트',
     rating: 5.0,
     soldCount: 456,
     category: '운동기구',
@@ -89,7 +89,7 @@ export const products: Product[] = [
     name: '아늑한 2층 하우스',
     price: 28000,
     images: ['🏠', '🏠', '🏠'],
-    vendor: '햄스터 건축가 함집사',
+    merchant: '햄스터 건축가 함집사',
     rating: 4.7,
     soldCount: 678,
     category: '집/용품',
@@ -110,7 +110,7 @@ export const products: Product[] = [
     name: '프리미엄 목화 침구',
     price: 8000,
     images: ['🛏️', '🛏️'],
-    vendor: '침구왕 함슬립',
+    merchant: '침구왕 함슬립',
     rating: 4.9,
     soldCount: 2341,
     category: '침구',
@@ -131,7 +131,7 @@ export const products: Product[] = [
     name: '귀여운 당근 인형',
     price: 5000,
     images: ['🥕', '🥕', '🥕'],
-    vendor: '장난감 공방 함토이',
+    merchant: '장난감 공방 함토이',
     rating: 4.6,
     soldCount: 543,
     category: '장난감',
@@ -151,7 +151,7 @@ export const products: Product[] = [
     name: '건강 간식 믹스',
     price: 18000,
     images: ['🥜', '🥜', '🥜', '🥜'],
-    vendor: '건강식품 함웰니스',
+    merchant: '건강식품 함웰니스',
     rating: 4.8,
     soldCount: 891,
     category: '간식',
@@ -171,7 +171,7 @@ export const products: Product[] = [
     name: '미니 터널 놀이터',
     price: 22000,
     images: ['🎪', '🎪', '🎪'],
-    vendor: '놀이터 함플레이',
+    merchant: '놀이터 함플레이',
     rating: 4.9,
     soldCount: 321,
     category: '장난감',

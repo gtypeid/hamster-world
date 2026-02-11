@@ -13,14 +13,17 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import com.hamsterworld.ecommerce.domain.product.repository.ProductRepository
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+import com.querydsl.jpa.impl.JPAQuery
 import org.springframework.stereotype.Repository
 
 @Repository
 class BoardRepository(
     private val boardJpaRepository: BoardJpaRepository,
     private val jpaQueryFactory: JPAQueryFactory,
-    private val productRepository: com.hamsterworld.ecommerce.domain.product.repository.ProductRepository,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+    private val productRepository: ProductRepository,
+    private val userRepository: UserRepository
 ) {
 
     fun save(board: Board): Board {
@@ -68,7 +71,7 @@ class BoardRepository(
         return PageImpl(entities, PageRequest.of(request.page, request.size), total)
     }
 
-    private fun baseQuery(request: BoardSearchRequest): com.querydsl.jpa.impl.JPAQuery<Board> {
+    private fun baseQuery(request: BoardSearchRequest): JPAQuery<Board> {
         return jpaQueryFactory
             .selectFrom(board)
             .where(*searchConditions(request).toTypedArray())

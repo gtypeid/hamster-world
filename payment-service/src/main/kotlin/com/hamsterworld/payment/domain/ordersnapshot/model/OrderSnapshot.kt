@@ -3,6 +3,7 @@ package com.hamsterworld.payment.domain.ordersnapshot.model
 import com.hamsterworld.common.domain.abs.AbsDomain
 import com.hamsterworld.payment.consumer.OrderItemDto
 import com.hamsterworld.payment.domain.product.event.OrderStockReservedEvent
+import com.hamsterworld.payment.domain.product.event.OrderItemDto as ProductEventOrderItemDto
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
@@ -107,7 +108,7 @@ class OrderSnapshot(
                     pointsUsed = pointsUsed,
                     cashAmount = cashAmount,
                     items = items.map { item ->
-                        com.hamsterworld.payment.domain.product.event.OrderItemDto(
+                        ProductEventOrderItemDto(
                             productId = item.productPublicId,
                             quantity = item.quantity,
                             price = item.price

@@ -6,6 +6,7 @@ import com.hamsterworld.common.domain.condition.ConditionFilterUtils
 import com.hamsterworld.ecommerce.domain.product.constant.ProductCategory
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
+import jakarta.persistence.Transient
 import java.math.BigDecimal
 
 /**
@@ -34,10 +35,10 @@ import java.math.BigDecimal
 @Embeddable
 class CouponUsageConditionFilter(
     /**
-     * 최소 주문 금액 (null이면 제한 없음)
+     * 최소 주문 금액 (0이면 제한 없음)
      */
-    @Column(name = "min_order_amount", nullable = true, precision = 15, scale = 2)
-    var minOrderAmount: BigDecimal? = null,
+    @Column(name = "min_order_amount", nullable = false, precision = 15, scale = 2)
+    var minOrderAmount: BigDecimal = BigDecimal.ZERO,
 
     /**
      * 필터 JSON (카테고리, 상품, 판매자 제약)
@@ -47,14 +48,15 @@ class CouponUsageConditionFilter(
     override var filtersJson: String? = null
 ) : ConditionFilter<CouponValidationInput> {
 
+    @Transient
     private val objectMapper = jacksonObjectMapper()
 
     /**
      * 주문이 쿠폰 사용 조건을 만족하는지 확인
      */
     override fun matches(input: CouponValidationInput): Boolean {
-        // 1. 최소 주문 금액 체크
-        if (minOrderAmount != null && input.totalAmount < minOrderAmount) {
+        // 1. 최소 주문 금액 체크 (0이면 제한 없음)
+        if (minOrderAmount > BigDecimal.ZERO && input.totalAmount < minOrderAmount) {
             return false
         }
 

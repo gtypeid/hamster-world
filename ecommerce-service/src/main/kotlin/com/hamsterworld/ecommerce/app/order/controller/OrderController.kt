@@ -1,6 +1,7 @@
 package com.hamsterworld.ecommerce.app.order.controller
 
 import com.hamsterworld.ecommerce.app.order.dto.OrderWithItems
+import com.hamsterworld.ecommerce.app.order.request.CartOrderRequest
 import com.hamsterworld.ecommerce.app.order.request.OrderSearchRequest
 import com.hamsterworld.ecommerce.app.order.response.*
 import com.hamsterworld.ecommerce.domain.order.service.OrderService
@@ -18,12 +19,13 @@ class OrderController(
     private val orderService: OrderService
 ) {
 
-    @Operation(summary = "장바구니 주문")
+    @Operation(summary = "장바구니 주문", description = "장바구니 → 주문 생성. 쿠폰 적용 시 userCouponPublicId 전달")
     @PostMapping
     fun cartOrder(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: User,
+        @RequestBody(required = false) request: CartOrderRequest?
     ): ResponseEntity<OrderWithItems> {
-        val order = orderService.createOrder(user.id!!)
+        val order = orderService.createOrder(user.id!!, request?.userCouponPublicId)
         return ResponseEntity.ok(order)
     }
 

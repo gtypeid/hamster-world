@@ -1,7 +1,6 @@
 package com.hamsterworld.payment.app.product.controller
 
 import com.hamsterworld.payment.app.product.response.ProductDetailResponse
-import com.hamsterworld.payment.app.product.response.ProductRecordResponse
 import com.hamsterworld.payment.app.product.response.ProductResponse
 import com.hamsterworld.payment.domain.product.dto.ProductSearchRequest
 import com.hamsterworld.payment.domain.product.service.ProductService
@@ -29,9 +28,7 @@ class ProductController(
     fun getProductList(
         request: ProductSearchRequest
     ): ResponseEntity<List<ProductResponse>> {
-        val products = productService.searchProducts(request)
-        val responses = products.map { ProductResponse.from(it) }
-        return ResponseEntity.ok(responses)
+        return ResponseEntity.ok(productService.searchProductResponses(request))
     }
 
     /**
@@ -43,9 +40,7 @@ class ProductController(
     fun getProductPage(
         request: ProductSearchRequest
     ): ResponseEntity<Page<ProductResponse>> {
-        val productsPage = productService.searchProductPage(request)
-        val responses = productsPage.map { ProductResponse.from(it) }
-        return ResponseEntity.ok(responses)
+        return ResponseEntity.ok(productService.searchProductResponsePage(request))
     }
 
     /**
@@ -60,21 +55,6 @@ class ProductController(
     fun getProductDetail(
         @PathVariable publicId: String
     ): ResponseEntity<ProductDetailResponse> {
-        val detailData = productService.findProductDetailByPublicId(publicId)
-
-        // ProductRecord 변환 시 productPublicId 전달 필요
-        val recordResponses = detailData.records.map { record ->
-            ProductRecordResponse.from(
-                record = record,
-                productPublicId = detailData.product.publicId
-            )
-        }
-
-        val response = ProductDetailResponse.from(
-            product = detailData.product,
-            records = recordResponses
-        )
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(productService.findProductDetailResponseByPublicId(publicId))
     }
 }

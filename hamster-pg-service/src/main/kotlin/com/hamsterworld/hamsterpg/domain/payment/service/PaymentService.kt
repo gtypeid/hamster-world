@@ -1,6 +1,8 @@
 package com.hamsterworld.hamsterpg.domain.payment.service
 
 import com.hamsterworld.hamsterpg.app.payment.request.PaymentSearchRequest
+import com.hamsterworld.hamsterpg.app.payment.response.PaymentResponse
+import com.hamsterworld.hamsterpg.app.payment.response.TransactionResponse
 import com.hamsterworld.hamsterpg.domain.payment.constant.PaymentStatus
 import com.hamsterworld.hamsterpg.domain.payment.model.Payment
 import com.hamsterworld.hamsterpg.domain.payment.repository.PaymentRepository
@@ -74,5 +76,49 @@ class PaymentService(
 
     fun searchTransactionsPage(request: PaymentSearchRequest): Page<Payment> {
         return repository.searchPage(request)
+    }
+
+    // DTO conversion methods (used by controllers)
+    @Transactional
+    fun createPaymentResponse(
+        midId: String,
+        orderPublicId: String,
+        amount: BigDecimal,
+        callbackUrl: String,
+        echo: String?
+    ): PaymentResponse {
+        val payment = createPayment(midId, orderPublicId, amount, callbackUrl, echo)
+        return PaymentResponse(
+            tid = payment.tid,
+            orderPublicId = payment.orderPublicId,
+            amount = payment.amount,
+            status = payment.status.name
+        )
+    }
+
+    @Transactional
+    fun requestCancelPaymentResponse(tid: String): PaymentResponse {
+        val payment = requestCancelPayment(tid)
+        return PaymentResponse(
+            tid = payment.tid,
+            orderPublicId = payment.orderPublicId,
+            amount = payment.amount,
+            status = payment.status.name
+        )
+    }
+
+    fun getTransactionResponse(tid: String): TransactionResponse {
+        val transaction = getTransaction(tid)
+        return TransactionResponse.from(transaction)
+    }
+
+    fun searchTransactionsResponseList(request: PaymentSearchRequest): List<TransactionResponse> {
+        val transactions = searchTransactions(request)
+        return transactions.map { TransactionResponse.from(it) }
+    }
+
+    fun searchTransactionsResponsePage(request: PaymentSearchRequest): Page<TransactionResponse> {
+        val page = searchTransactionsPage(request)
+        return page.map { TransactionResponse.from(it) }
     }
 }

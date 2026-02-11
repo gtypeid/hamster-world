@@ -1,6 +1,9 @@
 package com.hamsterworld.payment.domain.account.service
 
 import com.hamsterworld.common.domain.eventsourcing.RecordRepository
+import com.hamsterworld.payment.app.account.response.AccountDetailResponse
+import com.hamsterworld.payment.app.account.response.AccountRecordResponse
+import com.hamsterworld.payment.app.account.response.AccountResponse
 import com.hamsterworld.payment.domain.account.constant.AccountType
 import com.hamsterworld.payment.domain.account.dto.AccountSearchRequest
 import com.hamsterworld.payment.domain.account.model.Account
@@ -159,4 +162,66 @@ class AccountService(
         val account: Account,
         val records: List<AccountRecord>
     )
+
+    // ===== DTO Conversion Methods (for Controller) =====
+
+    /**
+     * 계좌 목록 조회 (List) - DTO 변환 포함
+     *
+     * @param search 검색 조건
+     * @return AccountResponse 목록
+     */
+    @Transactional(readOnly = true)
+    fun searchAccountResponses(search: AccountSearchRequest): List<AccountResponse> {
+        val accounts = accountRepository.findAll(search)
+        return accounts.map { AccountResponse.from(it) }
+    }
+
+    /**
+     * 계좌 목록 조회 (Page) - DTO 변환 포함
+     *
+     * @param search 검색 조건
+     * @return AccountResponse 페이지
+     */
+    @Transactional(readOnly = true)
+    fun searchAccountResponsePage(search: AccountSearchRequest): Page<AccountResponse> {
+        val pagedSearch = search.copy(paged = true)
+        val accountsPage = accountRepository.findAllPage(pagedSearch)
+        return accountsPage.map { AccountResponse.from(it) }
+    }
+
+    /**
+     * 계좌 상세 조회 (Public ID로 조회) - DTO 변환 포함
+     *
+     * @param publicId Account Public ID
+     * @return AccountDetailResponse (Account + AccountRecord 목록)
+     */
+    @Transactional(readOnly = true)
+    fun findAccountDetailResponseByPublicId(publicId: String): AccountDetailResponse {
+        val detailData = findAccountDetailByPublicId(publicId)
+
+        val recordResponses = detailData.records.map { record ->
+            AccountRecordResponse.from(
+                record = record,
+                accountPublicId = detailData.account.publicId
+            )
+        }
+
+        return AccountDetailResponse.from(
+            account = detailData.account,
+            records = recordResponses
+        )
+    }
+
+    /**
+     * 사용자의 모든 계좌 조회 - DTO 변환 포함
+     *
+     * @param userPublicId 사용자 Public ID
+     * @return AccountResponse 목록
+     */
+    @Transactional(readOnly = true)
+    fun findAccountResponsesByUserPublicId(userPublicId: String): List<AccountResponse> {
+        val accounts = accountRepository.findByUserPublicId(userPublicId)
+        return accounts.map { AccountResponse.from(it) }
+    }
 }

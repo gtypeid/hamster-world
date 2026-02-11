@@ -3,11 +3,13 @@ package com.hamsterworld.cashgateway.external.paymentgateway.polling
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus
 import com.hamsterworld.cashgateway.domain.paymentprocess.repository.PaymentProcessRepository
+import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayClientRegistry
 import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayProvider
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.AcknowledgementResponse
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.ApprovePaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentRequest
+import com.hamsterworld.cashgateway.external.paymentgateway.provider.DummyPaymentGatewayProvider
 import com.hamsterworld.common.web.exception.CustomRuntimeException
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -104,7 +106,7 @@ class PaymentGatewayPgPollingService(
      * CAS 업데이트와 PG 요청을 한 번에 처리
      */
     @Transactional
-    fun processPaymentRequest(process: com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess) {
+    fun processPaymentRequest(process: PaymentProcess) {
         val now = LocalDateTime.now()
         val processId = process.id!!
 
@@ -131,7 +133,7 @@ class PaymentGatewayPgPollingService(
             var request: PaymentRequest = provider.prepareRequest(paymentCtx)
 
             // DummyPaymentRequest인 경우 echo에 gatewayReferenceId 추가
-            if (request is com.hamsterworld.cashgateway.external.paymentgateway.provider.DummyPaymentGatewayProvider.DummyPaymentRequest) {
+            if (request is DummyPaymentGatewayProvider.DummyPaymentRequest) {
                 val echoWithGatewayRef = request.echo + ("gatewayReferenceId" to process.gatewayReferenceId)
                 request = request.copy(echo = echoWithGatewayRef)
             }

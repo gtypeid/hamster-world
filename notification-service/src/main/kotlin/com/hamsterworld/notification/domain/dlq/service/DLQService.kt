@@ -65,10 +65,24 @@ class DLQService(
     }
 
     /**
+     * PENDING 메시지 개수 (DTO 반환)
+     */
+    fun getPendingCountDto(): Map<String, Long> {
+        return mapOf("count" to getPendingCount())
+    }
+
+    /**
      * 토픽별 PENDING 개수
      */
     fun getPendingCountByTopic(topic: String): Long {
         return dlqMessageRepository.countByOriginalTopicAndStatus(topic, DLQStatus.PENDING)
+    }
+
+    /**
+     * 토픽별 PENDING 개수 (DTO 반환)
+     */
+    fun getPendingCountByTopicDto(topic: String): Map<String, Long> {
+        return mapOf("count" to getPendingCountByTopic(topic))
     }
 
     /**
@@ -122,6 +136,28 @@ class DLQService(
             dlqMessageRepository.save(message)
 
             throw e
+        }
+    }
+
+    /**
+     * 메시지 재처리 (원본 토픽으로 재전송) - DTO 반환
+     *
+     * @param id DLQ 메시지 ID
+     * @param adminId 관리자 ID
+     * @return ReprocessResponse
+     */
+    fun reprocessMessageDto(id: String, adminId: String): ReprocessResponse {
+        return try {
+            val success = reprocessMessage(id, adminId)
+            ReprocessResponse(
+                success = success,
+                message = if (success) "Message reprocessed successfully" else "Failed to reprocess message"
+            )
+        } catch (e: Exception) {
+            ReprocessResponse(
+                success = false,
+                message = e.message ?: "Unknown error"
+            )
         }
     }
 
@@ -184,4 +220,12 @@ data class DLQStatistics(
     val reprocessingCount: Long,
     val resolvedCount: Long,
     val ignoredCount: Long
+)
+
+/**
+ * 재처리 응답
+ */
+data class ReprocessResponse(
+    val success: Boolean,
+    val message: String
 )

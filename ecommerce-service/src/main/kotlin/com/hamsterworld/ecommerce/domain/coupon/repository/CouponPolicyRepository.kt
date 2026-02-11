@@ -7,7 +7,9 @@ import com.hamsterworld.ecommerce.domain.coupon.constant.CouponIssuerType
 import com.hamsterworld.ecommerce.domain.coupon.constant.CouponStatus
 import com.hamsterworld.ecommerce.domain.coupon.model.CouponPolicy
 import com.hamsterworld.ecommerce.domain.coupon.model.QCouponPolicy.couponPolicy as qCouponPolicy
+import com.hamsterworld.ecommerce.domain.coupon.model.QCouponPolicyProduct.couponPolicyProduct as qCouponPolicyProduct
 import com.querydsl.core.types.dsl.BooleanExpression
+import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQuery
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.domain.Page
@@ -15,6 +17,7 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * Coupon Policy Repository
@@ -104,6 +107,30 @@ class CouponPolicyRepository(
             PageRequest.of(page, size),
             total
         )
+    }
+
+    /**
+     * 전체 상품 대상 활성 쿠폰 정책 조회
+     *
+     * CouponPolicyProduct 레코드가 없는 정책 = 상품 제한 없음 = 모든 상품에 발급 가능
+     * ACTIVE 상태 + 현재 유효기간 내인 정책만 반환
+     */
+    fun findUniversalActivePolicies(): List<CouponPolicy> {
+        val now = LocalDateTime.now()
+
+        return jpaQueryFactory
+            .selectFrom(qCouponPolicy)
+            .where(
+                qCouponPolicy.status.eq(CouponStatus.ACTIVE),
+                qCouponPolicy.validFrom.loe(now),
+                qCouponPolicy.validUntil.goe(now),
+                qCouponPolicy.id.notIn(
+                    JPAExpressions
+                        .select(qCouponPolicyProduct.couponPolicyId)
+                        .from(qCouponPolicyProduct)
+                )
+            )
+            .fetch()
     }
 
     /**

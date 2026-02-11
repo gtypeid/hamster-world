@@ -1,5 +1,6 @@
 package com.hamsterworld.ecommerce.domain.order.service
 
+import com.hamsterworld.ecommerce.app.cart.dto.CartOrderInput
 import com.hamsterworld.ecommerce.app.cart.dto.CartWithItems
 import com.hamsterworld.ecommerce.app.cart.dto.CartWithItemsResponse
 import com.hamsterworld.ecommerce.app.order.dto.OrderWithItems
@@ -30,16 +31,24 @@ class OrderService(
     private val merchantRepository: MerchantRepository
 ) {
 
+    /**
+     * 주문 생성 (장바구니 → 주문)
+     *
+     * @param userId 사용자 ID
+     * @param userCouponPublicId 적용할 UserCoupon의 Public ID (선택)
+     */
     @Transactional
-    fun createOrder(userId: Long): OrderWithItems {
+    fun createOrder(userId: Long, userCouponPublicId: String? = null): OrderWithItems {
         val user: User = userRepository.findById(userId)
-        val cartResponse: CartWithItemsResponse = cartService.getCart(userId)
 
-        // CartWithItemsResponse를 내부 처리용 CartWithItems로 변환
+        // CartWithItems 조회
         val cart: CartWithItems = cartService.getCartInternal(userId)
 
-        // 카트 내역을 오더로 전환
-        val order: OrderWithItems = converterAdapter.convert(cart, OrderWithItems::class.java)
+        // CartOrderInput 생성 (쿠폰 정보 포함)
+        val cartOrderInput = CartOrderInput.from(cart, userCouponPublicId)
+
+        // 카트 내역을 오더로 전환 (Validator + Converter 파이프라인)
+        val order: OrderWithItems = converterAdapter.convert(cartOrderInput, OrderWithItems::class.java)
         val savedOrder: OrderWithItems = orderRepository.saveOrderRecord(order)
 
         // 주문 생성 후 카트 비우기

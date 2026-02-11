@@ -51,15 +51,10 @@ class SeasonPromotionController(
         @PathVariable promotionId: String,
         @RequestBody request: ClaimSeasonPromotionRewardRequest
     ): ClaimSeasonPromotionRewardResponse {
-        seasonPromotionService.claimReward(
+        return seasonPromotionService.claimRewardDto(
             userPublicId = request.userPublicId,
             promotionId = promotionId,
             step = request.step
-        )
-
-        return ClaimSeasonPromotionRewardResponse(
-            success = true,
-            message = "Season promotion reward claimed successfully"
         )
     }
 }

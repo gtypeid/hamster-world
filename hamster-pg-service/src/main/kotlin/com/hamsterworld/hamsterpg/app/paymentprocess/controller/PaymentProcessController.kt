@@ -1,6 +1,7 @@
 package com.hamsterworld.hamsterpg.app.paymentprocess.controller
 
 import com.hamsterworld.hamsterpg.app.paymentprocess.request.ProcessPaymentRequest
+import com.hamsterworld.hamsterpg.app.paymentprocess.response.PaymentProcessDetailsResponse
 import com.hamsterworld.hamsterpg.app.paymentprocess.response.ProcessPaymentResponse
 import com.hamsterworld.hamsterpg.domain.paymentprocess.service.PaymentProcessService
 import org.slf4j.LoggerFactory
@@ -53,23 +54,11 @@ class PaymentProcessController(
      * 트랜잭션 조회 (디버깅용)
      */
     @GetMapping("/transaction/{tid}")
-    fun getTransaction(@PathVariable tid: String): ResponseEntity<Any> {
-        val process = paymentProcessService.findByTid(tid)
+    fun getTransaction(@PathVariable tid: String): ResponseEntity<PaymentProcessDetailsResponse> {
+        val response = paymentProcessService.findByTidResponse(tid)
             ?: return ResponseEntity.notFound().build()
 
-        return ResponseEntity.ok(
-            mapOf(
-                "tid" to process.tid,
-                "orderId" to process.orderId,
-                "amount" to process.amount,
-                "status" to process.status.name,
-                "approvalNo" to process.approvalNo,
-                "failReason" to process.failReason,
-                "requestedAt" to process.requestedAt,
-                "processedAt" to process.processedAt,
-                "webhookSentAt" to process.webhookSentAt
-            )
-        )
+        return ResponseEntity.ok(response)
     }
 
     /**

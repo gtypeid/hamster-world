@@ -1,6 +1,6 @@
 package com.hamsterworld.ecommerce.domain.order.converter
 
-import com.hamsterworld.ecommerce.app.cart.dto.CartWithItems
+import com.hamsterworld.ecommerce.app.cart.dto.CartOrderInput
 import com.hamsterworld.common.domain.converter.DomainConverterValidator
 import com.hamsterworld.common.web.exception.CustomRuntimeException
 import org.slf4j.LoggerFactory
@@ -9,19 +9,22 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class CartToOrderValidator : DomainConverterValidator<CartWithItems> {
+class CartToOrderValidator(
+    private val couponValidator: CartToOrderCouponValidator
+) : DomainConverterValidator<CartOrderInput> {
 
     private val log = LoggerFactory.getLogger(CartToOrderValidator::class.java)
 
     @Transactional(propagation = Propagation.MANDATORY)
-    override fun validate(cart: CartWithItems) {
-        if (cart.items.isEmpty()) {
+    override fun validate(source: CartOrderInput) {
+        // 1. 장바구니 기본 검증
+        if (source.items.isEmpty()) {
             throw CustomRuntimeException("장바구니에 상품이 없습니다.")
         }
 
         // "대충 체크" - Product.stock은 캐시이므로 정확하지 않을 수 있음
         // 실제 재고 확인은 Payment Service에서 수행
-        cart.items.forEach { item ->
+        source.items.forEach { item ->
             val product = item.product
             val requestedQty = item.cartItem.quantity
 
@@ -42,5 +45,8 @@ class CartToOrderValidator : DomainConverterValidator<CartWithItems> {
                 )
             }
         }
+
+        // 2. 쿠폰 검증 (couponCode가 있으면)
+        couponValidator.validate(source)
     }
 }

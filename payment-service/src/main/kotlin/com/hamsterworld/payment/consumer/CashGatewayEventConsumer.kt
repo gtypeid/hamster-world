@@ -9,6 +9,7 @@ import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
 import com.hamsterworld.payment.domain.ordersnapshot.repository.OrderSnapshotRepository
 import com.hamsterworld.payment.domain.payment.event.PaymentProcessFailedEvent
+import com.hamsterworld.payment.domain.payment.event.InternalStockRestoreEvent
 import com.hamsterworld.payment.domain.payment.model.Payment
 import com.hamsterworld.payment.domain.payment.repository.PaymentRepository
 import com.hamsterworld.payment.domain.product.service.ProductService
@@ -187,7 +188,7 @@ class CashGatewayEventConsumer(
         // InternalStockRestoreEvent 발행 (재고 복원)
         // → PaymentEventHandler가 동기 실행 (같은 트랜잭션)
         applicationEventPublisher.publishEvent(
-            com.hamsterworld.payment.domain.payment.event.InternalStockRestoreEvent(
+            InternalStockRestoreEvent(
                 orderPublicId = event.orderPublicId,
                 orderSnapshotId = snapshot.id!!,
                 reason = "[결제 실패 복원] orderPublicId=${event.orderPublicId}, processPublicId=${event.processPublicId}"

@@ -30,10 +30,10 @@ class PaymentController(
     ): ResponseEntity<PaymentResponse> {
         log.info("Payment request received: type=${request::class.simpleName}, midId=${pgMid.midId}")
 
-        val transaction = when (request) {
+        val response = when (request) {
             is CreatePaymentRequest -> {
                 log.info("Creating payment: orderPublicId=${request.orderPublicId}, amount=${request.amount}")
-                transactionService.createPayment(
+                transactionService.createPaymentResponse(
                     midId = pgMid.midId,
                     orderPublicId = request.orderPublicId,
                     amount = request.amount,
@@ -43,16 +43,9 @@ class PaymentController(
             }
             is CancelPaymentRequest -> {
                 log.info("Requesting cancellation: tid=${request.tid}")
-                transactionService.requestCancelPayment(request.tid)
+                transactionService.requestCancelPaymentResponse(request.tid)
             }
         }
-
-        val response = PaymentResponse(
-            tid = transaction.tid,
-            orderPublicId = transaction.orderPublicId,
-            amount = transaction.amount,
-            status = transaction.status.name
-        )
 
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response)
     }
@@ -63,8 +56,7 @@ class PaymentController(
     ): ResponseEntity<List<TransactionResponse>> {
         log.info("Searching transactions (list): midId=${search.midId}, status=${search.status}, orderPublicId=${search.orderPublicId}")
 
-        val transactions = transactionService.searchTransactions(search)
-        val responses = transactions.map { TransactionResponse.from(it) }
+        val responses = transactionService.searchTransactionsResponseList(search)
 
         log.info("Found ${responses.size} transactions")
 
@@ -77,10 +69,9 @@ class PaymentController(
     ): ResponseEntity<Page<TransactionResponse>> {
         log.info("Searching transactions (page): page=${search.page}, size=${search.size}, midId=${search.midId}")
 
-        val page = transactionService.searchTransactionsPage(search)
-        val responses = page.map { TransactionResponse.from(it) }
+        val responses = transactionService.searchTransactionsResponsePage(search)
 
-        log.info("Found ${page.totalElements} transactions (page ${page.number}/${page.totalPages})")
+        log.info("Found ${responses.totalElements} transactions (page ${responses.number}/${responses.totalPages})")
 
         return ResponseEntity.ok(responses)
     }
@@ -91,9 +82,6 @@ class PaymentController(
     ): ResponseEntity<TransactionResponse> {
         log.info("Getting transaction: tid=$tid")
 
-        val transaction = transactionService.getTransaction(tid)
-        val response = TransactionResponse.from(transaction)
-
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(transactionService.getTransactionResponse(tid))
     }
 }

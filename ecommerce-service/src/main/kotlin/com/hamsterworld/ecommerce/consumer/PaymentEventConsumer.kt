@@ -6,6 +6,8 @@ import com.hamsterworld.common.domain.processedevent.repository.ProcessedEventRe
 import com.hamsterworld.common.web.kafka.BaseKafkaConsumer
 import com.hamsterworld.common.web.kafka.KafkaTopics
 import com.hamsterworld.common.web.kafka.ParsedEvent
+import com.hamsterworld.common.web.kafka.EventRegistryProperties
+import com.hamsterworld.ecommerce.domain.account.service.AccountService
 import com.hamsterworld.ecommerce.domain.order.constant.OrderStatus
 import com.hamsterworld.ecommerce.domain.order.repository.OrderRepository
 import com.hamsterworld.ecommerce.domain.product.service.ProductService
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional
  * Payment Service에서 발행하는 다음 이벤트를 수신:
  * - PaymentConfirmedEvent: Payment Service 결제 확정 → Order 상태 PAID로 변경
  * - ProductStockSynchronizedEvent: 재고 변경 → E-commerce Service Product 동기화
+ * - AccountBalanceSynchronizedEvent: 잔액 변경 → E-commerce Service Account 동기화
  * - OrderStockValidationFailedEvent: 재고 검증 실패 → Order 상태 FAILED로 변경
  *
  * ## 멱등성 전략
@@ -40,8 +43,9 @@ import org.springframework.transaction.annotation.Transactional
 class PaymentEventConsumer(
     objectMapper: ObjectMapper,
     processedEventRepository: ProcessedEventRepository,
-    eventRegistryProperties: com.hamsterworld.common.web.kafka.EventRegistryProperties,
+    eventRegistryProperties: EventRegistryProperties,
     private val productService: ProductService,
+    private val accountService: AccountService,
     private val orderRepository: OrderRepository
 ) : BaseKafkaConsumer(objectMapper, processedEventRepository, eventRegistryProperties, KafkaTopics.PAYMENT_EVENTS) {
 
@@ -61,6 +65,7 @@ class PaymentEventConsumer(
             "PaymentProcessFailedEvent" -> handlePaymentProcessFailed(parsedEvent)
             "PaymentCancelConfirmedEvent" -> handlePaymentCancelConfirmed(parsedEvent)
             "ProductStockSynchronizedEvent" -> handleProductStockSynchronized(parsedEvent)
+            "AccountBalanceSynchronizedEvent" -> handleAccountBalanceSynchronized(parsedEvent)
             "OrderStockValidationFailedEvent" -> handleOrderStockValidationFailed(parsedEvent)
             else -> logger.debug("Ignoring event: {}", parsedEvent.eventType)
         }
@@ -204,6 +209,32 @@ class PaymentEventConsumer(
         logger.info(
             "재고 동기화 완료 (Kafka) | ecommerceProductId={} | stock={} | isSoldOut={} | reason={} | traceId={} | eventId={}",
             event.ecommerceProductId, event.stock, event.isSoldOut, event.reason,
+            parsedEvent.traceId ?: "N/A", parsedEvent.eventId
+        )
+    }
+
+    /**
+     * AccountBalanceSynchronizedEvent 처리
+     *
+     * ## 멱등성 보장
+     * - eventId 체크 (BaseKafkaConsumer, 자동)
+     *
+     * ## 처리 내용
+     * - Account 잔액 동기화 (Payment Service로부터)
+     * - Account가 없으면 생성, 있으면 해당 accountType 컬럼만 업데이트
+     */
+    private fun handleAccountBalanceSynchronized(parsedEvent: ParsedEvent) {
+        val event = objectMapper.convertValue<AccountBalanceSynchronizedEventDto>(parsedEvent.payload)
+
+        accountService.syncBalance(
+            userPublicId = event.userPublicId,
+            accountType = event.accountType,
+            balance = event.balance
+        )
+
+        logger.info(
+            "잔액 동기화 완료 (Kafka) | userPublicId={} | accountType={} | balance={} | reason={} | traceId={} | eventId={}",
+            event.userPublicId, event.accountType, event.balance, event.reason,
             parsedEvent.traceId ?: "N/A", parsedEvent.eventId
         )
     }

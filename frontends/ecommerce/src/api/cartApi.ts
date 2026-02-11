@@ -26,7 +26,7 @@ export interface CartItemWithProduct {
     name: string
     price: number
     images: string[]
-    vendor: string
+    merchant: string
     stock: number
   }
 }
@@ -51,7 +51,7 @@ export const cartApi = {
             name: item.product.name,
             price: item.product.price,
             images: [item.product.imageUrl || '📦'],
-            vendor: '', // TODO: Add vendor info from backend
+            merchant: '', // TODO: Add merchant info from backend
             stock: item.product.stock,
           }
         }))
@@ -77,7 +77,7 @@ export const cartApi = {
           name: product.name,
           price: product.price,
           images: product.images,
-          vendor: product.vendor,
+          merchant: product.merchant,
           stock: product.stock,
         },
       }

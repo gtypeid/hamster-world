@@ -4,9 +4,15 @@ import com.hamsterworld.common.web.exception.CustomRuntimeException
 import com.hamsterworld.ecommerce.app.board.request.BoardCreateRequest
 import com.hamsterworld.ecommerce.app.board.request.BoardSearchRequest
 import com.hamsterworld.ecommerce.app.board.request.BoardUpdateRequest
+import com.hamsterworld.ecommerce.app.board.response.BoardResponse
+import com.hamsterworld.ecommerce.app.board.response.BoardWithCommentsResponse
 import com.hamsterworld.ecommerce.domain.board.constant.BoardCategory
 import com.hamsterworld.ecommerce.domain.board.model.Board
 import com.hamsterworld.ecommerce.domain.board.repository.BoardRepository
+import com.hamsterworld.ecommerce.domain.product.repository.ProductRepository
+import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+import com.hamsterworld.ecommerce.domain.comment.repository.CommentRepository
+import com.hamsterworld.ecommerce.domain.comment.service.CommentService
 import org.springframework.data.domain.Page
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class BoardService(
     private val boardRepository: BoardRepository,
-    private val productRepository: com.hamsterworld.ecommerce.domain.product.repository.ProductRepository,
-    private val userRepository: com.hamsterworld.ecommerce.domain.user.repository.UserRepository,
-    private val commentRepository: com.hamsterworld.ecommerce.domain.comment.repository.CommentRepository
+    private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
+    private val commentRepository: CommentRepository
 ) {
 
     /**
@@ -139,6 +145,86 @@ class BoardService(
                 commentCount = commentCounts[board.id] ?: 0
             )
         }
+    }
+
+    // ==================== DTO 반환 메서드 ====================
+
+    /**
+     * 게시글 작성 (DTO 반환)
+     */
+    @Transactional
+    fun createAndReturnDto(request: BoardCreateRequest, authorPublicId: String, authorName: String): BoardResponse {
+        val board = create(request, authorPublicId, authorName)
+        val boardWithIds = getByPublicIdWithPublicIds(board.publicId)
+        return BoardResponse.from(boardWithIds.board, boardWithIds.productPublicId, boardWithIds.authorPublicId, boardWithIds.commentCount)
+    }
+
+    /**
+     * 게시글 수정 (DTO 반환)
+     */
+    @Transactional
+    fun updateAndReturnDto(publicId: String, request: BoardUpdateRequest, userPublicId: String): BoardResponse {
+        val board = update(publicId, request, userPublicId)
+        val boardWithIds = getByPublicIdWithPublicIds(board.publicId)
+        return BoardResponse.from(boardWithIds.board, boardWithIds.productPublicId, boardWithIds.authorPublicId, boardWithIds.commentCount)
+    }
+
+    /**
+     * 게시글 검색 (리스트) - DTO 반환
+     */
+    @Transactional(readOnly = true)
+    fun searchListAsDto(request: BoardSearchRequest): List<BoardResponse> {
+        val boards = searchList(request)
+        return boards.map { BoardResponse.from(it.board, it.productPublicId, it.authorPublicId, it.commentCount) }
+    }
+
+    /**
+     * 게시글 검색 (페이징) - DTO 반환
+     */
+    @Transactional(readOnly = true)
+    fun searchPageAsDto(request: BoardSearchRequest): Page<BoardResponse> {
+        val boards = searchPage(request)
+        return boards.map { BoardResponse.from(it.board, it.productPublicId, it.authorPublicId, it.commentCount) }
+    }
+
+    /**
+     * 게시글 단건 조회 (댓글 포함) - DTO 반환
+     */
+    @Transactional(readOnly = true)
+    fun getBoardWithCommentsAsDto(publicId: String): BoardWithCommentsResponse {
+        val boardWithIds = getByPublicIdWithPublicIds(publicId)
+        val commentsWithIds = commentRepository.findByBoardId(boardWithIds.board.id!!)
+            .let { comments ->
+                if (comments.isEmpty()) return@let emptyList()
+
+                // Batch 조회로 N+1 방지
+                val authorIds = comments.map { it.authorId }.distinct()
+                val parentIds = comments.mapNotNull { it.parentId }.distinct()
+
+                val authors = userRepository.findByIds(authorIds).associateBy { it.id!! }
+                val parentComments = if (parentIds.isNotEmpty()) {
+                    commentRepository.findByIds(parentIds).associateBy { it.id!! }
+                } else {
+                    emptyMap()
+                }
+
+                comments.map { comment ->
+                    val author = authors[comment.authorId]
+                        ?: throw CustomRuntimeException("사용자를 찾을 수 없습니다. ID: ${comment.authorId}")
+                    val parentPublicId = comment.parentId?.let { parentId ->
+                        parentComments[parentId]?.publicId
+                    }
+
+                    CommentService.CommentWithPublicIds(
+                        comment = comment,
+                        boardPublicId = boardWithIds.board.publicId,
+                        authorPublicId = author.publicId,
+                        parentPublicId = parentPublicId
+                    )
+                }
+            }
+
+        return BoardWithCommentsResponse.from(boardWithIds, commentsWithIds)
     }
 
     /**

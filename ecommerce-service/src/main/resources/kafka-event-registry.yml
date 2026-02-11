@@ -14,6 +14,7 @@ event:
         - PaymentProcessFailedEvent       # 결제 실패 확정 (Business Truth) → Order 상태 PAYMENT_FAILED
         - PaymentCancelConfirmedEvent     # 결제 취소 확정 (Business Truth) → Order 상태 CANCELED
         - ProductStockSynchronizedEvent   # 재고 동기화 → Product.stock 업데이트
+        - AccountBalanceSynchronizedEvent # 잔액 동기화 → Account 잔액 업데이트
         - OrderStockValidationFailedEvent # 재고 검증 실패 → Order 상태 FAILED
 
   # 발행하는 이벤트 (Publish)

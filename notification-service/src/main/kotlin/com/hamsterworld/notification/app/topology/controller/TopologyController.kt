@@ -40,8 +40,7 @@ class TopologyController(
     @PreAuthorize("hasRole('DEVELOPER')")
     @GetMapping("/internal/event-registry")
     fun getEventRegistry(): EventRegistryResponse {
-        val dto = eventRegistryReader.readEventRegistry()
-        return EventRegistryResponse.from(dto)
+        return eventRegistryReader.readEventRegistryResponse()
     }
 
     /**
@@ -64,8 +63,7 @@ class TopologyController(
     @PreAuthorize("hasRole('DEVELOPER')")
     @GetMapping("/topology")
     fun getTopology(): TopologyResponse {
-        val allRegistries = topologyAggregator.collectTopology()
-        val responses = allRegistries.map { EventRegistryResponse.from(it) }
+        val responses = topologyAggregator.collectTopologyResponse()
         return TopologyResponse(services = responses)
     }
 }

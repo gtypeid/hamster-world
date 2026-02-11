@@ -3,6 +3,7 @@ package com.hamsterworld.cashgateway.domain.payment.event
 import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
 import com.hamsterworld.common.tracing.TraceContextHolder
+import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -20,7 +21,7 @@ data class PaymentFailedEvent(
     val processPublicId: String,    // PaymentProcess의 Public ID (Snowflake Base62)
     val orderPublicId: String?,     // Order의 Public ID (Snowflake Base62)
     val userPublicId: String?,      // User의 Public ID (Snowflake Base62)
-    val provider: com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider?,
+    val provider: Provider?,
     val mid: String,
     val amount: BigDecimal,
     val orderNumber: String?,

@@ -49,11 +49,6 @@ class ArchiveController(
         @PathVariable archiveId: String,
         @RequestBody request: ClaimArchiveRequest
     ): ClaimArchiveResponse {
-        archiveService.claimReward(request.userPublicId, archiveId)
-
-        return ClaimArchiveResponse(
-            success = true,
-            message = "Archive claimed successfully"
-        )
+        return archiveService.claimRewardDto(request.userPublicId, archiveId)
     }
 }

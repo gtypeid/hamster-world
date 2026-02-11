@@ -1,6 +1,7 @@
 package com.hamsterworld.progression.domain.archive.service
 
 import com.hamsterworld.progression.app.archive.response.UserArchiveDto
+import com.hamsterworld.progression.app.archive.response.ClaimArchiveResponse
 import com.hamsterworld.progression.domain.archive.dto.ArchiveSearchRequest
 import com.hamsterworld.progression.domain.archive.model.ArchiveMaster
 import com.hamsterworld.progression.domain.archive.model.UserArchiveProgress
@@ -85,6 +86,22 @@ class ArchiveService(
         }
 
         return archiveProgressRepository.save(progress)
+    }
+
+    /**
+     * Archive 보상 클레임 (DTO 반환)
+     */
+    @Transactional
+    fun claimRewardDto(
+        userPublicId: String,
+        archiveId: String
+    ): ClaimArchiveResponse {
+        claimReward(userPublicId, archiveId)
+
+        return ClaimArchiveResponse(
+            success = true,
+            message = "Archive claimed successfully"
+        )
     }
 
     // ==================== Internal/Consumer용 ====================

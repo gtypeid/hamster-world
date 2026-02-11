@@ -1,11 +1,11 @@
 import { AdminLayout } from '../../components/admin/AdminLayout'
 
 const allOrders = [
-  { id: 1, orderNumber: 'ORD-001', product: '프리미엄 도토리 세트', vendor: '도토리 장수 함돌이', customer: '햄찌사랑', amount: 15000, status: '배송준비', date: '2026-01-29 09:15' },
-  { id: 2, orderNumber: 'ORD-002', product: '유기농 해바라기씨', vendor: '해바라기 농장 함순이', customer: '함스터맘', amount: 12000, status: '결제완료', date: '2026-01-29 08:30' },
-  { id: 3, orderNumber: 'ORD-003', product: '럭셔리 쳇바퀴', vendor: '운동기구 함피트', customer: '쪼꼬미', amount: 35000, status: '배송중', date: '2026-01-28 15:20' },
-  { id: 4, orderNumber: 'ORD-004', product: '아늑한 2층 하우스', vendor: '햄스터 건축가 함집사', customer: '햄순이', amount: 28000, status: '결제완료', date: '2026-01-28 10:15' },
-  { id: 5, orderNumber: 'ORD-005', product: '프리미엄 목화 침구', vendor: '침구왕 함슬립', customer: '함집사', amount: 8000, status: '배송완료', date: '2026-01-27 14:30' },
+  { id: 1, orderNumber: 'ORD-001', product: '프리미엄 도토리 세트', merchant: '도토리 장수 함돌이', customer: '햄찌사랑', amount: 15000, status: '배송준비', date: '2026-01-29 09:15' },
+  { id: 2, orderNumber: 'ORD-002', product: '유기농 해바라기씨', merchant: '해바라기 농장 함순이', customer: '함스터맘', amount: 12000, status: '결제완료', date: '2026-01-29 08:30' },
+  { id: 3, orderNumber: 'ORD-003', product: '럭셔리 쳇바퀴', merchant: '운동기구 함피트', customer: '쪼꼬미', amount: 35000, status: '배송중', date: '2026-01-28 15:20' },
+  { id: 4, orderNumber: 'ORD-004', product: '아늑한 2층 하우스', merchant: '햄스터 건축가 함집사', customer: '햄순이', amount: 28000, status: '결제완료', date: '2026-01-28 10:15' },
+  { id: 5, orderNumber: 'ORD-005', product: '프리미엄 목화 침구', merchant: '침구왕 함슬립', customer: '함집사', amount: 8000, status: '배송완료', date: '2026-01-27 14:30' },
 ]
 
 const getStatusColor = (status: string) => {
@@ -88,7 +88,7 @@ export function AdminOrdersPage() {
                       {order.product}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {order.vendor}
+                      {order.merchant}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {order.customer}
