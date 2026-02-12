@@ -1,4 +1,4 @@
-name: Build HamsterPG Front
+name: Build Hamster-PG Front
 
 on:
   push:
