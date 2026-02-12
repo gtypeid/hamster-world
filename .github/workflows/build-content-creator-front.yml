@@ -1,0 +1,23 @@
+name: Build Content-Creator Front
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontends/content-creator/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push
+        run: |
+          cd frontends/content-creator
+          docker build -t ghcr.io/gtypeid/hamster-front-content-creator:latest .
+          docker push ghcr.io/gtypeid/hamster-front-content-creator:latest
