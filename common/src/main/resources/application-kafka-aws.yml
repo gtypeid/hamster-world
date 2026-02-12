@@ -1,0 +1,7 @@
+# Kafka AWS 환경 설정
+# application-kafka.yml의 AWS 오버라이드
+# 환경변수: KAFKA_HOST (Terraform에서 Kafka 인스턴스 private IP 주입)
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST}:9093

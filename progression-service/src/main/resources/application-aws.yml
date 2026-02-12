@@ -1,0 +1,44 @@
+# Progression Service - AWS 환경 설정
+#
+# 환경변수 (Terraform/Docker에서 주입):
+#   DB_HOST       - MySQL 인스턴스 private IP
+#   DB_PASSWORD   - MySQL root 비밀번호
+#   KAFKA_HOST    - Kafka 인스턴스 private IP
+
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/progression_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 8084
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.progression: INFO
+
+outbox:
+  processor:
+    enabled: true
+
+master:
+  data:
+    path: classpath:master/

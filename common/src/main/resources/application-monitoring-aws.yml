@@ -1,0 +1,8 @@
+# Monitoring AWS 환경 설정
+# application-monitoring.yml의 AWS 오버라이드
+# 환경변수: MONITORING_HOST (Grafana 스택 인스턴스 private IP)
+
+management:
+  otlp:
+    tracing:
+      endpoint: http://${MONITORING_HOST:localhost}:4318/v1/traces

@@ -1,0 +1,13 @@
+# OAuth2 AWS 환경 설정
+# application-oauth2.yml의 AWS 오버라이드
+# 환경변수: KEYCLOAK_HOST (Terraform에서 Front 인스턴스 private IP 주입)
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://${KEYCLOAK_HOST}:8090/realms/hamster-world
+
+keycloak:
+  server-url: http://${KEYCLOAK_HOST}:8090

@@ -1,0 +1,19 @@
+# Topology URL Mappings - AWS 환경
+#
+# AWS에서는 각 서비스가 다른 인스턴스에서 실행되므로 private IP 기반 URL 사용
+# 전체 서비스 고유 포트 체계: 8080~8086
+#
+# 환경변수 (Terraform/Docker에서 주입):
+#   ECOMMERCE_HOST - commerce 인스턴스 private IP (ecommerce: 8080)
+#   PAYMENT_HOST   - payment 인스턴스 private IP (payment: 8083)
+#   BILLING_HOST   - billing 인스턴스 private IP (cash-gateway: 8082, hamster-pg: 8086)
+#   SUPPORT_HOST   - support 인스턴스 private IP (progression: 8084, notification: 8085)
+
+topology:
+  url-mappings:
+    ecommerce-service: http://${ECOMMERCE_HOST}:8080
+    payment-service: http://${PAYMENT_HOST}:8083
+    cash-gateway-service: http://${BILLING_HOST}:8082
+    hamster-pg-service: http://${BILLING_HOST}:8086
+    notification-service: http://${SUPPORT_HOST}:8085
+    progression-service: http://${SUPPORT_HOST}:8084

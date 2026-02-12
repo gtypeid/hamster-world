@@ -1,0 +1,54 @@
+# Notification Service - AWS 환경 설정
+#
+# 환경변수 (Terraform/Docker에서 주입):
+#   DB_HOST       - MySQL 인스턴스 private IP
+#   DB_PASSWORD   - MySQL root 비밀번호
+#   KAFKA_HOST    - Kafka 인스턴스 private IP
+#   MONGO_PASSWORD - MongoDB admin 비밀번호
+#
+# 서비스 URL 환경변수 (topology aggregation용):
+#   ECOMMERCE_HOST    - ecommerce 인스턴스 private IP
+#   PAYMENT_HOST      - payment 인스턴스 private IP
+#   BILLING_HOST      - cash-gateway 인스턴스 private IP
+#   SUPPORT_HOST      - support 인스턴스 private IP (self + hamster-pg + progression)
+
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+      - classpath:topology-url-mappings-aws.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/notification_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  data:
+    mongodb:
+      host: ${DB_HOST}
+      port: 27017
+      database: notification_db
+      username: admin
+      password: ${MONGO_PASSWORD}
+      authentication-database: admin
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 8085
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.notification: INFO

@@ -1,0 +1,57 @@
+# Cash Gateway Service - AWS 환경 설정
+#
+# 환경변수 (Terraform/Docker에서 주입):
+#   DB_HOST       - MySQL 인스턴스 private IP
+#   DB_PASSWORD   - MySQL root 비밀번호
+#   KAFKA_HOST    - Kafka 인스턴스 private IP
+#   KEYCLOAK_HOST - Keycloak(Front) 인스턴스 private IP
+#   PG_HOST       - Hamster PG 인스턴스 private IP (support 인스턴스)
+
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-oauth2-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/cash_gateway_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+server:
+  port: 8082
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.cashgateway: INFO
+
+# PG 관련 설정 - hamster-pg는 support 인스턴스에서 8086 포트로 실행
+payment:
+  gateway:
+    dummy-pg:
+      url: http://${PG_HOST}:8086
+      timeout: 5000
+    retry:
+      maxAttempts: 3
+      backoffDelay: 1000
+    polling:
+      enabled: true
+      fixedDelay: 5000
+      initialDelay: 10000
+      batchSize: 10
+
+outbox:
+  processor:
+    enabled: true

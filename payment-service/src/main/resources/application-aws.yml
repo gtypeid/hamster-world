@@ -1,0 +1,47 @@
+# Payment Service - AWS 환경 설정
+#
+# 환경변수 (Terraform/Docker에서 주입):
+#   DB_HOST       - MySQL 인스턴스 private IP
+#   DB_PASSWORD   - MySQL root 비밀번호
+#   KAFKA_HOST    - Kafka 인스턴스 private IP
+#   KEYCLOAK_HOST - Keycloak(Front) 인스턴스 private IP
+
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-oauth2-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/payment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+server:
+  port: 8083
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.payment: INFO
+
+outbox:
+  processor:
+    enabled: true
