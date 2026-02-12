@@ -1,6 +1,6 @@
 # OAuth2 AWS 환경 설정
 # application-oauth2.yml의 AWS 오버라이드
-# 환경변수: KEYCLOAK_HOST (Terraform에서 Front 인스턴스 private IP 주입)
+# 환경변수: KEYCLOAK_HOST (Terraform에서 Auth 인스턴스 private IP 주입)
 
 spring:
   security:

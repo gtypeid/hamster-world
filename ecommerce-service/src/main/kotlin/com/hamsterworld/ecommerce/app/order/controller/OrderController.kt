@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @Tag(name = "주문")
-@RequestMapping("/orders")
+@RequestMapping("/api/orders")
 @RestController
 class OrderController(
     private val orderService: OrderService

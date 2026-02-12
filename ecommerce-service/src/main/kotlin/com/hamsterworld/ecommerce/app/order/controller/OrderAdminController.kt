@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*
  * DEVELOPER role 전용 - 모든 주문 조회
  */
 @Tag(name = "주문 Admin", description = "관리자용 주문 관리 API")
-@RequestMapping("/admin/orders")
+@RequestMapping("/api/admin/orders")
 @RestController
 @PreAuthorize("hasRole('DEVELOPER')")
 class OrderAdminController(

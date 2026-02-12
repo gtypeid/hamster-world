@@ -21,3 +21,18 @@ jobs:
           cd frontends/content-creator
           docker build -t ghcr.io/gtypeid/hamster-front-content-creator:latest .
           docker push ghcr.io/gtypeid/hamster-front-content-creator:latest
+
+  build-aws:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (AWS)
+        run: |
+          cd frontends/content-creator
+          docker build --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-content-creator:aws .
+          docker push ghcr.io/gtypeid/hamster-front-content-creator:aws

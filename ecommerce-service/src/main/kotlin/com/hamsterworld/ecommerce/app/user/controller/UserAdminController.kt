@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*
  * DEVELOPER role 전용 - 모든 사용자 관리
  */
 @RestController
-@RequestMapping("/admin/users")
+@RequestMapping("/api/admin/users")
 @Tag(name = "사용자 Admin", description = "관리자용 사용자 관리 API")
 @PreAuthorize("hasRole('DEVELOPER')")
 class UserAdminController(

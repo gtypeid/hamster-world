@@ -1,4 +1,5 @@
 FROM node:20 AS build
+ARG BUILD_ENV=production
 WORKDIR /app/hamster-controller
 
 # hamster-controller 의존성 설치
@@ -13,6 +14,9 @@ RUN ln -s /app/hamster-controller/node_modules /app/common/node_modules
 
 # hamster-controller 소스 복사
 COPY hamster-controller/ ./
+
+# BUILD_ENV에 따라 .env 파일 선택 (aws → .env.aws를 .env.production으로 복사)
+RUN if [ "$BUILD_ENV" = "aws" ] && [ -f .env.aws ]; then cp .env.aws .env.production; fi
 
 RUN npm run build
 

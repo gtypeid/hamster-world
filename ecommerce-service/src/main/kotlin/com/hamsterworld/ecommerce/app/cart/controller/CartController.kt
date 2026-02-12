@@ -17,7 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @Tag(name = "장바구니")
-@RequestMapping("/carts")
+@RequestMapping("/api/carts")
 @RestController
 class CartController(
     private val cartService: CartService

@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*
  */
 @Tag(name = "쿠폰 관리자")
 @RestController
-@RequestMapping("/admin/coupons")
+@RequestMapping("/api/admin/coupons")
 class CouponAdminController(
     private val couponService: CouponService
 ) {
