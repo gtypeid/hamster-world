@@ -11,7 +11,7 @@ import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 export class EventStatusIndicatorItem extends TopologyWorldItem {
   constructor(
     private eventId: string,
-    private eventName: string,
+    _eventName: string,
     private status: 'success' | 'failed',
     traceContext?: any
   ) {

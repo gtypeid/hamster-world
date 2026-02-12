@@ -16,7 +16,7 @@ const menuItems = [
   { path: '/merchant/settings', label: '스토어 설정', icon: '⚙️' },
 ]
 
-export function MerchantLayout({ children }: VendorLayoutProps) {
+export function MerchantLayout({ children }: MerchantLayoutProps) {
   const { showAlert, showConfirm } = useAlert()
   const location = useLocation()
   const { data: merchant } = useMyMerchant()

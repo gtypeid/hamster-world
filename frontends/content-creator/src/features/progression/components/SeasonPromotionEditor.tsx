@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SeasonPromotionMaster, SeasonPromotionFormData, PromotionTargetRole, MissionType, MissionFilters } from '@/types/progression'
+import type { SeasonPromotionMaster, SeasonPromotionFormData, MissionType, MissionFilters } from '@/types/progression'
 import { StepRewardTable } from './StepRewardTable'
 
 interface SeasonPromotionEditorProps {

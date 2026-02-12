@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import ReactFlow, {
-  Node,
-  Edge,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
-  type Edge as EdgeType,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { fetchTopology } from '@/api/topologyService'

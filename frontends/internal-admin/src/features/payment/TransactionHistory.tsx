@@ -155,7 +155,7 @@ export function TransactionHistory() {
             return (
               <div
                 key={payment.paymentPublicId}
-                ref={(el) => (itemRefs.current[payment.paymentPublicId] = el)}
+                ref={(el) => { itemRefs.current[payment.paymentPublicId] = el }}
                 className={`bg-white rounded-lg shadow-md p-6 border-2 transition-all duration-500 ${
                   isHighlighted
                     ? 'ring-4 ring-blue-500 ring-offset-2 border-blue-500'

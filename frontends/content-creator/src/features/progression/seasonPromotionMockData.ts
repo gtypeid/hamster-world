@@ -1,4 +1,4 @@
-import type { SeasonPromotionMaster, StepReward } from '@/types/progression'
+import type { SeasonPromotionMaster } from '@/types/progression'
 
 /**
  * Mock Season Promotion 데이터

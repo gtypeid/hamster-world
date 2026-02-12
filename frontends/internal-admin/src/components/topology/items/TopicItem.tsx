@@ -1,5 +1,4 @@
-import type { Node, Edge } from 'reactflow'
-import { MarkerType } from 'reactflow'
+import type { Node } from 'reactflow'
 import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 
 const TOPIC_NODE_WIDTH = 200
@@ -13,8 +12,8 @@ const TOPIC_NODE_HEIGHT = 80
 export class TopicItem extends TopologyWorldItem {
   constructor(
     private topic: string,
-    private publishers: { serviceName: string; publisherId: string }[],
-    private consumers: { serviceName: string; consumerId: string }[],
+    _publishers: { serviceName: string; publisherId: string }[],
+    _consumers: { serviceName: string; consumerId: string }[],
     traceContext?: any
   ) {
     super(traceContext)

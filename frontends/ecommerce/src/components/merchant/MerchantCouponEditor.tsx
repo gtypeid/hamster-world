@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MerchantCoupon, MerchantCouponFormData, CouponDiscountType } from '../../types/ecommerce'
+import type { MerchantCouponFormData, CouponDiscountType } from '../../types/ecommerce'
 import { ProductPickerModal } from './ProductPickerModal'
 
 interface MerchantCouponEditorProps {
@@ -7,7 +7,7 @@ interface MerchantCouponEditorProps {
   onCancel: () => void
 }
 
-export function MerchantCouponEditor({ onSave, onCancel }: VendorCouponEditorProps) {
+export function MerchantCouponEditor({ onSave, onCancel }: MerchantCouponEditorProps) {
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [applyToAllProducts, setApplyToAllProducts] = useState(true)
   const [formData, setFormData] = useState<MerchantCouponFormData>(() => {

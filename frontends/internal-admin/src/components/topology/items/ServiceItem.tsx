@@ -1,4 +1,4 @@
-import type { Node, Edge } from 'reactflow'
+import type { Node } from 'reactflow'
 import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 import { ServiceRegistry } from '@/components/navigation/registry/ServiceRegistry'
 

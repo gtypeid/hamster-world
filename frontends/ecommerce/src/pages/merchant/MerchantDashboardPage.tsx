@@ -108,7 +108,7 @@ export function MerchantDashboardPage() {
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => value.toLocaleString() + '원'}
+                  formatter={(value: number | undefined) => value ? value.toLocaleString() + '원' : '0원'}
                   labelStyle={{ color: '#000' }}
                 />
                 <Legend />
@@ -139,11 +139,11 @@ export function MerchantDashboardPage() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {categoryData.map((entry, index) => (
+                  {categoryData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => value.toLocaleString() + '원'} />
+                <Tooltip formatter={(value: number | undefined) => value ? value.toLocaleString() + '원' : '0원'} />
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -172,7 +172,7 @@ export function MerchantDashboardPage() {
                 <XAxis dataKey="hour" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => value + '건'}
+                  formatter={(value: number | undefined) => value ? value + '건' : '0건'}
                   labelStyle={{ color: '#000' }}
                 />
                 <Legend />
@@ -190,7 +190,7 @@ export function MerchantDashboardPage() {
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => value + '건'}
+                  formatter={(value: number | undefined) => value ? value + '건' : '0건'}
                   labelStyle={{ color: '#000' }}
                 />
                 <Legend />

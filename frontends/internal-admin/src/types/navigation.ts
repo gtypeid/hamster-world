@@ -14,6 +14,7 @@ export type IdType =
   // Payment Service
   | 'payment-id' // Payment Service Payment publicId (Business Truth)
   | 'product-id' // Product publicId
+  | 'product-record-id' // Product Event Sourcing Record ID
 
   // Ecommerce Service (Cross-service references)
   | 'order-id' // Order publicId

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Navigable } from '@/components/navigation/Navigable'
 import { mockDLQMessages, getDLQStatistics, getTopicOwner, type DLQMessage, type DLQStatus } from './mockData'
 import { ServiceRegistry } from '@/components/navigation/registry/ServiceRegistry'
@@ -338,7 +337,6 @@ function FilterButton({
   onClick,
   label,
   count,
-  color = 'orange',
 }: FilterButtonProps) {
   const baseStyle = active
     ? 'bg-hamster-orange text-white'
@@ -351,23 +349,6 @@ function FilterButton({
     >
       {label} ({count})
     </button>
-  )
-}
-
-function StatusBadge({ status }: { status: DLQStatus }) {
-  const statusStyles: Record<DLQStatus, { label: string; className: string }> = {
-    PENDING: { label: '⏳ 미처리', className: 'bg-yellow-100 text-yellow-700' },
-    REPROCESSING: { label: '🔄 재처리중', className: 'bg-blue-100 text-blue-700' },
-    RESOLVED: { label: '✅ 해결됨', className: 'bg-green-100 text-green-700' },
-    IGNORED: { label: '🚫 무시됨', className: 'bg-gray-100 text-gray-700' },
-  }
-
-  const { label, className } = statusStyles[status]
-
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${className}`}>
-      {label}
-    </span>
   )
 }
 

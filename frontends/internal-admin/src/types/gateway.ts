@@ -26,6 +26,7 @@ export interface PaymentProcess {
   pgTransaction: string | null // PG transaction ID
   pgApprovalNo: string | null // PG approval number
   lastPgResponseCode: string | null // 마지막 PG 응답 코드
+  failureReason: string | null // 실패 사유
 
   // === Source Info ===
   originSource: string | null // 요청 출처 (ECOMMERCE, EXTERNAL 등)

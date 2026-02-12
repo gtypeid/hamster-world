@@ -2,9 +2,7 @@ import type {
   PaymentProcess,
   PaymentProcessStatus,
   ProcessDetail,
-  ProcessEvent,
   ProcessEventType,
-  Payment,
   PaymentStatus,
 } from '@/types/gateway'
 
@@ -12,9 +10,10 @@ import type {
 export const mockProcesses: PaymentProcess[] = [
   {
     // Public IDs
-    publicId: '7nX9kP2mQ8rT1vY5', // PaymentProcess Public ID (Snowflake Base62)
-    orderPublicId: '5aB3cD7eF9gH2jK4', // Ecommerce Order Public ID
-    userPublicId: '3xY6zA9bC2dE5fG8', // Ecommerce User Public ID
+    publicId: '7nX9kP2mQ8rT1vY5',
+    orderPublicId: '5aB3cD7eF9gH2jK4',
+    userPublicId: '3xY6zA9bC2dE5fG8',
+    originProcessPublicId: null,
 
     // Process Info
     gatewayReferenceId: 'CGW_20260204_001',
@@ -25,25 +24,34 @@ export const mockProcesses: PaymentProcess[] = [
     status: 'UNKNOWN' as PaymentProcessStatus,
 
     // PG Info
+    code: null,
+    message: null,
     pgTransaction: null,
     pgApprovalNo: null,
+    lastPgResponseCode: null,
     failureReason: null,
 
+    // Source Info
+    originSource: 'ECOMMERCE',
+    requestPayload: null,
+    responsePayload: null,
+
     // PG Request Tracking
-    requestedAt: new Date(Date.now() - 7000).toISOString(), // 7초 전 PG 요청 시작
-    ackReceivedAt: new Date(Date.now() - 6500).toISOString(), // 6.5초 전 PG 202 응답
+    requestedAt: new Date(Date.now() - 7000).toISOString(),
+    ackReceivedAt: new Date(Date.now() - 6500).toISOString(),
     lastRequestAttemptAt: new Date(Date.now() - 7000).toISOString(),
     requestAttemptCount: 1,
 
     // Timestamps
-    createdAt: new Date(Date.now() - 10000).toISOString(), // 10초 전
-    modifiedAt: null, // 아직 Webhook 안받음
+    createdAt: new Date(Date.now() - 10000).toISOString(),
+    modifiedAt: null,
   },
   {
     // Public IDs
     publicId: '8oY1lQ3nR9sU2wZ6',
     orderPublicId: '6bC4dE8fG0hI3kL5',
     userPublicId: '4yZ7aB0cD3eF6gH9',
+    originProcessPublicId: null,
 
     // Process Info
     gatewayReferenceId: 'CGW_20260204_002',
@@ -54,25 +62,34 @@ export const mockProcesses: PaymentProcess[] = [
     status: 'SUCCESS' as PaymentProcessStatus,
 
     // PG Info
+    code: 'SUCCESS',
+    message: '결제 성공',
     pgTransaction: 'PG87654321',
     pgApprovalNo: 'AUTH789',
+    lastPgResponseCode: 'SUCCESS',
     failureReason: null,
 
+    // Source Info
+    originSource: 'ECOMMERCE',
+    requestPayload: null,
+    responsePayload: null,
+
     // PG Request Tracking
-    requestedAt: new Date(Date.now() - 297000).toISOString(), // PG 요청
-    ackReceivedAt: new Date(Date.now() - 296800).toISOString(), // PG 202 응답
+    requestedAt: new Date(Date.now() - 297000).toISOString(),
+    ackReceivedAt: new Date(Date.now() - 296800).toISOString(),
     lastRequestAttemptAt: new Date(Date.now() - 297000).toISOString(),
     requestAttemptCount: 1,
 
     // Timestamps
-    createdAt: new Date(Date.now() - 300000).toISOString(), // 5분 전
-    modifiedAt: new Date(Date.now() - 295000).toISOString(), // Webhook 받은 시각
+    createdAt: new Date(Date.now() - 300000).toISOString(),
+    modifiedAt: new Date(Date.now() - 295000).toISOString(),
   },
   {
     // Public IDs
     publicId: '9pZ2mR4oS0tV3xA7',
     orderPublicId: '7cD5eF9gH1iJ4lM6',
     userPublicId: '5zA8bC1dE4fG7hI0',
+    originProcessPublicId: null,
 
     // Process Info
     gatewayReferenceId: 'CGW_20260204_003',
@@ -83,25 +100,34 @@ export const mockProcesses: PaymentProcess[] = [
     status: 'FAILED' as PaymentProcessStatus,
 
     // PG Info
+    code: 'INSUFFICIENT_BALANCE',
+    message: '잔액 부족',
     pgTransaction: 'PG11111111',
     pgApprovalNo: null,
+    lastPgResponseCode: 'INSUFFICIENT_BALANCE',
     failureReason: '잔액 부족 (INSUFFICIENT_BALANCE)',
 
+    // Source Info
+    originSource: 'ECOMMERCE',
+    requestPayload: null,
+    responsePayload: null,
+
     // PG Request Tracking
-    requestedAt: new Date(Date.now() - 3598500).toISOString(), // PG 요청
-    ackReceivedAt: new Date(Date.now() - 3598300).toISOString(), // PG 202 응답
+    requestedAt: new Date(Date.now() - 3598500).toISOString(),
+    ackReceivedAt: new Date(Date.now() - 3598300).toISOString(),
     lastRequestAttemptAt: new Date(Date.now() - 3598500).toISOString(),
     requestAttemptCount: 1,
 
     // Timestamps
-    createdAt: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
-    modifiedAt: new Date(Date.now() - 3598000).toISOString(), // Webhook으로 FAILED 받은 시각
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    modifiedAt: new Date(Date.now() - 3598000).toISOString(),
   },
   {
     // Public IDs
     publicId: '0qA3nS5pT1uW4yB8',
     orderPublicId: '8dE6fG0hI2jK5mN7',
     userPublicId: '6aB9cD2eF5gH8iJ1',
+    originProcessPublicId: null,
 
     // Process Info
     gatewayReferenceId: 'CGW_20260204_004',
@@ -112,19 +138,27 @@ export const mockProcesses: PaymentProcess[] = [
     status: 'SUCCESS' as PaymentProcessStatus,
 
     // PG Info
+    code: 'SUCCESS',
+    message: '결제 성공',
     pgTransaction: 'PG22222222',
     pgApprovalNo: 'AUTH456',
+    lastPgResponseCode: 'SUCCESS',
     failureReason: null,
 
+    // Source Info
+    originSource: 'ECOMMERCE',
+    requestPayload: null,
+    responsePayload: null,
+
     // PG Request Tracking
-    requestedAt: new Date(Date.now() - 7198000).toISOString(), // PG 요청
-    ackReceivedAt: new Date(Date.now() - 7197500).toISOString(), // PG 202 응답
+    requestedAt: new Date(Date.now() - 7198000).toISOString(),
+    ackReceivedAt: new Date(Date.now() - 7197500).toISOString(),
     lastRequestAttemptAt: new Date(Date.now() - 7198000).toISOString(),
     requestAttemptCount: 1,
 
     // Timestamps
-    createdAt: new Date(Date.now() - 7200000).toISOString(), // 2시간 전
-    modifiedAt: new Date(Date.now() - 7195000).toISOString(), // Webhook 받은 시각
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+    modifiedAt: new Date(Date.now() - 7195000).toISOString(),
   },
 ]
 

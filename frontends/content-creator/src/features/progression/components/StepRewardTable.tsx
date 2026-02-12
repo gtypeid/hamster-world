@@ -28,7 +28,6 @@ export function StepRewardTable({
   const handleAddReward = () => {
     setIsAddingReward(true)
     // Suggest next step number
-    const usedSteps = new Set(allSteps)
     let suggested = maxStep + 1
     if (suggested < 1) suggested = 1
     setNewStepNumber(suggested)

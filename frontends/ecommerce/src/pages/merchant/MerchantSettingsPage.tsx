@@ -398,7 +398,7 @@ export function MerchantSettingsPage() {
                 </label>
                 <select
                   value={settlementInfo.settlementCycle}
-                  onChange={(e) => setSettlementInfo({ ...settlementInfo, settlementCycle: e.target.value })}
+                  onChange={(e) => setSettlementInfo({ ...settlementInfo, settlementCycle: e.target.value as SettlementCycle })}
                   disabled={!isEditing}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:bg-gray-50"
                 >

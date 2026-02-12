@@ -18,7 +18,7 @@ export function SeasonPromotionManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [targetRoleFilter, setTargetRoleFilter] = useState<PromotionTargetRole | 'ALL'>('CUSTOMER') // 고객 전용
+  const [targetRoleFilter] = useState<PromotionTargetRole | 'ALL'>('CUSTOMER') // 고객 전용
   const [statusFilter, setStatusFilter] = useState<PromotionStatus>('ALL')
 
   // Get promotion status
@@ -88,7 +88,7 @@ export function SeasonPromotionManagement() {
       targetRole: formData.targetRole,
       startAt: new Date(formData.startAt).toISOString(),
       endAt: new Date(formData.endAt).toISOString(),
-      maxStep: formData.maxStep,
+      maxStep: formData.maxStep ?? 1,
       condition: {
         type: formData.conditionType,
         requirement: formData.conditionRequirement,
@@ -160,10 +160,6 @@ export function SeasonPromotionManagement() {
       default:
         return '-'
     }
-  }
-
-  const getTargetRoleColor = (role: PromotionTargetRole) => {
-    return role === 'CUSTOMER' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'
   }
 
   const formatDate = (dateStr: string) => {

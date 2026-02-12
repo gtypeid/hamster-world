@@ -1,7 +1,5 @@
 import { type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
 import { useNavigation } from './NavigationContext'
-import { ViewerRegistry } from './registry/ViewerRegistry'
 import { ServiceRegistry } from './registry/ServiceRegistry'
 import { FieldRegistry } from './registry/FieldRegistry'
 import type { IdType, ViewerType } from '@/types/navigation'
@@ -31,7 +29,6 @@ export function Navigable({
   data,
 }: NavigableProps) {
   const { navigate } = useNavigation()
-  const location = useLocation()
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()

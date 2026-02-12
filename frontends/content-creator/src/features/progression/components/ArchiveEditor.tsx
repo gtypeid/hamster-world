@@ -5,7 +5,6 @@ import type {
   ArchiveType,
   ProgressType,
   RewardType,
-  MissionType,
   MissionFilters,
 } from '@/types/progression'
 import { ConditionBuilder } from './ConditionBuilder'

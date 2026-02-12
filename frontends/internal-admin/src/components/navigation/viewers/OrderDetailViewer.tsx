@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { ViewerProps } from '@/types/navigation'
-import type { OrderDetail } from '@/types/order'
+import type { OrderDetail, OrderStatus } from '@/types/order'
 import { fetchOrderDetail } from '@/api/orderService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Navigable } from '../Navigable'
@@ -70,18 +70,13 @@ export function OrderDetailViewer({ id, data: initialData }: ViewerProps) {
     switch (order.status) {
       case 'CREATED':
         return 'bg-gray-100 text-gray-800'
+      case 'PAYMENT_REQUESTED':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'PAYMENT_APPROVED':
+        return 'bg-blue-100 text-blue-800'
       case 'PAYMENT_FAILED':
         return 'bg-red-100 text-red-800'
-      case 'PAYMENT_COMPLETED':
-        return 'bg-blue-100 text-blue-800'
-      case 'PREPARING':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'SHIPPED':
-        return 'bg-purple-100 text-purple-800'
-      case 'DELIVERED':
-        return 'bg-green-100 text-green-800'
-      case 'CANCELLED':
-      case 'REFUNDED':
+      case 'CANCELED':
         return 'bg-gray-100 text-gray-800'
       default:
         return 'bg-gray-100 text-gray-800'
@@ -89,15 +84,12 @@ export function OrderDetailViewer({ id, data: initialData }: ViewerProps) {
   }
 
   const getStatusLabel = () => {
-    const labels = {
+    const labels: Record<OrderStatus, string> = {
       CREATED: '생성됨',
+      PAYMENT_REQUESTED: '결제 요청',
+      PAYMENT_APPROVED: '결제 승인',
       PAYMENT_FAILED: '결제 실패',
-      PAYMENT_COMPLETED: '결제 완료',
-      PREPARING: '준비 중',
-      SHIPPED: '배송 중',
-      DELIVERED: '배송 완료',
-      CANCELLED: '취소됨',
-      REFUNDED: '환불됨',
+      CANCELED: '취소됨',
     }
     return labels[order.status]
   }

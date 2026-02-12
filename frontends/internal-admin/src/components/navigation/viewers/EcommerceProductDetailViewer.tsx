@@ -3,7 +3,6 @@ import type { ViewerProps } from '@/types/navigation'
 import type { EcommerceProduct } from '@/types/ecommerce'
 import { fetchEcommerceProductDetail } from '@/api/ecommerceProductService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import { Navigable } from '../Navigable'
 import { FieldRenderer } from '../FieldRenderer'
 
 /**

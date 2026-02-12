@@ -6,7 +6,7 @@ export interface DLQMessageViewerProps {
   data?: DLQMessage
 }
 
-export function DLQMessageViewer({ id, data }: DLQMessageViewerProps) {
+export function DLQMessageViewer({ id: _id, data }: DLQMessageViewerProps) {
   if (!data) {
     return (
       <div className="p-6 text-center text-gray-500">

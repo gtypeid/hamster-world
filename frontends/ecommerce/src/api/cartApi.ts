@@ -1,6 +1,6 @@
 import { products } from '../data/products'
 import type { CartItem } from '../data/cart'
-import type { CartWithItems, CartItemsUpdateRequest } from '../types/cart'
+import type { CartWithItems } from '../types/cart'
 import { apiClient } from './client'
 import { productApi } from './productApi'
 
@@ -36,7 +36,7 @@ const USE_REAL_API = true
 
 export const cartApi = {
   // 장바구니 조회
-  async getCart(token?: string): Promise<CartItemWithProduct[]> {
+  async getCart(_token?: string): Promise<CartItemWithProduct[]> {
     if (USE_REAL_API) {
       try {
         const response = await apiClient.get<CartWithItems>('/carts')
@@ -85,7 +85,7 @@ export const cartApi = {
   },
 
   // 장바구니에 상품 추가
-  async addToCart(productId: string, quantity: number = 1, token?: string): Promise<void> {
+  async addToCart(productId: string, quantity: number = 1, _token?: string): Promise<void> {
     if (USE_REAL_API) {
       try {
         // Get current cart
@@ -145,7 +145,7 @@ export const cartApi = {
   },
 
   // 장바구니 수량 변경
-  async updateCartQuantity(itemId: string, quantity: number, token?: string): Promise<void> {
+  async updateCartQuantity(itemId: string, quantity: number, _token?: string): Promise<void> {
     if (USE_REAL_API) {
       try {
         const currentCart = await apiClient.get<CartWithItems>('/carts')
@@ -181,7 +181,7 @@ export const cartApi = {
   },
 
   // 장바구니에서 상품 제거
-  async removeFromCart(itemId: string, token?: string): Promise<void> {
+  async removeFromCart(itemId: string, _token?: string): Promise<void> {
     if (USE_REAL_API) {
       try {
         const currentCart = await apiClient.get<CartWithItems>('/carts')
@@ -210,7 +210,7 @@ export const cartApi = {
   },
 
   // 장바구니 전체 삭제
-  async clearCart(token?: string): Promise<void> {
+  async clearCart(_token?: string): Promise<void> {
     if (USE_REAL_API) {
       try {
         await apiClient.put<CartWithItems>('/carts', { items: [] })

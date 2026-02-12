@@ -76,17 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(authenticated)
 
         if (authenticated && keycloak.tokenParsed) {
-          const keycloakUserId = keycloak.tokenParsed.sub || ''
-          const keycloakRole = extractRoleFromToken(keycloak.tokenParsed)
+          const tokenParsed = keycloak.tokenParsed
+          const keycloakUserId = tokenParsed.sub || ''
+          const keycloakRole = extractRoleFromToken(tokenParsed)
 
           // 백엔드 User API에서 실제 role 가져오기
           userService.getCurrentUser(keycloakUserId, keycloak.token!)
             .then(backendUser => {
               setUser({
                 id: keycloakUserId,
-                username: keycloak.tokenParsed.preferred_username || '',
-                email: keycloak.tokenParsed.email,
-                name: keycloak.tokenParsed.name,
+                username: tokenParsed.preferred_username || '',
+                email: tokenParsed.email,
+                name: tokenParsed.name,
                 role: backendUser.role, // 백엔드 User의 role 사용
               })
               console.log('[Keycloak] User role from backend:', backendUser.role)
@@ -96,9 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // 백엔드 API 실패 시 Keycloak 토큰의 role 사용
               setUser({
                 id: keycloakUserId,
-                username: keycloak.tokenParsed.preferred_username || '',
-                email: keycloak.tokenParsed.email,
-                name: keycloak.tokenParsed.name,
+                username: tokenParsed.preferred_username || '',
+                email: tokenParsed.email,
+                name: tokenParsed.name,
                 role: keycloakRole,
               })
               console.log('[Keycloak] User role from token (fallback):', keycloakRole)
@@ -117,16 +118,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshInterval = setInterval(() => {
       keycloak.updateToken(70).then((refreshed) => {
         if (refreshed && keycloak.tokenParsed) {
-          const keycloakUserId = keycloak.tokenParsed.sub || ''
+          const tokenParsed = keycloak.tokenParsed
+          const keycloakUserId = tokenParsed.sub || ''
 
           // 토큰이 갱신되면 백엔드 User API에서 최신 role 가져오기
           userService.getCurrentUser(keycloakUserId, keycloak.token!)
             .then(backendUser => {
               setUser({
                 id: keycloakUserId,
-                username: keycloak.tokenParsed.preferred_username || '',
-                email: keycloak.tokenParsed.email,
-                name: keycloak.tokenParsed.name,
+                username: tokenParsed.preferred_username || '',
+                email: tokenParsed.email,
+                name: tokenParsed.name,
                 role: backendUser.role,
               })
               console.log('[Keycloak] Token refreshed, user role from backend:', backendUser.role)
@@ -135,10 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // Fallback to Keycloak role
               setUser({
                 id: keycloakUserId,
-                username: keycloak.tokenParsed.preferred_username || '',
-                email: keycloak.tokenParsed.email,
-                name: keycloak.tokenParsed.name,
-                role: extractRoleFromToken(keycloak.tokenParsed),
+                username: tokenParsed.preferred_username || '',
+                email: tokenParsed.email,
+                name: tokenParsed.name,
+                role: extractRoleFromToken(tokenParsed),
               })
             })
         }

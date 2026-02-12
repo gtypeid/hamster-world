@@ -134,7 +134,7 @@ export function OrderList() {
             return (
               <div
                 key={order.orderPublicId}
-                ref={(el) => (itemRefs.current[order.orderPublicId] = el)}
+                ref={(el) => { itemRefs.current[order.orderPublicId] = el }}
                 className={`transition-all duration-500 ${
                   isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2 rounded-lg' : ''
                 }`}
@@ -162,7 +162,7 @@ function FilterButton({
   onClick,
   label,
   count,
-  color = 'orange',
+  color = 'blue',
 }: FilterButtonProps) {
   const colorStyles = {
     gray: active ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
@@ -171,7 +171,6 @@ function FilterButton({
     yellow: active ? 'bg-yellow-600 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200',
     purple: active ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200',
     green: active ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
-    orange: active ? 'bg-hamster-orange text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-200',
   }
 
   return (

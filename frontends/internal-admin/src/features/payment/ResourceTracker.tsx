@@ -153,7 +153,7 @@ export function ResourceTracker() {
             return (
               <div
                 key={product.publicId}
-                ref={(el) => (itemRefs.current[product.publicId] = el)}
+                ref={(el) => { itemRefs.current[product.publicId] = el }}
                 className={`bg-white rounded-lg shadow-md transition-all duration-500 ${
                   isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''
                 }`}

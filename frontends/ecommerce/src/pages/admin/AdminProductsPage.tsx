@@ -6,7 +6,6 @@ import { useAlert } from '../../contexts/AlertContext'
 export function AdminProductsPage() {
   const { showAlert, showConfirm } = useAlert()
   const [products, setProducts] = useState(initialProducts.map(p => ({ ...p, hidden: false })))
-  const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null)
 
   const handleToggleHidden = (productId: string) => {
     setProducts(products.map(p =>
@@ -93,7 +92,7 @@ export function AdminProductsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {product.soldCount.toLocaleString()}개
+                      {(product.soldCount ?? 0).toLocaleString()}개
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
@@ -103,12 +102,6 @@ export function AdminProductsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => setSelectedProduct(product)}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          상세
-                        </button>
                         <button
                           onClick={async () => {
                             const action = product.hidden ? '노출' : '숨김'

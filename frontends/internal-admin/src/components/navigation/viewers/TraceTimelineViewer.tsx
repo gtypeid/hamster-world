@@ -16,7 +16,7 @@ interface TraceEvent {
   details?: string
 }
 
-function getMockTraceEvents(traceId: string): TraceEvent[] {
+function getMockTraceEvents(_traceId: string): TraceEvent[] {
   // TODO: 실제로는 백엔드 API 호출
   return [
     {
@@ -49,8 +49,8 @@ function getMockTraceEvents(traceId: string): TraceEvent[] {
   ]
 }
 
-export function TraceTimelineViewer({ id, data }: TraceTimelineViewerProps) {
-  const [events] = useState<TraceEvent[]>(getMockTraceEvents(id))
+export function TraceTimelineViewer({ id: _traceId, data: _data }: TraceTimelineViewerProps) {
+  const [events] = useState<TraceEvent[]>(getMockTraceEvents(_traceId))
 
   if (events.length === 0) {
     return (
@@ -68,7 +68,7 @@ export function TraceTimelineViewer({ id, data }: TraceTimelineViewerProps) {
           🔗 Trace Timeline
         </h2>
         <p className="text-sm text-gray-600 mt-1 font-mono">
-          Trace ID: {id}
+          Trace ID: {_traceId}
         </p>
         <p className="text-xs text-gray-500 mt-1">
           총 {events.length}개의 이벤트가 이 Trace에 포함되어 있습니다.

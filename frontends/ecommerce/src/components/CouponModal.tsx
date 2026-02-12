@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { useMyAvailableCoupons } from '../hooks/useCoupon'
-import type { UserCouponDto, CouponPolicyDto } from '../types/coupon'
+import type { UserCouponDto } from '../types/coupon'
 
 interface CouponModalProps {
   isOpen: boolean
@@ -106,7 +105,7 @@ export function CouponModal({ isOpen, onClose, totalPrice, onSelectCoupon }: Cou
  */
 function CouponCard({
   coupon,
-  totalPrice,
+  totalPrice: _totalPrice,
   onSelect
 }: {
   coupon: UserCouponDto

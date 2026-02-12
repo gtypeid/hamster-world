@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ViewerRegistry } from '../registry/ViewerRegistry'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import type { ViewerProps, ViewerType } from '@/types/navigation'
+import type { ViewerType } from '@/types/navigation'
 
 interface GenericDataViewerProps {
   id: string

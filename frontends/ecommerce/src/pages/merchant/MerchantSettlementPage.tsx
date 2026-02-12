@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { MerchantLayout } from '../../components/merchant/MerchantLayout'
-import { useAlert } from '../../contexts/AlertContext'
 
 const settlements = [
   { month: '2026년 1월', sales: 5420000, commission: 542000, amount: 4878000, status: '정산 예정', date: '2026-02-05 예정' },

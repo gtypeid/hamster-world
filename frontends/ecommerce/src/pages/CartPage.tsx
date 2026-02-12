@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart, useUpdateCartQuantity, useRemoveFromCart, useClearCart } from '../hooks/useCart'
-import { useAuth } from '../contexts/AuthContext'
 import { useAlert } from '../contexts/AlertContext'
 import { useCreateOrder } from '../hooks/useOrders'
 import { useMyAvailableCoupons } from '../hooks/useCoupon'
@@ -10,7 +9,6 @@ import type { UserCouponDto } from '../types/coupon'
 
 export function CartPage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
   const { showAlert, showConfirm } = useAlert()
   const { data: cartItems = [], isLoading, error } = useCart()
   const { data: availableCoupons = [] } = useMyAvailableCoupons()

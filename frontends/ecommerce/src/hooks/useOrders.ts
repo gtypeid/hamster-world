@@ -2,10 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { orderApi } from '../api/orderApi'
 import type {
   OrderSearchParams,
-  OrderResponse,
-  OrderDetailResponse,
-  MerchantOrderResponse,
-  MerchantOrderDetailResponse
 } from '../types/order'
 
 /**

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { MerchantLayout } from '../../components/merchant/MerchantLayout'
-import { useAlert } from '../../contexts/AlertContext'
 import { useMerchantOrders, useMerchantOrderDetail } from '../../hooks/useOrders'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type OrderStatus } from '../../types/order'
 
@@ -14,7 +13,6 @@ const getTodayString = () => {
 }
 
 export function MerchantOrdersPage() {
-  const { showAlert } = useAlert()
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | undefined>(undefined)
   const [dateFrom, setDateFrom] = useState<string>(getTodayString())
   const [dateTo, setDateTo] = useState<string>(getTodayString())

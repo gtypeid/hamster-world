@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { couponApi } from '../api/couponApi'
-import type { UserCouponDto, CouponPolicyDto } from '../types/coupon'
 
 /**
  * 쿠폰 관련 React Query 훅

@@ -4,7 +4,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { AppLayout } from './components/layout/AppLayout'
-import { Dashboard } from './features/Dashboard'
 import { QuotaManagement } from './features/progression/QuotaManagement'
 import { CouponManagement } from './features/progression/CouponManagement'
 import { ArchiveManagement } from './features/progression/ArchiveManagement'
@@ -56,23 +55,6 @@ function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
-  )
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-hamster-brown mb-2">{title}</h1>
-      </div>
-      <div className="bg-white rounded-lg border-2 border-gray-200 p-8">
-        <div className="text-center text-gray-500 py-12">
-          <div className="text-6xl mb-4">🚧</div>
-          <p className="text-lg font-medium">Coming Soon</p>
-          <p className="text-sm mt-2">{title}을 준비 중입니다</p>
-        </div>
-      </div>
-    </div>
   )
 }
 

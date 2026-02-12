@@ -3,7 +3,6 @@ import type { ViewerProps } from '@/types/navigation'
 import type { User } from '@/types/user'
 import { fetchUserDetail } from '@/api/userService'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import { Navigable } from '../Navigable'
 import { FieldRenderer } from '../FieldRenderer'
 
 /**

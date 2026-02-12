@@ -1,5 +1,3 @@
-import type { User } from '../types/user'
-
 /**
  * 로그인이 필요한 기능을 실행하기 전에 인증 확인
  *
@@ -9,7 +7,7 @@ import type { User } from '../types/user'
  * @returns 인증 성공 여부
  */
 export function requireAuth(
-  user: User | null,
+  user: { id: string; username: string; email?: string; name?: string; role?: 'USER' | 'MERCHANT' | 'ADMIN' } | null,
   onSuccess: () => void,
   showAlert: (message: string) => void
 ): boolean {

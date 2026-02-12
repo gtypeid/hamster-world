@@ -80,7 +80,7 @@ export function ProcessDetailViewer({ id, data: initialData }: ViewerProps) {
       minute: '2-digit',
       second: '2-digit',
       fractionalSecondDigits: 3,
-    })
+    } as Intl.DateTimeFormatOptions)
   }
 
   const calculateDuration = (start: string, end: string): string => {

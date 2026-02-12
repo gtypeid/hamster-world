@@ -11,14 +11,13 @@ import type { User } from '../types/user'
 
 export function MyPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, user: authUser, token, login } = useAuth()
+  const { isAuthenticated, user: authUser, token } = useAuth()
   const { showAlert, showConfirm } = useAlert()
   const createMerchant = useCreateMerchant()
   const [activeTab, setActiveTab] = useState<'orders' | 'info' | 'coupons' | 'merchant'>('info')
   const [userData, setUserData] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
 
   // 오늘 날짜를 YYYY-MM-DD 형식으로 가져오기 (로컬 타임존 기준)
   const getTodayString = () => {
@@ -425,7 +424,6 @@ export function MyPage() {
                 {coupons.map((coupon) => {
                   const isExpired = coupon.status === 'EXPIRED'
                   const isUsed = coupon.status === 'USED'
-                  const isAvailable = coupon.status === 'AVAILABLE'
 
                   return (
                     <div

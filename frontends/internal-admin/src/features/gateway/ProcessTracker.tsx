@@ -181,7 +181,7 @@ export function ProcessTracker() {
             return (
               <div
                 key={process.publicId}
-                ref={(el) => (itemRefs.current[process.publicId] = el)}
+                ref={(el) => { itemRefs.current[process.publicId] = el }}
                 className={`bg-white rounded-lg shadow-md transition-all duration-500 ${
                   isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''
                 }`}

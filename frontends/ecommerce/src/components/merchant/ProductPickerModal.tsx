@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import { useProducts } from '../../hooks/useProducts'
-import type { Product } from '../../types/ecommerce'
 
 interface ProductPickerModalProps {
   selectedProductIds: string[]
@@ -26,7 +25,7 @@ export function ProductPickerModal({ selectedProductIds, onSelect, onClose }: Pr
 
   // Filter products
   const filteredProducts = useMemo(() => {
-    return products.filter((product: Product) => {
+    return products.filter((product: any) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()

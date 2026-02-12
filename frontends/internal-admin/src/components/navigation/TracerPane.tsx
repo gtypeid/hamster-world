@@ -21,7 +21,7 @@ export function TracerPane() {
   // "내 아이템 가기" 핸들러
   const handleGoToMyItem = () => {
     const viewerConfig = ViewerRegistry.get(currentItem.viewerType)
-    if (!viewerConfig?.myItem || viewerConfig.myItem === false) return
+    if (!viewerConfig?.myItem || typeof viewerConfig.myItem === 'boolean') return
 
     // 커스텀 listRoute가 있으면 사용, 없으면 ServiceRegistry에서 가져오기
     const route = viewerConfig.myItem.listRoute
@@ -156,7 +156,7 @@ export function TracerPane() {
           </button>
 
           {/* "내 아이템 가기" 버튼 */}
-          {viewerConfig.myItem && viewerConfig.myItem !== false && (
+          {viewerConfig.myItem && typeof viewerConfig.myItem !== 'boolean' && (
             <button
               onClick={handleGoToMyItem}
               className="px-3 py-1 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"

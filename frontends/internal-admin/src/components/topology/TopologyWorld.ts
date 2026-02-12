@@ -140,6 +140,7 @@ export class TopologyWorld {
               consumerItem.getId(),
               sub.topic,
               ownerService, // 토픽의 발행자 서비스
+              [],
               traceContext
             )
           )
@@ -181,10 +182,6 @@ export class TopologyWorld {
     publisherEventItems.forEach((eventItem) => {
       const topic = (eventItem as any).topic
       const eventName = (eventItem as any).eventName
-      const consumers = topicConsumers.get(topic) || []
-      const consumerIds = consumers.map((c) => c.consumerId)
-      eventItem.setSubscribingConsumerIds(consumerIds)
-
       // Publisher Event → Event 엣지 생성 (publisher-event, 항상)
       items.push(
         new EdgeRelationItem('publisher-event', (eventItem as any).parentId, eventItem.getId(), traceContext)

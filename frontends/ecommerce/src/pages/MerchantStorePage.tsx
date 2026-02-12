@@ -17,7 +17,7 @@ export function MerchantStorePage() {
     rating: 4.8,
     reviewCount: 328,
     productCount: merchantProducts.length,
-    soldCount: merchantProducts.reduce((sum, p) => sum + p.soldCount, 0),
+    soldCount: merchantProducts.reduce((sum, p) => sum + (p.soldCount ?? 0), 0),
     description: '햄스터들을 위한 최고의 상품을 제공하는 믿을 수 있는 판매자입니다. 신선한 도토리부터 튼튼한 쳇바퀴까지, 항상 최상의 품질을 보장합니다.',
     joinDate: '2024년 1월',
   }

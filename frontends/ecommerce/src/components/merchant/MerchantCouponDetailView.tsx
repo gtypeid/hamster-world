@@ -6,7 +6,7 @@ interface MerchantCouponDetailViewProps {
   onClose: () => void
 }
 
-export function MerchantCouponDetailView({ coupon, onDelete, onClose }: VendorCouponDetailViewProps) {
+export function MerchantCouponDetailView({ coupon, onDelete, onClose }: MerchantCouponDetailViewProps) {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('ko-KR', {
       year: 'numeric',

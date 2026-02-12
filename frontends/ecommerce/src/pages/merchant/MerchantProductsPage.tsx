@@ -1,18 +1,17 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { MerchantLayout } from '../../components/merchant/MerchantLayout'
 import { useAlert } from '../../contexts/AlertContext'
 import { useProducts } from '../../hooks/useProducts'
-import { useCreateProduct, useUpdateProduct, useAdjustStock } from '../../hooks/useMerchantProducts'
+import { useCreateProduct, useUpdateProduct } from '../../hooks/useMerchantProducts'
 
 
 export function MerchantProductsPage() {
   const navigate = useNavigate()
-  const { showAlert, showConfirm } = useAlert()
+  const { showAlert } = useAlert()
   const { data: allProducts = [], isLoading, error } = useProducts()
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
-  const adjustStock = useAdjustStock()
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
@@ -46,20 +45,6 @@ export function MerchantProductsPage() {
 
   const handleOpenAddModal = () => {
     resetForm()
-    setShowAddModal(true)
-  }
-
-  const handleOpenEditModal = (product: any) => {
-    setEditingProduct(product)
-    setFormData({
-      sku: product.sku || '',
-      name: product.name,
-      category: product.category,
-      price: product.price.toString(),
-      stock: product.stock.toString(),
-      imageUrl: product.images?.[0] || '',
-      description: product.description || ''
-    })
     setShowAddModal(true)
   }
 

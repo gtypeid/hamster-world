@@ -1,4 +1,4 @@
-import type { EcommerceProduct, EcommerceProductDetail } from '@/types/ecommerce'
+import type { EcommerceProduct } from '@/types/ecommerce'
 
 // Mock: Ecommerce Product 목록
 export const mockEcommerceProducts: EcommerceProduct[] = [
@@ -13,6 +13,12 @@ export const mockEcommerceProducts: EcommerceProduct[] = [
     stock: 45, // Payment Service와 동기화된 재고
     isSoldOut: false,
     lastStockSyncedAt: new Date(Date.now() - 300000).toISOString(), // 5분 전
+    averageRating: 4.5,
+    reviewCount: 23,
+    merchant: {
+      publicId: 'MERCHANT_001',
+      storeName: '햄스터 월드 스토어',
+    },
     createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
     modifiedAt: new Date(Date.now() - 300000).toISOString(),
   },
@@ -27,6 +33,12 @@ export const mockEcommerceProducts: EcommerceProduct[] = [
     stock: 0,
     isSoldOut: true,
     lastStockSyncedAt: new Date(Date.now() - 7200000).toISOString(), // 2시간 전
+    averageRating: 4.8,
+    reviewCount: 42,
+    merchant: {
+      publicId: 'MERCHANT_001',
+      storeName: '햄스터 월드 스토어',
+    },
     createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
     modifiedAt: new Date(Date.now() - 7200000).toISOString(),
   },
@@ -41,6 +53,12 @@ export const mockEcommerceProducts: EcommerceProduct[] = [
     stock: 120,
     isSoldOut: false,
     lastStockSyncedAt: new Date(Date.now() - 86400000).toISOString(), // 1일 전
+    averageRating: 4.2,
+    reviewCount: 15,
+    merchant: {
+      publicId: 'MERCHANT_001',
+      storeName: '햄스터 월드 스토어',
+    },
     createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
     modifiedAt: new Date(Date.now() - 86400000).toISOString(),
   },
@@ -55,6 +73,12 @@ export const mockEcommerceProducts: EcommerceProduct[] = [
     stock: 3,
     isSoldOut: false,
     lastStockSyncedAt: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
+    averageRating: 4.7,
+    reviewCount: 31,
+    merchant: {
+      publicId: 'MERCHANT_001',
+      storeName: '햄스터 월드 스토어',
+    },
     createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
     modifiedAt: new Date(Date.now() - 3600000).toISOString(),
   },
@@ -63,12 +87,7 @@ export const mockEcommerceProducts: EcommerceProduct[] = [
 // Helper: Ecommerce Product Public ID로 상세 조회
 export function getMockEcommerceProductDetail(
   publicId: string
-): EcommerceProductDetail | null {
+): EcommerceProduct | null {
   const product = mockEcommerceProducts.find((p) => p.publicId === publicId)
-  if (!product) return null
-
-  return {
-    product,
-    // TODO: Payment Service에 연결된 Product 목록 등 추가
-  }
+  return product || null
 }

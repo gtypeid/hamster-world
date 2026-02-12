@@ -15,22 +15,15 @@ export type EventRenderMode = 'single' | 'multi'
  * - 복수 모드: 모든 이벤트를 각자 노드로 생성
  */
 export class EventItem extends TopologyWorldItem {
-  private subscribingConsumerIds: string[] = []
-
   constructor(
     private eventName: string,
     private parentId: string, // publisher-xxx 또는 consumer-xxx
     private topic: string,
     private ownerService: string, // 이벤트를 발행하는 서비스명
-    subscribingConsumerIds: string[] = [],
+    _subscribingConsumerIds: string[] = [],
     traceContext?: any
   ) {
     super(traceContext)
-    this.subscribingConsumerIds = subscribingConsumerIds
-  }
-
-  setSubscribingConsumerIds(ids: string[]): void {
-    this.subscribingConsumerIds = ids
   }
 
   getId(): string {

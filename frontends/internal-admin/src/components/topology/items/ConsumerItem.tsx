@@ -1,5 +1,4 @@
-import type { Node, Edge } from 'reactflow'
-import { MarkerType } from 'reactflow'
+import type { Node } from 'reactflow'
 import { TopologyWorldItem } from './TopologyWorldItem.tsx'
 
 const CONSUMER_NODE_WIDTH = 200
