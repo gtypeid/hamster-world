@@ -19,7 +19,7 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename="/hamster-controller">
         <AppLayout>
           <Routes>
             <Route path="/" element={<Home />} />

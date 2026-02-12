@@ -1,4 +1,4 @@
-import type { TopologyResponse } from '@/types/topology'
+import type { TopologyResponse } from '@common/topology'
 import { mockTopology } from './mockTopology'
 
 const NOTIFICATION_SERVICE_URL = import.meta.env.VITE_NOTIFICATION_SERVICE_URL || 'http://localhost:8084'

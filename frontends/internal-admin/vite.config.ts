@@ -7,7 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@common': path.resolve(__dirname, '../common'),
     },
+    dedupe: ['react', 'react-dom', 'reactflow', 'dagre'],
   },
   server: {
     port: 3002,

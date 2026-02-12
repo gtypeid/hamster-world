@@ -4,7 +4,7 @@
  * - TopologyViewer 테스트용
  */
 
-import type { TopologyTraceContext } from '@/types/topologyTraceContext'
+import type { TopologyTraceContext } from '@common/topology'
 
 /**
  * 시나리오 1: OrderCreatedEvent (ecommerce-service 발행)

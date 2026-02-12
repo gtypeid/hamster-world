@@ -1,4 +1,4 @@
-import type { TopologyResponse } from '@/types/topology'
+import type { TopologyResponse } from '@common/topology'
 
 /**
  * Mock Topology Data
