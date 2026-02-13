@@ -1,7 +1,8 @@
 import axios from 'axios'
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8083',
+  // localhost 폴백 제거: 환경변수 누락 시 즉시 에러가 나야 빠르게 해결 가능
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

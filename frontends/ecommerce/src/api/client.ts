@@ -1,12 +1,12 @@
 import axios from 'axios'
 
-// Base URL for ecommerce service
-const ECOMMERCE_API_BASE_URL = import.meta.env.VITE_ECOMMERCE_API_URL || 'http://localhost:8080'
+// localhost 폴백 제거: 환경변수 누락 시 조용히 localhost로 요청하면
+// AWS 배포 등에서 원인 파악이 어려운 버그가 됨. 누락 시 즉시 에러가 나야 빠르게 해결 가능.
+const ECOMMERCE_API_BASE_URL = import.meta.env.VITE_ECOMMERCE_API_URL
 
 /**
  * Axios 인스턴스 for ecommerce-service
  *
- * 백엔드 서버: http://localhost:8080
  * 인증: Keycloak JWT Bearer Token
  * Resource Server: OAuth2 JWT 검증
  */

@@ -1,7 +1,8 @@
 import type { TopologyResponse } from '@common/topology'
 import { mockTopology } from './mockTopology'
 
-const NOTIFICATION_SERVICE_URL = import.meta.env.VITE_NOTIFICATION_SERVICE_URL || 'http://localhost:8084'
+// localhost 폴백 제거: 환경변수 누락 시 즉시 에러가 나야 빠르게 해결 가능
+const NOTIFICATION_SERVICE_URL = import.meta.env.VITE_NOTIFICATION_SERVICE_URL
 const USE_MOCK = true // TODO: 백엔드 연동 시 false로 변경
 
 /**

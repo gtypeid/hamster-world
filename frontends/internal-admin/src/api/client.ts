@@ -1,9 +1,10 @@
 import axios from 'axios'
 
-// Base URLs for services
-const CASH_GATEWAY_API_URL = import.meta.env.VITE_GATEWAY_API_URL || 'http://localhost:8082'
-const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL || 'http://localhost:8084'
-const ECOMMERCE_API_URL = import.meta.env.VITE_ECOMMERCE_API_URL || 'http://localhost:8080'
+// localhost 폴백 제거: 환경변수 누락 시 조용히 localhost로 요청하면
+// AWS 배포 등에서 원인 파악이 어려운 버그가 됨. 누락 시 즉시 에러가 나야 빠르게 해결 가능.
+const CASH_GATEWAY_API_URL = import.meta.env.VITE_GATEWAY_API_URL
+const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL
+const ECOMMERCE_API_URL = import.meta.env.VITE_ECOMMERCE_API_URL
 
 /**
  * Keycloak 토큰 가져오기 함수
