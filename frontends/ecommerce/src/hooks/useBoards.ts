@@ -22,7 +22,7 @@ export function useBoards(params: BoardSearchParams) {
   return useQuery({
     queryKey: boardKeys.list(params),
     queryFn: async () => {
-      const response = await apiClient.get<Board[]>('/api/public/boards/list', { params })
+      const response = await apiClient.get<Board[]>('/public/boards/list', { params })
       return response.data
     },
     enabled: !!params.productPublicId,
@@ -34,7 +34,7 @@ export function useBoard(publicId: string | undefined) {
   return useQuery({
     queryKey: boardKeys.detail(publicId || ''),
     queryFn: async () => {
-      const response = await apiClient.get<BoardWithComments>(`/api/public/boards/${publicId}`)
+      const response = await apiClient.get<BoardWithComments>(`/public/boards/${publicId}`)
       return response.data
     },
     enabled: !!publicId,
@@ -47,7 +47,7 @@ export function useCreateBoard() {
 
   return useMutation({
     mutationFn: async (data: BoardCreateRequest) => {
-      const response = await apiClient.post<Board>('/api/boards', data)
+      const response = await apiClient.post<Board>('/boards', data)
       return response.data
     },
     onSuccess: () => {
@@ -63,7 +63,7 @@ export function useUpdateBoard() {
 
   return useMutation({
     mutationFn: async ({ publicId, data }: { publicId: string; data: BoardUpdateRequest }) => {
-      const response = await apiClient.put<Board>(`/api/boards/${publicId}`, data)
+      const response = await apiClient.put<Board>(`/boards/${publicId}`, data)
       return response.data
     },
     onSuccess: (_, variables) => {
@@ -79,7 +79,7 @@ export function useDeleteBoard() {
 
   return useMutation({
     mutationFn: async (publicId: string) => {
-      await apiClient.delete(`/api/boards/${publicId}`)
+      await apiClient.delete(`/boards/${publicId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: boardKeys.lists() })

@@ -29,11 +29,11 @@ interface EcommerceProductDetailResponse {
 
 /**
  * Ecommerce Product 상세 조회 (Public API - 인증 불필요)
- * GET /api/public/products/{publicId}
+ * GET /public/products/{publicId} (Nginx가 /api/ 붙여줌)
  */
 export async function fetchEcommerceProductDetail(publicId: string): Promise<EcommerceProduct> {
   const response = await ecommerceClient.get<EcommerceProductDetailResponse>(
-    `/api/public/products/${publicId}`
+    `/public/products/${publicId}`
   )
 
   return {

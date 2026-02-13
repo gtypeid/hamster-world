@@ -6,10 +6,8 @@ import type { BackendProduct } from '../types/api'
  *
  * 판매자(Merchant)가 상품을 등록/수정하는 API
  *
- * 백엔드 엔드포인트:
- * - POST   /api/merchant/products              - 상품 생성
- * - PUT    /api/merchant/products/{id}         - 상품 메타데이터 수정
- * - POST   /api/merchant/products/{id}/adjust-stock - 재고 조정
+ * 백엔드 엔드포인트: /api/merchant/products/*
+ * 프론트 호출 경로: /merchant/products/* (Nginx가 /api/ 접두사를 붙여줌)
  */
 
 /**
@@ -48,11 +46,11 @@ export const merchantProductApi = {
   /**
    * 상품 생성
    *
-   * POST /api/merchant/products
+   * POST /merchant/products
    */
   async createProduct(request: CreateProductRequest): Promise<BackendProduct> {
     console.log('[merchantProductApi] createProduct request:', request)
-    const response = await apiClient.post<BackendProduct>('/api/merchant/products', request)
+    const response = await apiClient.post<BackendProduct>('/merchant/products', request)
     console.log('[merchantProductApi] createProduct response:', response.data)
     return response.data
   },
@@ -60,21 +58,21 @@ export const merchantProductApi = {
   /**
    * 상품 메타데이터 수정
    *
-   * PUT /api/merchant/products/{id}
+   * PUT /merchant/products/{id}
    */
   async updateProduct(id: string, request: UpdateProductRequest): Promise<BackendProduct> {
-    const response = await apiClient.put<BackendProduct>(`/api/merchant/products/${id}`, request)
+    const response = await apiClient.put<BackendProduct>(`/merchant/products/${id}`, request)
     return response.data
   },
 
   /**
    * 재고 조정 요청
    *
-   * POST /api/merchant/products/{id}/adjust-stock
+   * POST /merchant/products/{id}/adjust-stock
    *
    * Response: 202 Accepted (Payment Service에서 비동기 처리)
    */
   async adjustStock(id: string, request: AdjustStockRequest): Promise<void> {
-    await apiClient.post(`/api/merchant/products/${id}/adjust-stock`, request)
+    await apiClient.post(`/merchant/products/${id}/adjust-stock`, request)
   }
 }

@@ -6,10 +6,11 @@ import type { PaymentProcess, ProcessDetail, Payment } from '@/types/gateway'
  * - Cash Gateway Service의 API 호출
  *
  * Backend:
- * - GET /api/payment-processes/list → List<PaymentProcessResponse>
- * - GET /api/payment-processes/page → Page<PaymentProcessResponse>
- * - GET /api/payments/list → List<PaymentResponse> (TODO: 백엔드 구현 필요)
- * - GET /api/payments/{publicId} → PaymentResponse (TODO: 백엔드 구현 필요)
+ * 프론트 호출 경로 (Nginx가 /api/ 접두사를 붙여줌):
+ * - GET /payment-processes/list → List<PaymentProcessResponse>
+ * - GET /payment-processes/page → Page<PaymentProcessResponse>
+ * - GET /payments/list → List<PaymentResponse> (TODO: 백엔드 구현 필요)
+ * - GET /payments/{publicId} → PaymentResponse (TODO: 백엔드 구현 필요)
  */
 
 /**
@@ -18,7 +19,7 @@ import type { PaymentProcess, ProcessDetail, Payment } from '@/types/gateway'
  * GET /api/payment-processes/list
  */
 export async function fetchProcessList(): Promise<PaymentProcess[]> {
-  const response = await gatewayClient.get<PaymentProcess[]>('/api/payment-processes/list')
+  const response = await gatewayClient.get<PaymentProcess[]>('/payment-processes/list')
   return response.data
 }
 
@@ -26,7 +27,7 @@ export async function fetchProcessList(): Promise<PaymentProcess[]> {
  * 프로세스 상세 조회 (with events)
  *
  * TODO: 백엔드에 상세 API 구현 필요
- * GET /api/payment-processes/{publicId}
+ * GET /payment-processes/{publicId}
  *
  * Response 예시:
  * {
@@ -37,7 +38,7 @@ export async function fetchProcessList(): Promise<PaymentProcess[]> {
  */
 export async function fetchProcessDetail(publicId: string): Promise<ProcessDetail> {
   // TODO: 백엔드에 상세 API 구현되면 교체
-  // const response = await gatewayClient.get<ProcessDetail>(`/api/payment-processes/${publicId}`)
+  // const response = await gatewayClient.get<ProcessDetail>(`/payment-processes/${publicId}`)
   // return response.data
 
   // 임시: list에서 찾아서 반환 (events는 빈 배열)
@@ -56,13 +57,13 @@ export async function fetchProcessDetail(publicId: string): Promise<ProcessDetai
  * Gateway Payment 상세 조회 (Cash Gateway Communication Truth)
  *
  * TODO: 백엔드에 API 구현 필요
- * GET /api/payments/{publicId}
+ * GET /payments/{publicId}
  */
 export async function fetchGatewayPayment(publicId: string): Promise<Payment> {
   // TODO: 백엔드 API 구현되면 교체
-  // const response = await gatewayClient.get<Payment>(`/api/payments/${publicId}`)
+  // const response = await gatewayClient.get<Payment>(`/payments/${publicId}`)
   // return response.data
 
   // 임시: API 미구현 에러 (Promise.reject로 반환)
-  return Promise.reject(new Error(`🚧 Backend API not implemented: GET /api/payments/${publicId}`))
+  return Promise.reject(new Error(`Backend API not implemented: GET /payments/${publicId}`))
 }

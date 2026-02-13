@@ -37,19 +37,19 @@ interface ProductDetailResponse {
 
 /**
  * Product 목록 조회
- * GET /api/products/list
+ * GET /products/list (Nginx가 /api/ 붙여줌)
  */
 export async function fetchProductList(): Promise<Product[]> {
-  const response = await paymentClient.get<ProductListResponse[]>('/api/products/list')
+  const response = await paymentClient.get<ProductListResponse[]>('/products/list')
   return response.data.map(mapProductResponse)
 }
 
 /**
  * Product 상세 조회 (with Event Sourcing Records)
- * GET /api/products/{publicId}
+ * GET /products/{publicId}
  */
 export async function fetchProductDetail(publicId: string): Promise<ResourceDetail> {
-  const response = await paymentClient.get<ProductDetailResponse>(`/api/products/${publicId}`)
+  const response = await paymentClient.get<ProductDetailResponse>(`/products/${publicId}`)
 
   return {
     product: mapProductResponse(response.data.product),
@@ -89,18 +89,18 @@ function mapProductResponse(data: ProductListResponse): Product {
 
 /**
  * Payment 목록 조회
- * GET /api/payments/list
+ * GET /payments/list
  */
 export async function fetchPaymentList(): Promise<Payment[]> {
-  const response = await paymentClient.get<Payment[]>('/api/payments/list')
+  const response = await paymentClient.get<Payment[]>('/payments/list')
   return response.data
 }
 
 /**
  * Payment 상세 조회
- * GET /api/payments/{publicId}
+ * GET /payments/{publicId}
  */
 export async function fetchPaymentDetail(publicId: string): Promise<PaymentDetail> {
-  const response = await paymentClient.get<PaymentDetail>(`/api/payments/${publicId}`)
+  const response = await paymentClient.get<PaymentDetail>(`/payments/${publicId}`)
   return response.data
 }

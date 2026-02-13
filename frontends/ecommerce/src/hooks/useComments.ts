@@ -10,7 +10,7 @@ export function useCreateComment() {
   return useMutation({
     mutationFn: async ({ boardPublicId, data }: { boardPublicId: string; data: CommentCreateRequest }) => {
       const response = await apiClient.post<Comment>(
-        `/api/boards/${boardPublicId}/comments`,
+        `/boards/${boardPublicId}/comments`,
         data
       )
       return response.data
@@ -39,7 +39,7 @@ export function useUpdateComment() {
       data: CommentUpdateRequest
     }) => {
       const response = await apiClient.put<Comment>(
-        `/api/boards/${boardPublicId}/comments/${commentPublicId}`,
+        `/boards/${boardPublicId}/comments/${commentPublicId}`,
         data
       )
       return response.data
@@ -62,7 +62,7 @@ export function useDeleteComment() {
       boardPublicId: string
       commentPublicId: string
     }) => {
-      await apiClient.delete(`/api/boards/${boardPublicId}/comments/${commentPublicId}`)
+      await apiClient.delete(`/boards/${boardPublicId}/comments/${commentPublicId}`)
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: boardKeys.detail(variables.boardPublicId) })

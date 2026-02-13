@@ -8,7 +8,7 @@ const USE_MOCK = true // TODO: 백엔드 연동 시 false로 변경
 /**
  * 전체 Kafka 토폴로지 조회
  *
- * GET /api/topology
+ * GET /topology (Nginx가 /api/ 붙여줌)
  */
 export async function fetchTopology(): Promise<TopologyResponse> {
   // Mock 데이터 사용
@@ -18,7 +18,7 @@ export async function fetchTopology(): Promise<TopologyResponse> {
   }
 
   // 실제 API 호출
-  const response = await fetch(`${NOTIFICATION_SERVICE_URL}/api/topology`, {
+  const response = await fetch(`${NOTIFICATION_SERVICE_URL}/topology`, {
     headers: {
       'Content-Type': 'application/json',
       // TODO: Auth header 추가

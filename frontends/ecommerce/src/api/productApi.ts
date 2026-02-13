@@ -13,10 +13,8 @@ const USE_REAL_API = true
 /**
  * 상품 API - Public (인증 불필요)
  *
- * 백엔드 엔드포인트:
- * - GET /api/public/products/list     - 상품 목록 조회
- * - GET /api/public/products/{id}     - 상품 단건 조회
- * - GET /api/public/products/page     - 상품 페이지 조회 (페이징)
+ * 백엔드 엔드포인트: /api/public/products/*
+ * 프론트 호출 경로: /public/products/* (Nginx가 /api/ 접두사를 붙여줌)
  *
  * 백엔드는 ProductResponse를 반환하므로 adapter로 변환 필요
  */
@@ -25,7 +23,7 @@ export const productApi = {
   async getProducts(): Promise<Product[]> {
     if (USE_REAL_API) {
       try {
-        const response = await apiClient.get<BackendProduct[]>('/api/public/products/list')
+        const response = await apiClient.get<BackendProduct[]>('/public/products/list')
         return adaptProducts(response.data)
       } catch (error) {
         console.error('Failed to fetch products:', error)
@@ -44,7 +42,7 @@ export const productApi = {
     if (USE_REAL_API) {
       try {
         const params = category !== 'all' ? { category } : {}
-        const response = await apiClient.get<BackendProduct[]>('/api/public/products/list', { params })
+        const response = await apiClient.get<BackendProduct[]>('/public/products/list', { params })
         return adaptProducts(response.data)
       } catch (error) {
         console.error('Failed to fetch products by category:', error)
@@ -62,7 +60,7 @@ export const productApi = {
   async getProduct(id: string): Promise<Product> {
     if (USE_REAL_API) {
       try {
-        const response = await apiClient.get<BackendProduct>(`/api/public/products/${id}`)
+        const response = await apiClient.get<BackendProduct>(`/public/products/${id}`)
         return adaptProduct(response.data)
       } catch (error) {
         console.error('Failed to fetch product:', error)
@@ -82,7 +80,7 @@ export const productApi = {
   // 상품 상세 조회 (판매자 정보 포함)
   async getProductDetail(id: string): Promise<ProductDetailResponse> {
     try {
-      const response = await apiClient.get<ProductDetailResponse>(`/api/public/products/${id}`)
+      const response = await apiClient.get<ProductDetailResponse>(`/public/products/${id}`)
       return response.data
     } catch (error) {
       console.error('Failed to fetch product detail:', error)
