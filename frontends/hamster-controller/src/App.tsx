@@ -1,10 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
-import { Home } from './pages/Home';
-import { Services } from './pages/Services';
-import { Architecture } from './pages/Architecture';
 import { Infrastructure } from './pages/Infrastructure';
+import { Architecture } from './pages/Architecture';
 import { Documentation } from './pages/Documentation';
 
 const queryClient = new QueryClient({
@@ -22,10 +20,9 @@ function App() {
       <BrowserRouter basename="/hamster-controller">
         <AppLayout>
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/services" element={<Services />} />
+            <Route path="/" element={<Infrastructure />} />
             <Route path="/architecture" element={<Architecture />} />
-            <Route path="/infrastructure" element={<Infrastructure />} />
+            <Route path="/topology" element={<Architecture />} />
             <Route path="/docs" element={<Documentation />} />
           </Routes>
         </AppLayout>

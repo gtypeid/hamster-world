@@ -70,8 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .init({
         onLoad: 'check-sso',
         silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-        // HTTP 환경(AWS IP 직접 접속)에서는 Web Crypto API 사용 불가 → PKCE 비활성화
-        ...(window.isSecureContext ? {} : { pkceMethod: false as any }),
       })
       .then((authenticated) => {
         console.log('[Keycloak] Initialization successful, authenticated:', authenticated)

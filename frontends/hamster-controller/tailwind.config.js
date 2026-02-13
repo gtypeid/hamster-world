@@ -30,12 +30,17 @@ export default {
       animation: {
         'wiggle': 'wiggle 0.5s ease-in-out infinite',
         'spin-slow': 'spin 3s linear infinite',
+        'shimmer': 'shimmer 2s infinite',
       },
       keyframes: {
         wiggle: {
           '0%, 100%': { transform: 'rotate(-3deg)' },
           '50%': { transform: 'rotate(3deg)' },
-        }
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
       }
     },
   },

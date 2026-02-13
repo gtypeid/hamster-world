@@ -14,23 +14,17 @@ interface MenuSection {
 export function Sidebar() {
   const menuSections: MenuSection[] = [
     {
-      title: 'Main',
-      items: [
-        { to: '/', icon: '🏠', label: 'Home' },
-        { to: '/services', icon: '🎯', label: 'Services' },
-      ],
-    },
-    {
-      title: 'Documentation',
-      items: [
-        { to: '/architecture', icon: '🏗️', label: 'Architecture' },
-        { to: '/docs', icon: '📚', label: 'Documents' },
-      ],
-    },
-    {
       title: 'Control',
       items: [
-        { to: '/infrastructure', icon: '🎮', label: 'Infrastructure' },
+        { to: '/', icon: '🎮', label: 'Infrastructure' },
+      ],
+    },
+    {
+      title: 'Viewer',
+      items: [
+        { to: '/architecture', icon: '🏗️', label: 'Architecture' },
+        { to: '/topology', icon: '📡', label: 'Event Topology' },
+        { to: '/docs', icon: '📚', label: 'Documents' },
       ],
     },
   ];

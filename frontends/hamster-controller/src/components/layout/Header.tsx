@@ -9,7 +9,7 @@ export function Header() {
               Hamster Controller
             </h1>
             <p className="text-xs text-accent-orange font-medium">
-              Portfolio Hub & Infrastructure Control
+              Infrastructure Control Dashboard
             </p>
           </div>
         </div>
@@ -20,7 +20,7 @@ export function Header() {
             <p className="text-xs text-gray-400">Portfolio Viewer</p>
           </div>
           <a
-            href="https://github.com/your-username/hamster-world"
+            href="https://github.com/gtypeid/hamster-world"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 bg-accent-orange text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm"
