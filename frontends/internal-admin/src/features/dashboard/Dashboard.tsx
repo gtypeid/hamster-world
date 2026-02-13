@@ -52,7 +52,7 @@ export function Dashboard() {
                   <span className="w-3 h-3 bg-green-500 rounded-full"></span>
                   <div>
                     <p className="font-bold text-gray-900">Cash Gateway</p>
-                    <p className="text-xs text-gray-500">http://localhost:8082</p>
+                    <p className="text-xs text-gray-500">{import.meta.env.VITE_GATEWAY_API_URL}</p>
                   </div>
                 </div>
                 <span className="text-green-600 text-sm font-medium">정상</span>
@@ -63,7 +63,7 @@ export function Dashboard() {
                   <span className="w-3 h-3 bg-green-500 rounded-full"></span>
                   <div>
                     <p className="font-bold text-gray-900">Payment Service</p>
-                    <p className="text-xs text-gray-500">http://localhost:8084</p>
+                    <p className="text-xs text-gray-500">{import.meta.env.VITE_PAYMENT_API_URL}</p>
                   </div>
                 </div>
                 <span className="text-green-600 text-sm font-medium">정상</span>
@@ -74,7 +74,7 @@ export function Dashboard() {
                   <span className="w-3 h-3 bg-green-500 rounded-full"></span>
                   <div>
                     <p className="font-bold text-gray-900">Kafka</p>
-                    <p className="text-xs text-gray-500">localhost:9092</p>
+                    <p className="text-xs text-gray-500">Kafka Broker</p>
                   </div>
                 </div>
                 <span className="text-green-600 text-sm font-medium">정상</span>
