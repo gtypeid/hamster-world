@@ -1,0 +1,84 @@
+name: Build All Frontends
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # === 단독 빌드 가능한 프론트 (frontends/{app} 내에서 빌드) ===
+
+  ecommerce:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (aws)
+        run: |
+          cd frontends/ecommerce
+          docker build --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-ecommerce:aws .
+          docker push ghcr.io/gtypeid/hamster-front-ecommerce:aws
+
+  content-creator:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (aws)
+        run: |
+          cd frontends/content-creator
+          docker build --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-content-creator:aws .
+          docker push ghcr.io/gtypeid/hamster-front-content-creator:aws
+
+  hamster-pg:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (aws)
+        run: |
+          cd frontends/hamster-pg
+          docker build --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-hamster-pg:aws .
+          docker push ghcr.io/gtypeid/hamster-front-hamster-pg:aws
+
+  # === common 디렉터리 참조 필요한 프론트 (frontends/ 에서 -f 로 빌드) ===
+
+  internal-admin:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (aws)
+        run: |
+          cd frontends
+          docker build -f internal-admin/Dockerfile --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-internal-admin:aws .
+          docker push ghcr.io/gtypeid/hamster-front-internal-admin:aws
+
+  hamster-controller:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (aws)
+        run: |
+          cd frontends
+          docker build -f hamster-controller/Dockerfile --build-arg BUILD_ENV=aws -t ghcr.io/gtypeid/hamster-front-hamster-controller:aws .
+          docker push ghcr.io/gtypeid/hamster-front-hamster-controller:aws
