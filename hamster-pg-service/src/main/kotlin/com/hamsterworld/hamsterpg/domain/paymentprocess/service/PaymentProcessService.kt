@@ -8,6 +8,7 @@ import com.hamsterworld.hamsterpg.domain.paymentprocess.constant.PaymentProcessS
 import com.hamsterworld.hamsterpg.domain.paymentprocess.model.PaymentProcess
 import com.hamsterworld.hamsterpg.domain.paymentprocess.repository.PaymentProcessJpaRepository
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -22,7 +23,9 @@ import java.time.format.DateTimeFormatter
 @Service
 class PaymentProcessService(
     private val paymentProcessRepository: PaymentProcessJpaRepository,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @Value("\${payment.webhook.base-url}")
+    private val webhookBaseUrl: String
 ) {
 
     companion object {
@@ -51,6 +54,7 @@ class PaymentProcessService(
             amount = request.amount,
             status = PaymentProcessStatus.PENDING,
             echo = echoJson,
+            webhookUrl = "${webhookBaseUrl}/api/webhook/pg/DUMMY",
             requestedAt = LocalDateTime.now()
         )
 

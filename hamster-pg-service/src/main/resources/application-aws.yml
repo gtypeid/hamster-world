@@ -27,6 +27,11 @@ spring:
         format_sql: false
         dialect: org.hibernate.dialect.MySQLDialect
 
+# Webhook 설정 - cash-gateway가 같은 인스턴스에서 실행되므로 SELF_IP 사용
+payment:
+  webhook:
+    base-url: http://${CASH_GATEWAY_HOST}:8082
+
 server:
   port: 8086
 

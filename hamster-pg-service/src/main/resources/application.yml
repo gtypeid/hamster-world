@@ -24,6 +24,11 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
 
+# Webhook 설정 - 로컬에서는 localhost의 cash-gateway(8082)로 전송
+payment:
+  webhook:
+    base-url: http://localhost:8082
+
 server:
   port: 8083
 
