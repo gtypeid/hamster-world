@@ -14,23 +14,25 @@ import com.hamsterworld.cashgateway.external.paymentgateway.dto.dummy.DummyAckno
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.common.web.exception.CustomRuntimeException
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 
 @Component
 class DummyPaymentGatewayProvider(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @Value("\${payment.gateway.dummy-pg.url}") private val pgBaseUrl: String
 ) : PaymentGatewayProvider {
 
     companion object {
-        private const val ENDPOINT = "http://localhost:8083/api/payment-process"
+        private const val ENDPOINT_PATH = "/api/payment-process"
         private const val SUCCESS_CODE = "0000"
         private const val MID = "hamster_dummy_mid_001"  // Dummy PG MID
     }
 
     override fun getProvider(): Provider = Provider.DUMMY
 
-    override fun getEndpoint(): String = ENDPOINT
+    override fun getEndpoint(): String = "${pgBaseUrl}${ENDPOINT_PATH}"
 
     override fun getMid(): String = MID
 
