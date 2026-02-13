@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onLoad: 'check-sso', // SSO 체크만 수행 (자동 리다이렉트 안함)
         checkLoginIframe: false,
         // HTTP 환경(AWS IP 직접 접속)에서는 Web Crypto API 사용 불가 → PKCE 비활성화
-        ...(window.isSecureContext ? {} : { pkceMethod: '' as any }),
+        ...(window.isSecureContext ? {} : { pkceMethod: false as any }),
       })
       .then((authenticated) => {
         console.log('[Keycloak] Initialization successful, authenticated:', authenticated)
