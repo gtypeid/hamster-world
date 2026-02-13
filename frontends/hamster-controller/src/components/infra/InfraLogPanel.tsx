@@ -13,15 +13,15 @@ export function InfraLogPanel() {
   }, [logs.length]);
 
   return (
-    <div className="bg-dark-card border border-dark-border rounded-lg overflow-hidden flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-dark-border bg-dark-sidebar/50">
+    <div className="bg-[#0c1222] flex flex-col h-full">
+      {/* Header - compact */}
+      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-dark-border/50 bg-dark-sidebar/30 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
             Runtime Log
           </span>
           {logs.length > 0 && (
-            <span className="text-[10px] bg-dark-hover text-gray-500 px-1.5 py-0.5 rounded font-mono">
+            <span className="text-[9px] bg-dark-hover text-gray-500 px-1.5 py-0.5 rounded font-mono">
               {logs.length}
             </span>
           )}
@@ -31,14 +31,14 @@ export function InfraLogPanel() {
         )}
       </div>
 
-      {/* Log entries */}
+      {/* Log entries - scrollable horizontal-friendly */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-2 font-mono text-xs space-y-0.5"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-1 font-mono text-[11px] space-y-px"
         style={{ minHeight: 0 }}
       >
         {logs.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-600">
+          <div className="flex items-center h-full text-gray-600 text-xs">
             Waiting for session to start...
           </div>
         ) : (
@@ -69,7 +69,7 @@ function LogEntry({ log }: { log: InfraLog }) {
   }[log.level];
 
   return (
-    <div className="flex gap-2 leading-relaxed hover:bg-dark-hover/30 px-1 rounded">
+    <div className="flex gap-2 leading-snug hover:bg-white/[0.02] px-1 rounded whitespace-nowrap">
       <span className="text-gray-600 shrink-0">{time}</span>
       <span className={`${levelColor} shrink-0`}>{levelIcon}</span>
       {log.instanceId && (

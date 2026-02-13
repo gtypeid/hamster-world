@@ -41,7 +41,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AlertProvider>
           <AuthProvider>
-            <BrowserRouter>
+            <BrowserRouter basename={import.meta.env.BASE_URL}>
               <Routes>
         {/* Shop Routes (with header) */}
         <Route path="/" element={

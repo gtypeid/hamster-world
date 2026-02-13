@@ -13,47 +13,48 @@ function simulateDeployment() {
         addLog({ message: 'Terraform apply started', level: 'info' });
       },
     },
-    // DB provisioning
+    // DB provisioning (internal-sg)
     {
       delay: 2000,
       action: () => {
         updateInstance('hamster-db', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-db', message: 'Instance launching...', level: 'info' });
+        addLog({ instanceId: 'hamster-db', message: '[internal-sg] Instance launching...', level: 'info' });
       },
     },
     {
       delay: 3000,
       action: () => {
         updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5' });
-        addLog({ instanceId: 'hamster-db', message: 'MySQL started, 8 databases created', level: 'success' });
-        addLog({ instanceId: 'hamster-db', message: 'MongoDB started', level: 'success' });
+        addLog({ instanceId: 'hamster-db', message: 'MySQL 8.0 started (:3306), 8 databases created', level: 'success' });
+        addLog({ instanceId: 'hamster-db', message: 'DBs: ecommerce, delivery, cash_gateway, payment, progression, notification, hamster_pg, keycloak', level: 'info' });
+        addLog({ instanceId: 'hamster-db', message: 'MongoDB 7.0 started (:27017)', level: 'success' });
       },
     },
-    // Auth + Kafka in parallel
+    // Kafka (internal-sg) + Auth (auth-sg) in parallel
     {
       delay: 1500,
       action: () => {
-        updateInstance('hamster-auth', { status: 'provisioning' });
         updateInstance('hamster-kafka', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-auth', message: 'Instance launching...', level: 'info' });
-        addLog({ instanceId: 'hamster-kafka', message: 'Instance launching...', level: 'info' });
+        updateInstance('hamster-auth', { status: 'provisioning' });
+        addLog({ instanceId: 'hamster-kafka', message: '[internal-sg] Instance launching...', level: 'info' });
+        addLog({ instanceId: 'hamster-auth', message: '[auth-sg] Instance launching...', level: 'info' });
       },
     },
     {
       delay: 2500,
       action: () => {
         updateInstance('hamster-kafka', { status: 'running', ip: '172.31.10.8' });
-        addLog({ instanceId: 'hamster-kafka', message: 'KRaft broker ready (9092, 9093)', level: 'success' });
+        addLog({ instanceId: 'hamster-kafka', message: 'Kafka 7.5 KRaft broker ready (:9092, :9093)', level: 'success' });
       },
     },
     {
       delay: 2000,
       action: () => {
         updateInstance('hamster-auth', { status: 'running', ip: '172.31.10.6' });
-        addLog({ instanceId: 'hamster-auth', message: 'Keycloak started, realm imported', level: 'success' });
+        addLog({ instanceId: 'hamster-auth', message: 'Keycloak 23.0 started (:8090), realm imported', level: 'success' });
       },
     },
-    // App instances
+    // App instances (all internal-sg)
     {
       delay: 1000,
       action: () => {
@@ -61,50 +62,52 @@ function simulateDeployment() {
         updateInstance('hamster-billing', { status: 'provisioning' });
         updateInstance('hamster-payment', { status: 'provisioning' });
         updateInstance('hamster-support', { status: 'provisioning' });
-        addLog({ message: 'Application instances launching...', level: 'info' });
+        addLog({ message: '[internal-sg] Application instances launching...', level: 'info' });
       },
     },
     {
       delay: 2500,
       action: () => {
         updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11' });
-        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080)', level: 'success' });
+        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080) → ecommerce_db', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12' });
-        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082) + Hamster PG (:8086) ready', level: 'success' });
+        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082) → cash_gateway_db', level: 'success' });
+        addLog({ instanceId: 'hamster-billing', message: 'Hamster PG (:8086) → hamster_pg_db', level: 'success' });
       },
     },
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13' });
-        addLog({ instanceId: 'hamster-payment', message: 'Payment Service ready (:8083)', level: 'success' });
+        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083) → payment_db', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14' });
-        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084) + Notification (:8085) ready', level: 'success' });
+        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084) → progression_db', level: 'success' });
+        addLog({ instanceId: 'hamster-support', message: 'Notification (:8085) → notification_db + MongoDB', level: 'success' });
       },
     },
-    // Front
+    // Front (front-sg)
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-front', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-front', message: 'Instance launching, pulling frontend images...', level: 'info' });
+        addLog({ instanceId: 'hamster-front', message: '[front-sg] Instance launching, pulling frontend images...', level: 'info' });
       },
     },
     {
       delay: 3000,
       action: () => {
         updateInstance('hamster-front', { status: 'running', ip: '3.35.42.117' });
-        addLog({ instanceId: 'hamster-front', message: 'Nginx + React apps deployed', level: 'success' });
+        addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + 4 React apps deployed (ecommerce, content-creator, hamster-pg, internal-admin)', level: 'success' });
         addLog({ message: 'All 8 instances online - infrastructure ready', level: 'success' });
         setSessionPhase('running');
       },

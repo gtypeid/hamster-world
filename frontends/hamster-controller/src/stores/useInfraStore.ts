@@ -14,12 +14,16 @@ export type InstanceId =
 
 export type InstanceStatus = 'idle' | 'provisioning' | 'running' | 'failed' | 'destroying';
 
+export type SecurityGroup = 'front-sg' | 'auth-sg' | 'internal-sg';
+
 export interface InstanceState {
   id: InstanceId;
   label: string;
   status: InstanceStatus;
   ip?: string;
-  services: string[];       // e.g. ["MySQL", "MongoDB"]
+  services: string[];       // e.g. ["MySQL 8.0", "MongoDB 7.0"]
+  sg: SecurityGroup;        // security group
+  ports: string[];          // e.g. [":3306", ":27017"]
   startedAt?: string;       // ISO timestamp
   detail?: string;          // e.g. "8 databases created"
 }
@@ -70,56 +74,73 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
     id: 'hamster-db',
     label: 'Database',
     status: 'idle',
-    services: ['MySQL', 'MongoDB'],
+    sg: 'internal-sg',
+    services: ['MySQL 8.0', 'MongoDB 7.0'],
+    ports: [':3306', ':27017'],
+    detail: 'ecommerce / delivery / cash_gateway / payment / progression / notification / hamster_pg / keycloak',
   },
   'hamster-auth': {
     id: 'hamster-auth',
     label: 'Auth',
     status: 'idle',
-    services: ['Keycloak'],
+    sg: 'auth-sg',
+    services: ['Keycloak 23.0'],
+    ports: [':8090'],
   },
   'hamster-kafka': {
     id: 'hamster-kafka',
     label: 'Kafka',
     status: 'idle',
-    services: ['Kafka KRaft'],
+    sg: 'internal-sg',
+    services: ['Kafka 7.5 (KRaft)'],
+    ports: [':9092', ':9093'],
   },
   'hamster-commerce': {
     id: 'hamster-commerce',
     label: 'Commerce',
     status: 'idle',
+    sg: 'internal-sg',
     services: ['eCommerce API'],
+    ports: [':8080'],
   },
   'hamster-billing': {
     id: 'hamster-billing',
     label: 'Billing',
     status: 'idle',
+    sg: 'internal-sg',
     services: ['Cash Gateway', 'Hamster PG'],
+    ports: [':8082', ':8086'],
   },
   'hamster-payment': {
     id: 'hamster-payment',
     label: 'Payment',
     status: 'idle',
+    sg: 'internal-sg',
     services: ['Payment Service'],
+    ports: [':8083'],
   },
   'hamster-support': {
     id: 'hamster-support',
     label: 'Support',
     status: 'idle',
+    sg: 'internal-sg',
     services: ['Progression', 'Notification'],
+    ports: [':8084', ':8085'],
   },
   'hamster-front': {
     id: 'hamster-front',
     label: 'Front',
     status: 'idle',
-    services: ['Nginx', 'React Apps'],
+    sg: 'front-sg',
+    services: ['Nginx', '4 React Apps'],
+    ports: [':80'],
   },
 };
 
 function cloneInstances(): Record<InstanceId, InstanceState> {
   const clone: Record<string, InstanceState> = {};
   for (const [k, v] of Object.entries(DEFAULT_INSTANCES)) {
-    clone[k] = { ...v, services: [...v.services] };
+    clone[k] = { ...v, services: [...v.services], ports: [...v.ports] };
   }
   return clone as Record<InstanceId, InstanceState>;
 }
