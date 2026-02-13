@@ -27,6 +27,7 @@ spring:
     properties:
       hibernate:
         format_sql: false
+    defer-datasource-initialization: true  # Hibernate DDL 완료 후 sql.init 실행
 
   sql:
     init:
