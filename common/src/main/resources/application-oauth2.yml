@@ -11,12 +11,17 @@
 
 spring:
   # Keycloak OAuth2 Resource Server 설정
+  # [주의] issuer-uri와 jwk-set-uri가 동시에 존재하면
+  # Spring이 issuer-uri로 issuer 문자열 검증을 수행한다.
+  # AWS에서 issuer 불일치(퍼블릭IP vs 프라이빗IP) 문제를 방지하기 위해
+  # issuer-uri는 여기에 두지 않고 프로파일별 설정에서 관리한다.
+  # - 로컬: application-oauth2-local.yml (issuer-uri 사용)
+  # - AWS:  application-oauth2-aws.yml   (jwk-set-uri만 사용)
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8090/realms/hamster-world
-          # Public Key 자동 다운로드: http://localhost:8090/realms/hamster-world/protocol/openid-connect/certs
+          jwk-set-uri: http://localhost:8090/realms/hamster-world/protocol/openid-connect/certs
 
 # Keycloak Admin API 설정 (필요한 서비스만 사용)
 keycloak:
