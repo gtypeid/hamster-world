@@ -8,7 +8,6 @@ import com.hamsterworld.hamsterpg.domain.paymentprocess.repository.PaymentProces
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.domain.PageRequest
-import org.springframework.http.ResponseEntity
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -144,13 +143,13 @@ class PaymentProcessPollingScheduler(
 
     /**
      * 성공 처리
+     * CAS 업데이트 성공한 경우에만 webhook 전송
      */
     private fun handleSuccess(process: PaymentProcess) {
         val approvalNo = "AP${System.currentTimeMillis()}"
         val processedAt = LocalDateTime.now()
 
-        // CAS 업데이트: PROCESSING → SUCCESS
-        paymentProcessRepository.casUpdateToFinal(
+        val updated = paymentProcessRepository.casUpdateToFinal(
             id = process.id!!,
             expectedStatus = PaymentProcessStatus.PROCESSING,
             newStatus = PaymentProcessStatus.SUCCESS,
@@ -159,21 +158,24 @@ class PaymentProcessPollingScheduler(
             processedAt = processedAt
         )
 
-        logger.info("Payment approved - tid: {}, approvalNo: {}", process.tid, approvalNo)
+        if (updated == 0) {
+            logger.debug("CAS failed (PROCESSING → SUCCESS) - processId: {}, 이미 처리됨", process.id)
+            return
+        }
 
-        // Webhook 전송
+        logger.info("Payment approved - tid: {}, approvalNo: {}", process.tid, approvalNo)
         sendWebhook(process, true, approvalNo, null)
     }
 
     /**
      * 실패 처리
+     * CAS 업데이트 성공한 경우에만 webhook 전송
      */
     private fun handleFailure(process: PaymentProcess) {
         val failReason = FAIL_REASONS.random()
         val processedAt = LocalDateTime.now()
 
-        // CAS 업데이트: PROCESSING → FAILED
-        paymentProcessRepository.casUpdateToFinal(
+        val updated = paymentProcessRepository.casUpdateToFinal(
             id = process.id!!,
             expectedStatus = PaymentProcessStatus.PROCESSING,
             newStatus = PaymentProcessStatus.FAILED,
@@ -182,14 +184,19 @@ class PaymentProcessPollingScheduler(
             processedAt = processedAt
         )
 
-        logger.warn("Payment failed - tid: {}, reason: {}", process.tid, failReason)
+        if (updated == 0) {
+            logger.debug("CAS failed (PROCESSING → FAILED) - processId: {}, 이미 처리됨", process.id)
+            return
+        }
 
-        // Webhook 전송
+        logger.warn("Payment failed - tid: {}, reason: {}", process.tid, failReason)
         sendWebhook(process, false, null, failReason)
     }
 
     /**
      * Webhook 전송
+     *
+     * 상대(cash-gateway)의 응답은 관심 없음. 보냈다는 사실만 기록.
      */
     private fun sendWebhook(
         process: PaymentProcess,
@@ -197,58 +204,49 @@ class PaymentProcessPollingScheduler(
         approvalNo: String?,
         failReason: String?
     ) {
-        try {
-            val echo = try {
-                if (process.echo != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    objectMapper.readValue(process.echo, Map::class.java) as Map<String, Any?>
-                } else {
-                    emptyMap()
-                }
-            } catch (e: Exception) {
-                logger.warn("Failed to parse echo JSON: {}", e.message)
+        val echo = try {
+            if (process.echo != null) {
+                @Suppress("UNCHECKED_CAST")
+                objectMapper.readValue(process.echo, Map::class.java) as Map<String, Any?>
+            } else {
                 emptyMap()
             }
+        } catch (e: Exception) {
+            logger.warn("Failed to parse echo JSON: {}", e.message)
+            emptyMap()
+        }
 
-            val webhookPayload = WebhookPaymentResponse(
-                status = if (isSuccess) "SUCCESS" else "FAILED",
-                code = if (isSuccess) "0000" else "E001",
-                transactionId = process.tid,
-                approvalNo = approvalNo,
-                amount = process.amount,
-                echo = echo,
-                message = if (isSuccess) {
-                    "Payment approved successfully"
-                } else {
-                    "Payment failed: $failReason"
-                }
-            )
+        val webhookPayload = WebhookPaymentResponse(
+            status = if (isSuccess) "SUCCESS" else "FAILED",
+            code = if (isSuccess) "0000" else "E001",
+            transactionId = process.tid,
+            approvalNo = approvalNo,
+            amount = process.amount,
+            echo = echo,
+            message = if (isSuccess) {
+                "Payment approved successfully"
+            } else {
+                "Payment failed: $failReason"
+            }
+        )
 
-            val response: ResponseEntity<String> = restTemplate.postForEntity(
+        try {
+            restTemplate.postForEntity(
                 process.webhookUrl,
                 webhookPayload,
                 String::class.java
             )
-
-            val responseCode = response.statusCode.value()
-
-            logger.info(
-                "Webhook sent - tid: {}, url: {}, responseCode: {}",
-                process.tid, process.webhookUrl, responseCode
-            )
-
-            // Webhook 전송 시각 업데이트
-            val updatedProcess = paymentProcessRepository.findById(process.id!!).orElse(null)
-            updatedProcess?.markWebhookSent(responseCode)
-            if (updatedProcess != null) {
-                paymentProcessRepository.save(updatedProcess)
-            }
-
         } catch (e: Exception) {
-            logger.error(
-                "Failed to send webhook - tid: {}, url: {}, error: {}",
-                process.tid, process.webhookUrl, e.message, e
-            )
+            logger.warn("Webhook 전송 중 예외 (무시) - tid: {}, error: {}", process.tid, e.message)
         }
+
+        // 보냈으면 끝. 응답 코드 상관없이 전송 시각만 기록.
+        val updatedProcess = paymentProcessRepository.findById(process.id!!).orElse(null)
+        updatedProcess?.markWebhookSent(0)
+        if (updatedProcess != null) {
+            paymentProcessRepository.save(updatedProcess)
+        }
+
+        logger.info("Webhook sent - tid: {}, url: {}", process.tid, process.webhookUrl)
     }
 }
