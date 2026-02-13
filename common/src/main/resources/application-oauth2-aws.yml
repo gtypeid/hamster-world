@@ -1,13 +1,28 @@
 # OAuth2 AWS 환경 설정
 # application-oauth2.yml의 AWS 오버라이드
 # 환경변수: KEYCLOAK_HOST (Terraform에서 Auth 인스턴스 private IP 주입)
+#
+# [issuer-uri → jwk-set-uri 변경 이유]
+# issuer-uri를 사용하면 토큰의 iss 클레임과 설정값을 비교 검증한다.
+# 문제: 브라우저는 Nginx 프록시(퍼블릭 IP)로 Keycloak에 접근하므로
+#   토큰의 iss = "http://퍼블릭IP/keycloak/realms/hamster-world"
+# 백엔드는 VPC 내부(프라이빗 IP)로 Keycloak에 접근하므로
+#   issuer-uri = "http://프라이빗IP:8090/keycloak/realms/hamster-world"
+# → issuer 불일치로 모든 인증 API가 401 Unauthorized 발생.
+#
+# 퍼블릭 IP를 백엔드에 전달하면 Terraform 순환 참조 발생
+# (front → backend IP 필요, backend → front IP 필요)
+#
+# jwk-set-uri는 Keycloak의 공개키로 토큰 서명만 검증하고
+# issuer 문자열 비교를 하지 않으므로 이 문제를 회피한다.
+# 같은 Keycloak에서 발급한 토큰이므로 보안 수준은 동일하다.
 
 spring:
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://${KEYCLOAK_HOST}:8090/keycloak/realms/hamster-world
+          jwk-set-uri: http://${KEYCLOAK_HOST}:8090/keycloak/realms/hamster-world/protocol/openid-connect/certs
 
 keycloak:
   server-url: http://${KEYCLOAK_HOST}:8090/keycloak
