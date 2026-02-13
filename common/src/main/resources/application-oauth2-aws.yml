@@ -7,7 +7,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://${KEYCLOAK_HOST}:8090/realms/hamster-world
+          issuer-uri: http://${KEYCLOAK_HOST}:8090/keycloak/realms/hamster-world
 
 keycloak:
-  server-url: http://${KEYCLOAK_HOST}:8090
+  server-url: http://${KEYCLOAK_HOST}:8090/keycloak

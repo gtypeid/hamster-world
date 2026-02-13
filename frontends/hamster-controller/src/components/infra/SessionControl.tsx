@@ -158,45 +158,43 @@ export function SessionControl() {
   const isActive = sessionPhase !== 'idle' && sessionPhase !== 'completed' && sessionPhase !== 'failed';
 
   return (
-    <div className="bg-dark-card border border-dark-border rounded-lg p-4">
-      <div className="flex items-center justify-between">
-        {/* Budget info */}
-        <div className="flex items-center gap-4">
-          <div>
-            <span className="text-xs text-gray-400 block mb-1">Today's Sessions</span>
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: maxSessionsPerDay }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-4 h-4 rounded-sm ${
-                    i < sessionsUsedToday ? 'bg-accent-orange' : 'bg-dark-hover border border-dark-border'
-                  }`}
-                />
-              ))}
-              <span className="text-xs text-gray-500 ml-2 font-mono">
-                {sessionsUsedToday}/{maxSessionsPerDay}
-              </span>
-            </div>
-          </div>
+    <div className="space-y-3">
+      {/* Budget info */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-400">Sessions</span>
+          <span className="text-xs text-gray-500 font-mono">
+            {sessionsUsedToday}/{maxSessionsPerDay}
+          </span>
         </div>
+        <div className="flex items-center gap-1.5">
+          {Array.from({ length: maxSessionsPerDay }).map((_, i) => (
+            <div
+              key={i}
+              className={`flex-1 h-2 rounded-sm ${
+                i < sessionsUsedToday ? 'bg-accent-orange' : 'bg-dark-hover'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
 
-        {/* Control buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={handleStart}
-            disabled={!canStart}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-sm flex items-center gap-2"
-          >
-            <span>Start Infrastructure</span>
-          </button>
-          <button
-            onClick={handleStop}
-            disabled={!isActive}
-            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-sm flex items-center gap-2"
-          >
-            <span>Stop</span>
-          </button>
-        </div>
+      {/* Control buttons - stacked */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleStart}
+          disabled={!canStart}
+          className="flex-1 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-xs"
+        >
+          Start
+        </button>
+        <button
+          onClick={handleStop}
+          disabled={!isActive}
+          className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-xs"
+        >
+          Stop
+        </button>
       </div>
     </div>
   );
