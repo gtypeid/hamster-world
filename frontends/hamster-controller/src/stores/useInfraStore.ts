@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { InitResult } from '../services/mockGithub';
 
 // ─── Instance definitions matching terraform ───
 
@@ -35,7 +36,21 @@ export interface InfraLog {
   level: 'info' | 'success' | 'error' | 'warn';
 }
 
-export type SessionPhase = 'idle' | 'triggering' | 'applying' | 'running' | 'destroying' | 'completed' | 'failed';
+export type SessionPhase =
+  | 'idle'          // 최초 상태 - Connect 필요
+  | 'connecting'    // Connect 진행중 (GitHub Actions API 조회)
+  | 'connected'     // Connect 완료 - 상태에 따라 분기
+  | 'planning'      // Init 진행중 (terraform plan 실행)
+  | 'planned'       // Init 완료 - plan 결과 표시, Start 가능
+  | 'triggering'    // Start - workflow_dispatch 트리거
+  | 'applying'      // terraform apply 진행중
+  | 'running'       // 인프라 가동중
+  | 'destroying'    // terraform destroy 진행중
+  | 'completed'     // 세션 완료
+  | 'failed';       // 실패
+
+/** Connect 후 판단된 인프라 상태 */
+export type InfraStatus = 'unknown' | 'running' | 'cooldown' | 'available' | 'limit_exceeded';
 
 // ─── Store ───
 
@@ -43,7 +58,17 @@ interface InfraState {
   // Session
   sessionPhase: SessionPhase;
   sessionStartedAt: string | null;     // ISO timestamp when session started
-  sessionDurationMin: number;          // configured session duration (default 25)
+  sessionDurationMin: number;          // configured session duration (default 20)
+
+  // Connect result
+  infraStatus: InfraStatus;
+  initResult: InitResult | null;
+
+  // Plan result (terraform plan output)
+  planResult: string | null;
+
+  // 내가 Start를 눌러 시작한 세션인지 여부 (Connect으로 감지된 기존 세션이면 false)
+  startedByMe: boolean;
 
   // Budget
   sessionsUsedToday: number;
@@ -60,6 +85,8 @@ interface InfraState {
 
   // Actions
   setSessionPhase: (phase: SessionPhase) => void;
+  applyConnectResult: (result: InitResult) => void;
+  applyPlanResult: (planOutput: string) => void;
   startSession: () => void;
   endSession: () => void;
   updateInstance: (id: InstanceId, update: Partial<InstanceState>) => void;
@@ -67,6 +94,7 @@ interface InfraState {
   setSessionsUsedToday: (count: number) => void;
   setActiveWorkflowRunId: (id: number | null) => void;
   resetInstances: () => void;
+  resetAll: () => void;
 }
 
 const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
@@ -149,7 +177,13 @@ export const useInfraStore = create<InfraState>((set) => ({
   // Session
   sessionPhase: 'idle',
   sessionStartedAt: null,
-  sessionDurationMin: 25,
+  sessionDurationMin: 20,
+
+  // Connect result
+  infraStatus: 'unknown',
+  initResult: null,
+  planResult: null,
+  startedByMe: false,
 
   // Budget
   sessionsUsedToday: 0,
@@ -167,8 +201,65 @@ export const useInfraStore = create<InfraState>((set) => ({
   // Actions
   setSessionPhase: (phase) => set({ sessionPhase: phase }),
 
+  applyConnectResult: (result) => set((state) => {
+    const logs: InfraLog[] = [...state.logs];
+    const now = new Date().toISOString();
+
+    logs.push({ timestamp: now, message: `Sync complete - status: ${result.status}`, level: 'info' });
+    logs.push({ timestamp: now, message: `Today: ${result.sessionsUsedToday}/${result.maxSessionsPerDay} sessions used`, level: 'info' });
+
+    if (result.status === 'running') {
+      const remainMin = Math.ceil((result.remainingSeconds ?? 0) / 60);
+      logs.push({ timestamp: now, message: `Session active - ${remainMin}min remaining`, level: 'success' });
+    } else if (result.status === 'cooldown') {
+      const cooldownSec = result.cooldownRemainingSeconds ?? 0;
+      logs.push({ timestamp: now, message: `Cooldown - ${Math.ceil(cooldownSec / 60)}min until next session`, level: 'warn' });
+    } else if (result.status === 'limit_exceeded') {
+      logs.push({ timestamp: now, message: 'Daily session limit reached', level: 'error' });
+    } else {
+      logs.push({ timestamp: now, message: 'Infrastructure available - ready to init (terraform plan)', level: 'success' });
+    }
+
+    // running 상태면 인스턴스도 running으로 표시
+    let instances = state.instances;
+    if (result.status === 'running') {
+      const updated = { ...state.instances };
+      for (const id of INSTANCE_IDS) {
+        updated[id] = { ...updated[id], status: 'running' };
+      }
+      instances = updated;
+    }
+
+    return {
+      sessionPhase: result.status === 'running' ? 'running' : 'connected',
+      infraStatus: result.status,
+      initResult: result,
+      startedByMe: false, // Connect으로 감지된 세션 = 기존 세션 참여
+      sessionsUsedToday: result.sessionsUsedToday,
+      maxSessionsPerDay: result.maxSessionsPerDay,
+      sessionDurationMin: result.runtimeMin,
+      sessionStartedAt: result.sessionStartedAt ?? null,
+      instances,
+      logs,
+    };
+  }),
+
+  applyPlanResult: (planOutput) => set((state) => ({
+    sessionPhase: 'planned',
+    planResult: planOutput,
+    logs: [
+      ...state.logs,
+      {
+        timestamp: new Date().toISOString(),
+        message: 'Terraform plan completed - review infrastructure report',
+        level: 'success' as const,
+      },
+    ],
+  })),
+
   startSession: () => set((state) => ({
     sessionPhase: 'triggering',
+    startedByMe: true, // 내가 직접 시작한 세션
     sessionStartedAt: new Date().toISOString(),
     sessionsUsedToday: state.sessionsUsedToday + 1,
     logs: [
@@ -214,6 +305,19 @@ export const useInfraStore = create<InfraState>((set) => ({
   setActiveWorkflowRunId: (id) => set({ activeWorkflowRunId: id }),
 
   resetInstances: () => set({ instances: cloneInstances() }),
+
+  resetAll: () => set({
+    sessionPhase: 'idle',
+    sessionStartedAt: null,
+    infraStatus: 'unknown',
+    initResult: null,
+    planResult: null,
+    startedByMe: false,
+    sessionsUsedToday: 0,
+    instances: cloneInstances(),
+    logs: [],
+    activeWorkflowRunId: null,
+  }),
 }));
 
 // ─── Selectors ───
@@ -224,8 +328,21 @@ export const selectRunningCount = (state: InfraState) =>
 export const selectTotalInstances = (_state: InfraState) =>
   Object.keys(DEFAULT_INSTANCES).length;
 
+/** Connect 가능: idle, completed, failed */
+export const selectCanConnect = (state: InfraState) =>
+  state.sessionPhase === 'idle' || state.sessionPhase === 'completed' || state.sessionPhase === 'failed';
+
+/** Init(plan) 가능: connected + available */
+export const selectCanInit = (state: InfraState) =>
+  state.sessionPhase === 'connected' && state.infraStatus === 'available';
+
+/** Plan 완료 후 Start 가능 */
 export const selectCanStartSession = (state: InfraState) =>
-  state.sessionPhase === 'idle' && state.sessionsUsedToday < state.maxSessionsPerDay;
+  state.sessionPhase === 'planned';
+
+/** 가동중이거나 applying일 때 Stop 가능 */
+export const selectCanStop = (state: InfraState) =>
+  state.sessionPhase === 'running' || state.sessionPhase === 'applying' || state.sessionPhase === 'triggering';
 
 export const INSTANCE_IDS: InstanceId[] = [
   'hamster-db',

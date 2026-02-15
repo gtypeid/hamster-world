@@ -1,11 +1,34 @@
-import { useInfraStore, selectCanStartSession, INSTANCE_IDS } from '../../stores/useInfraStore';
+import {
+  useInfraStore,
+  selectCanStartSession,
+  selectCanConnect,
+  selectCanInit,
+  selectCanStop,
+  INSTANCE_IDS,
+} from '../../stores/useInfraStore';
+import { mockInit } from '../../services/mockGithub';
+
+// Mock: simulate terraform plan output
+const MOCK_PLAN_OUTPUT = `Plan: 12 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + entrypoint          = { front_url = "http://(known after apply)", keycloak_url = "http://(known after apply)/keycloak" }
+  + instances           = { 8x t3.micro EC2 instances }
+  + security_groups     = { front-sg (Public), auth-sg (VPC), internal-sg (VPC) }
+  + api_routes          = { 7 reverse proxy routes }
+  + infrastructure_spec = { ap-northeast-2, 240GB total storage }`;
+
+function mockPlan(): Promise<string> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(MOCK_PLAN_OUTPUT), 2000);
+  });
+}
 
 // Demo mode: simulate terraform deployment steps
 function simulateDeployment() {
   const { setSessionPhase, updateInstance, addLog } = useInfraStore.getState();
 
   const steps: { delay: number; action: () => void }[] = [
-    // Phase: applying
     {
       delay: 1500,
       action: () => {
@@ -13,7 +36,6 @@ function simulateDeployment() {
         addLog({ message: 'Terraform apply started', level: 'info' });
       },
     },
-    // DB provisioning (internal-sg)
     {
       delay: 2000,
       action: () => {
@@ -26,11 +48,9 @@ function simulateDeployment() {
       action: () => {
         updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5' });
         addLog({ instanceId: 'hamster-db', message: 'MySQL 8.0 started (:3306), 8 databases created', level: 'success' });
-        addLog({ instanceId: 'hamster-db', message: 'DBs: ecommerce, delivery, cash_gateway, payment, progression, notification, hamster_pg, keycloak', level: 'info' });
         addLog({ instanceId: 'hamster-db', message: 'MongoDB 7.0 started (:27017)', level: 'success' });
       },
     },
-    // Kafka (internal-sg) + Auth (auth-sg) in parallel
     {
       delay: 1500,
       action: () => {
@@ -54,7 +74,6 @@ function simulateDeployment() {
         addLog({ instanceId: 'hamster-auth', message: 'Keycloak 23.0 started (:8090), realm imported', level: 'success' });
       },
     },
-    // App instances (all internal-sg)
     {
       delay: 1000,
       action: () => {
@@ -69,45 +88,42 @@ function simulateDeployment() {
       delay: 2500,
       action: () => {
         updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11' });
-        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080) → ecommerce_db', level: 'success' });
+        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12' });
-        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082) → cash_gateway_db', level: 'success' });
-        addLog({ instanceId: 'hamster-billing', message: 'Hamster PG (:8086) → hamster_pg_db', level: 'success' });
+        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082), Hamster PG (:8086)', level: 'success' });
       },
     },
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13' });
-        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083) → payment_db', level: 'success' });
+        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14' });
-        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084) → progression_db', level: 'success' });
-        addLog({ instanceId: 'hamster-support', message: 'Notification (:8085) → notification_db + MongoDB', level: 'success' });
+        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084), Notification (:8085)', level: 'success' });
       },
     },
-    // Front (front-sg)
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-front', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-front', message: '[front-sg] Instance launching, pulling frontend images...', level: 'info' });
+        addLog({ instanceId: 'hamster-front', message: '[front-sg] Pulling frontend images...', level: 'info' });
       },
     },
     {
       delay: 3000,
       action: () => {
         updateInstance('hamster-front', { status: 'running', ip: '3.35.42.117' });
-        addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + 4 React apps deployed (ecommerce, content-creator, hamster-pg, internal-admin)', level: 'success' });
+        addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + 4 React apps deployed', level: 'success' });
         addLog({ message: 'All 8 instances online - infrastructure ready', level: 'success' });
         setSessionPhase('running');
       },
@@ -127,7 +143,6 @@ function simulateDestroy() {
   setSessionPhase('destroying');
   addLog({ message: 'Terraform destroy initiated', level: 'warn' });
 
-  // Mark all as destroying
   setTimeout(() => {
     for (const id of INSTANCE_IDS) {
       updateInstance(id, { status: 'destroying' });
@@ -135,7 +150,6 @@ function simulateDestroy() {
     addLog({ message: 'Terminating all instances...', level: 'info' });
   }, 1000);
 
-  // Complete
   setTimeout(() => {
     resetInstances();
     endSession();
@@ -144,10 +158,47 @@ function simulateDestroy() {
 
 export function SessionControl() {
   const sessionPhase = useInfraStore((s) => s.sessionPhase);
+  const infraStatus = useInfraStore((s) => s.infraStatus);
   const sessionsUsedToday = useInfraStore((s) => s.sessionsUsedToday);
   const maxSessionsPerDay = useInfraStore((s) => s.maxSessionsPerDay);
+  const initResult = useInfraStore((s) => s.initResult);
+
+  const canConnect = useInfraStore(selectCanConnect);
+  const canInit = useInfraStore(selectCanInit);
   const canStart = useInfraStore(selectCanStartSession);
+  const canStop = useInfraStore(selectCanStop);
+
+  const setSessionPhase = useInfraStore((s) => s.setSessionPhase);
+  const applyConnectResult = useInfraStore((s) => s.applyConnectResult);
+  const applyPlanResult = useInfraStore((s) => s.applyPlanResult);
+  const addLog = useInfraStore((s) => s.addLog);
   const startSession = useInfraStore((s) => s.startSession);
+
+  const handleConnect = async () => {
+    setSessionPhase('connecting');
+    addLog({ message: 'Syncing with GitHub Actions...', level: 'info' });
+
+    try {
+      const result = await mockInit();
+      applyConnectResult(result);
+    } catch {
+      setSessionPhase('failed');
+      addLog({ message: 'Failed to sync with GitHub Actions', level: 'error' });
+    }
+  };
+
+  const handleInit = async () => {
+    setSessionPhase('planning');
+    addLog({ message: 'Triggering terraform plan...', level: 'info' });
+
+    try {
+      const planOutput = await mockPlan();
+      applyPlanResult(planOutput);
+    } catch {
+      setSessionPhase('failed');
+      addLog({ message: 'Terraform plan failed', level: 'error' });
+    }
+  };
 
   const handleStart = () => {
     startSession();
@@ -157,8 +208,6 @@ export function SessionControl() {
   const handleStop = () => {
     simulateDestroy();
   };
-
-  const isActive = sessionPhase !== 'idle' && sessionPhase !== 'completed' && sessionPhase !== 'failed';
 
   return (
     <div className="space-y-3">
@@ -182,8 +231,36 @@ export function SessionControl() {
         </div>
       </div>
 
-      {/* Control buttons - stacked */}
+      {/* Status badge (Connect 결과) */}
+      {sessionPhase === 'connected' && (
+        <div className={`text-center text-xs font-semibold py-1.5 rounded ${getStatusStyle(infraStatus)}`}>
+          {getStatusMessage(infraStatus, initResult)}
+        </div>
+      )}
+
+      {/* Plan result badge */}
+      {sessionPhase === 'planned' && (
+        <div className="text-center text-xs font-semibold py-1.5 rounded bg-blue-900/30 text-blue-400">
+          Plan completed - ready to deploy
+        </div>
+      )}
+
+      {/* Control buttons - 4 buttons */}
       <div className="flex gap-2">
+        <button
+          onClick={handleConnect}
+          disabled={!canConnect}
+          className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-xs"
+        >
+          {sessionPhase === 'connecting' ? 'Syncing...' : 'Connect'}
+        </button>
+        <button
+          onClick={handleInit}
+          disabled={!canInit}
+          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-xs"
+        >
+          {sessionPhase === 'planning' ? 'Planning...' : 'Init'}
+        </button>
         <button
           onClick={handleStart}
           disabled={!canStart}
@@ -193,7 +270,7 @@ export function SessionControl() {
         </button>
         <button
           onClick={handleStop}
-          disabled={!isActive}
+          disabled={!canStop}
           className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all text-xs"
         >
           Stop
@@ -201,4 +278,33 @@ export function SessionControl() {
       </div>
     </div>
   );
+}
+
+function getStatusStyle(status: string): string {
+  switch (status) {
+    case 'running': return 'bg-green-900/30 text-green-400';
+    case 'cooldown': return 'bg-yellow-900/30 text-yellow-400';
+    case 'available': return 'bg-blue-900/30 text-blue-400';
+    case 'limit_exceeded': return 'bg-red-900/30 text-red-400';
+    default: return 'bg-gray-800 text-gray-400';
+  }
+}
+
+function getStatusMessage(status: string, initResult: any): string {
+  switch (status) {
+    case 'running': {
+      const remain = Math.ceil((initResult?.remainingSeconds ?? 0) / 60);
+      return `Active - ${remain}min remaining`;
+    }
+    case 'cooldown': {
+      const cd = Math.ceil((initResult?.cooldownRemainingSeconds ?? 0) / 60);
+      return `Cooldown - ${cd}min`;
+    }
+    case 'available':
+      return 'Ready to init (terraform plan)';
+    case 'limit_exceeded':
+      return 'Daily limit reached';
+    default:
+      return status;
+  }
 }

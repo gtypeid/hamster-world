@@ -22,6 +22,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
+          terraform_wrapper: false
 
       - name: Terraform Init
         run: terraform init
@@ -31,7 +32,9 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -input=false
+        run: |
+          terraform plan -no-color -input=false -out=tfplan 2>&1 | tee /tmp/plan-output.txt
+          terraform show -no-color -json tfplan > /tmp/plan.json
         env:
           TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
           TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
@@ -39,23 +42,118 @@ jobs:
           TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
           TF_VAR_mongo_password: ${{ secrets.MONGO_PASSWORD }}
 
-      - name: Plan Summary
+      - name: Generate Infrastructure Report
         run: |
-          echo "## Terraform Plan Result" >> $GITHUB_STEP_SUMMARY
+          cat << 'REPORT' >> $GITHUB_STEP_SUMMARY
+          # Hamster World - Infrastructure Plan Report
+
+          ## Infrastructure Spec
+          | Item | Detail |
+          |------|--------|
+          | Region | ap-northeast-2 (Seoul) |
+          | Instance Type | t3.micro (2 vCPU, 1GB RAM) x 8 |
+          | Storage | 30GB gp3 per instance (240GB total) |
+          | VPC | 172.31.0.0/16 (default) |
+          | Session | Ephemeral (apply → sleep → destroy) |
+
+          ## Instance Topology
+          | Instance | Role | Security Group | Services | Ports |
+          |----------|------|---------------|----------|-------|
+          | hamster-front | Reverse Proxy | **front-sg** (Public) | Nginx, React Apps x4 | :80 |
+          | hamster-auth | Authentication | **auth-sg** (VPC) | Keycloak 23.0 | :8090 |
+          | hamster-db | Data Layer | **internal-sg** (VPC) | MySQL 8.0, MongoDB 7.0 | :3306, :27017 |
+          | hamster-kafka | Event Broker | **internal-sg** (VPC) | Kafka 7.5 KRaft | :9092, :9093 |
+          | hamster-commerce | eCommerce | **internal-sg** (VPC) | eCommerce API | :8080 |
+          | hamster-billing | Payment Gateway | **internal-sg** (VPC) | Cash Gateway, Hamster PG | :8082, :8086 |
+          | hamster-payment | Payment | **internal-sg** (VPC) | Payment Service | :8083 |
+          | hamster-support | Support | **internal-sg** (VPC) | Progression, Notification | :8084, :8085 |
+
+          ## Security Groups (3-Tier Network Isolation)
+
+          ### front-sg — Public
+          > Nginx reverse proxy. 유일한 퍼블릭 진입점.
+          - `0.0.0.0/0 → :80` HTTP
+          - `0.0.0.0/0 → :22` SSH
+
+          ### auth-sg — VPC Internal
+          > Keycloak 인증 서버. 브라우저는 Nginx `/keycloak/` 프록시 경유.
+          - `172.31.0.0/16 → :8090` Keycloak
+          - `0.0.0.0/0 → :22` SSH
+
+          ### internal-sg — VPC Internal
+          > Backend services, DB, Kafka. 외부 직접 접근 불가.
+          - `172.31.0.0/16 → :3306` MySQL
+          - `172.31.0.0/16 → :27017` MongoDB
+          - `172.31.0.0/16 → :9092-9093` Kafka
+          - `172.31.0.0/16 → :8080-8086` Backend APIs
+          - `0.0.0.0/0 → :22` SSH
+
+          ## API Routing (Nginx Reverse Proxy)
+          | Path | Backend |
+          |------|---------|
+          | `/api/ecommerce/*` | hamster-commerce:8080 |
+          | `/api/cash-gateway/*` | hamster-billing:8082 |
+          | `/api/hamster-pg/*` | hamster-billing:8086 |
+          | `/api/payment/*` | hamster-payment:8083 |
+          | `/api/progression/*` | hamster-support:8084 |
+          | `/api/notification/*` | hamster-support:8085 |
+          | `/keycloak/*` | hamster-auth:8090 |
+
+          ## Databases (MySQL 8.0)
+          `ecommerce_db` · `delivery_db` · `cash_gateway_db` · `payment_db` · `progression_db` · `notification_db` · `hamster_pg_db` · `keycloak_db`
+
+          ## Event-Driven Architecture
+          - **Kafka 7.5** KRaft mode (no Zookeeper)
+          - 1 broker, cluster ID: `MkU3OEVBNTcwNTJENDM2Qk`
+          - Services publish/consume domain events via Kafka topics
+
+          ## Authentication (Keycloak 23.0)
+          - Realm: `hamster-world`
+          - Roles: `MERCHANT` · `USER` · `DEVELOPER` · `VENDOR` · `SYSTEM`
+          - Self-registration enabled
+          - All backend services validate JWT tokens
+
+          REPORT
+
+          # Plan 결과 요약 추가
+          echo "## Terraform Plan Output" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo '${{ steps.plan.outputs.stdout }}' >> $GITHUB_STEP_SUMMARY
+          # 마지막 Plan summary 라인만 추출 (Plan: N to add, ...)
+          grep -E "^(Plan:|No changes)" /tmp/plan-output.txt >> $GITHUB_STEP_SUMMARY || echo "See full output below" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Full Plan Output</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/plan-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Plan JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: terraform/tfplan
+          retention-days: 1
 
       - name: Comment Plan on PR
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
         with:
           script: |
-            const output = `#### Terraform Plan
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('/tmp/plan-output.txt', 'utf8');
+            const summary = planOutput.match(/Plan:.*/) || ['No changes detected'];
+            const output = `#### Terraform Plan Result
+            **${summary[0]}**
+
+            <details><summary>Show Full Plan</summary>
+
             \`\`\`
-            ${{ steps.plan.outputs.stdout }}
+            ${planOutput}
             \`\`\`
-            `;
+            </details>`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

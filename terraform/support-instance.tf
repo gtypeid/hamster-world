@@ -10,14 +10,21 @@ resource "aws_instance" "support" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("${path.module}/scripts/support.sh", {
-    DB_PRIVATE_IP       = aws_instance.db.private_ip
-    KAFKA_PRIVATE_IP    = aws_instance.kafka.private_ip
-    DB_ROOT_PASSWORD    = var.db_root_password
-    MONGO_PASSWORD      = var.mongo_password
-    COMMERCE_PRIVATE_IP = aws_instance.commerce.private_ip
-    PAYMENT_PRIVATE_IP  = aws_instance.payment.private_ip
-    BILLING_PRIVATE_IP  = aws_instance.billing.private_ip
+  user_data = templatefile("${path.module}/scripts/deploy-template.sh", {
+    instance_name   = "hamster-support"
+    gh_deploy_token = var.github_token
+    deploy_id       = var.deploy_id
+    gh_repo         = var.github_repo
+    report_script   = file("${path.module}/scripts/report-status.sh")
+    deploy_script   = templatefile("${path.module}/scripts/support.sh", {
+      DB_PRIVATE_IP       = aws_instance.db.private_ip
+      KAFKA_PRIVATE_IP    = aws_instance.kafka.private_ip
+      DB_ROOT_PASSWORD    = var.db_root_password
+      MONGO_PASSWORD      = var.mongo_password
+      COMMERCE_PRIVATE_IP = aws_instance.commerce.private_ip
+      PAYMENT_PRIVATE_IP  = aws_instance.payment.private_ip
+      BILLING_PRIVATE_IP  = aws_instance.billing.private_ip
+    })
   })
 
   tags = {

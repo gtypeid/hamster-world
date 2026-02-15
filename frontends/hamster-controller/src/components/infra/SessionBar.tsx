@@ -2,12 +2,32 @@ import { useState, useEffect } from 'react';
 import {
   useInfraStore,
   selectCanStartSession,
+  selectCanConnect,
+  selectCanInit,
+  selectCanStop,
   selectRunningCount,
   selectTotalInstances,
   INSTANCE_IDS,
 } from '../../stores/useInfraStore';
+import { mockInit } from '../../services/mockGithub';
 
-// ─── Demo simulation (unchanged logic) ───
+// ─── Demo simulation (Start 후 배포 시뮬레이션) ───
+
+// Mock: simulate terraform plan output
+const MOCK_PLAN_OUTPUT = `Plan: 12 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + entrypoint          = { front_url, keycloak_url }
+  + instances           = { 8x t3.micro EC2 }
+  + security_groups     = { front-sg, auth-sg, internal-sg }
+  + api_routes          = { 7 reverse proxy routes }
+  + infrastructure_spec = { ap-northeast-2, 240GB total }`;
+
+function mockPlan(): Promise<string> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(MOCK_PLAN_OUTPUT), 2000);
+  });
+}
 
 function simulateDeployment() {
   const { setSessionPhase, updateInstance, addLog } = useInfraStore.getState();
@@ -32,7 +52,6 @@ function simulateDeployment() {
       action: () => {
         updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5' });
         addLog({ instanceId: 'hamster-db', message: 'MySQL 8.0 started (:3306), 8 databases created', level: 'success' });
-        addLog({ instanceId: 'hamster-db', message: 'DBs: ecommerce, delivery, cash_gateway, payment, progression, notification, hamster_pg, keycloak', level: 'info' });
         addLog({ instanceId: 'hamster-db', message: 'MongoDB 7.0 started (:27017)', level: 'success' });
       },
     },
@@ -73,37 +92,35 @@ function simulateDeployment() {
       delay: 2500,
       action: () => {
         updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11' });
-        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080) \u2192 ecommerce_db', level: 'success' });
+        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12' });
-        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082) \u2192 cash_gateway_db', level: 'success' });
-        addLog({ instanceId: 'hamster-billing', message: 'Hamster PG (:8086) \u2192 hamster_pg_db', level: 'success' });
+        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082), Hamster PG (:8086)', level: 'success' });
       },
     },
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13' });
-        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083) \u2192 payment_db', level: 'success' });
+        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
         updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14' });
-        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084) \u2192 progression_db', level: 'success' });
-        addLog({ instanceId: 'hamster-support', message: 'Notification (:8085) \u2192 notification_db + MongoDB', level: 'success' });
+        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084), Notification (:8085)', level: 'success' });
       },
     },
     {
       delay: 1000,
       action: () => {
         updateInstance('hamster-front', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-front', message: '[front-sg] Instance launching, pulling frontend images...', level: 'info' });
+        addLog({ instanceId: 'hamster-front', message: '[front-sg] Pulling frontend images...', level: 'info' });
       },
     },
     {
@@ -147,19 +164,39 @@ function simulateDestroy() {
 
 export function SessionBar() {
   const sessionPhase = useInfraStore((s) => s.sessionPhase);
+  const infraStatus = useInfraStore((s) => s.infraStatus);
   const sessionStartedAt = useInfraStore((s) => s.sessionStartedAt);
   const sessionDurationMin = useInfraStore((s) => s.sessionDurationMin);
   const sessionsUsedToday = useInfraStore((s) => s.sessionsUsedToday);
   const maxSessionsPerDay = useInfraStore((s) => s.maxSessionsPerDay);
+  const initResult = useInfraStore((s) => s.initResult);
+
+  const canConnect = useInfraStore(selectCanConnect);
+  const canInit = useInfraStore(selectCanInit);
   const canStart = useInfraStore(selectCanStartSession);
-  const startSession = useInfraStore((s) => s.startSession);
+  const canStop = useInfraStore(selectCanStop);
   const runningCount = useInfraStore(selectRunningCount);
   const totalInstances = useInfraStore(selectTotalInstances);
 
+  const setSessionPhase = useInfraStore((s) => s.setSessionPhase);
+  const applyConnectResult = useInfraStore((s) => s.applyConnectResult);
+  const applyPlanResult = useInfraStore((s) => s.applyPlanResult);
+  const addLog = useInfraStore((s) => s.addLog);
+  const startSession = useInfraStore((s) => s.startSession);
+
   const [elapsed, setElapsed] = useState(0);
 
+  // 타이머 - running 상태에서 경과 시간 추적
   useEffect(() => {
-    if (!sessionStartedAt || sessionPhase === 'idle' || sessionPhase === 'completed') {
+    if (!sessionStartedAt || sessionPhase === 'idle' || sessionPhase === 'completed' || sessionPhase === 'connected' || sessionPhase === 'planned') {
+      // Connect으로 running 복원된 경우: initResult의 elapsedSeconds 사용
+      if (sessionPhase === 'running' && initResult?.elapsedSeconds != null) {
+        const startTime = new Date(sessionStartedAt!).getTime();
+        const tick = () => setElapsed(Math.floor((Date.now() - startTime) / 1000));
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+      }
       setElapsed(0);
       return;
     }
@@ -168,12 +205,46 @@ export function SessionBar() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [sessionStartedAt, sessionPhase]);
+  }, [sessionStartedAt, sessionPhase, initResult]);
 
-  const handleStart = () => { startSession(); simulateDeployment(); };
-  const handleStop = () => { simulateDestroy(); };
+  // ─── Handlers ───
 
-  const isActive = sessionPhase !== 'idle' && sessionPhase !== 'completed' && sessionPhase !== 'failed';
+  const handleConnect = async () => {
+    setSessionPhase('connecting');
+    addLog({ message: 'Syncing with GitHub Actions...', level: 'info' });
+
+    try {
+      const result = await mockInit();
+      applyConnectResult(result);
+    } catch {
+      setSessionPhase('failed');
+      addLog({ message: 'Failed to sync with GitHub Actions', level: 'error' });
+    }
+  };
+
+  const handleInit = async () => {
+    setSessionPhase('planning');
+    addLog({ message: 'Triggering terraform plan...', level: 'info' });
+
+    try {
+      const planOutput = await mockPlan();
+      applyPlanResult(planOutput);
+    } catch {
+      setSessionPhase('failed');
+      addLog({ message: 'Terraform plan failed', level: 'error' });
+    }
+  };
+
+  const handleStart = () => {
+    startSession();
+    simulateDeployment();
+  };
+
+  const handleStop = () => {
+    simulateDestroy();
+  };
+
+  const isActive = sessionPhase === 'triggering' || sessionPhase === 'applying' || sessionPhase === 'running' || sessionPhase === 'destroying';
   const totalSeconds = sessionDurationMin * 60;
   const progressPercent = Math.min((elapsed / totalSeconds) * 100, 100);
 
@@ -196,23 +267,37 @@ export function SessionBar() {
           <span className={`text-sm font-semibold w-36 truncate ${
             isActive ? 'text-white' : 'text-gray-400'
           }`}>
-            {getPhaseLabel(sessionPhase)}
+            {getPhaseLabel(sessionPhase, infraStatus)}
           </span>
         </div>
 
-        {/* Buttons */}
+        {/* Buttons: Connect / Init / Start / Stop */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleConnect}
+            disabled={!canConnect}
+            className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-purple-900/20"
+          >
+            {sessionPhase === 'connecting' ? 'Syncing...' : 'Connect'}
+          </button>
+          <button
+            onClick={handleInit}
+            disabled={!canInit}
+            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-indigo-900/20"
+          >
+            {sessionPhase === 'planning' ? 'Planning...' : 'Init'}
+          </button>
           <button
             onClick={handleStart}
             disabled={!canStart}
-            className="px-5 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-green-900/20 hover:shadow-green-800/30"
+            className="px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-green-900/20"
           >
             Start
           </button>
           <button
             onClick={handleStop}
-            disabled={!isActive}
-            className="px-5 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-red-900/20"
+            disabled={!canStop}
+            className="px-4 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-red-900/20"
           >
             Stop
           </button>
@@ -220,6 +305,35 @@ export function SessionBar() {
 
         {/* Divider */}
         <div className="w-px h-7 bg-gray-700 shrink-0" />
+
+        {/* Status message (Connect 결과) */}
+        {sessionPhase === 'connected' && (
+          <>
+            <div className="shrink-0">
+              <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusBadge(infraStatus)}`}>
+                {getStatusLabel(infraStatus)}
+              </span>
+            </div>
+            {infraStatus === 'cooldown' && initResult?.cooldownRemainingSeconds != null && (
+              <span className="text-xs text-gray-400">
+                {Math.ceil(initResult.cooldownRemainingSeconds / 60)}min cooldown
+              </span>
+            )}
+            <div className="w-px h-7 bg-gray-700 shrink-0" />
+          </>
+        )}
+
+        {/* Plan result badge */}
+        {sessionPhase === 'planned' && (
+          <>
+            <div className="shrink-0">
+              <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-900/50 text-blue-400 border border-blue-700/50">
+                PLAN READY
+              </span>
+            </div>
+            <div className="w-px h-7 bg-gray-700 shrink-0" />
+          </>
+        )}
 
         {/* Timer */}
         <div className="flex items-center gap-2.5 shrink-0">
@@ -307,9 +421,21 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-function getPhaseLabel(phase: string): string {
+function getPhaseLabel(phase: string, infraStatus: string): string {
   switch (phase) {
     case 'idle': return 'Ready';
+    case 'connecting': return 'Syncing...';
+    case 'connected': {
+      switch (infraStatus) {
+        case 'running': return 'Session Active';
+        case 'cooldown': return 'Cooldown';
+        case 'available': return 'Available';
+        case 'limit_exceeded': return 'Limit Reached';
+        default: return 'Connected';
+      }
+    }
+    case 'planning': return 'Planning...';
+    case 'planned': return 'Plan Ready';
     case 'triggering': return 'Triggering...';
     case 'applying': return 'Terraform Apply...';
     case 'running': return 'Online';
@@ -323,6 +449,10 @@ function getPhaseLabel(phase: string): string {
 function getPhaseColor(phase: string): string {
   switch (phase) {
     case 'idle': return 'bg-gray-500';
+    case 'connecting': return 'bg-purple-500 animate-pulse';
+    case 'connected': return 'bg-blue-500';
+    case 'planning': return 'bg-indigo-500 animate-pulse';
+    case 'planned': return 'bg-blue-400';
     case 'triggering': return 'bg-indigo-500 animate-pulse';
     case 'applying': return 'bg-amber-500 animate-pulse';
     case 'running': return 'bg-green-500 animate-pulse';
@@ -330,5 +460,25 @@ function getPhaseColor(phase: string): string {
     case 'completed': return 'bg-green-500';
     case 'failed': return 'bg-red-500';
     default: return 'bg-gray-500';
+  }
+}
+
+function getStatusBadge(status: string): string {
+  switch (status) {
+    case 'running': return 'bg-green-900/50 text-green-400 border border-green-700/50';
+    case 'cooldown': return 'bg-yellow-900/50 text-yellow-400 border border-yellow-700/50';
+    case 'available': return 'bg-blue-900/50 text-blue-400 border border-blue-700/50';
+    case 'limit_exceeded': return 'bg-red-900/50 text-red-400 border border-red-700/50';
+    default: return 'bg-gray-800 text-gray-400';
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'running': return 'ACTIVE';
+    case 'cooldown': return 'COOLDOWN';
+    case 'available': return 'READY';
+    case 'limit_exceeded': return 'LIMIT';
+    default: return status.toUpperCase();
   }
 }
