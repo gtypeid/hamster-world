@@ -10,7 +10,7 @@ resource "aws_instance" "payment" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("scripts/payment.sh", {
+  user_data = templatefile("${path.module}/scripts/payment.sh", {
     DB_PRIVATE_IP    = aws_instance.db.private_ip
     KAFKA_PRIVATE_IP = aws_instance.kafka.private_ip
     AUTH_PRIVATE_IP  = aws_instance.auth.private_ip

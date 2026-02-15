@@ -14,11 +14,11 @@ resource "aws_instance" "auth" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("scripts/auth.sh", {
+  user_data = templatefile("${path.module}/scripts/auth.sh", {
     DB_PRIVATE_IP           = aws_instance.db.private_ip
     DB_ROOT_PASSWORD        = var.db_root_password
     KEYCLOAK_ADMIN_PASSWORD = var.keycloak_admin_password
-    REALM_JSON              = file("keycloak/hamster-world-realm.json")
+    REALM_JSON              = file("${path.module}/keycloak/hamster-world-realm.json")
   })
 
   tags = {

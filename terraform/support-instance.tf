@@ -10,7 +10,7 @@ resource "aws_instance" "support" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("scripts/support.sh", {
+  user_data = templatefile("${path.module}/scripts/support.sh", {
     DB_PRIVATE_IP       = aws_instance.db.private_ip
     KAFKA_PRIVATE_IP    = aws_instance.kafka.private_ip
     DB_ROOT_PASSWORD    = var.db_root_password

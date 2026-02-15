@@ -10,7 +10,7 @@ resource "aws_instance" "db" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("scripts/db.sh", {
+  user_data = templatefile("${path.module}/scripts/db.sh", {
     DB_ROOT_PASSWORD = var.db_root_password
     MONGO_PASSWORD   = var.mongo_password
   })

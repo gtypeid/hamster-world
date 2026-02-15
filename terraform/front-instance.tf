@@ -13,7 +13,7 @@ resource "aws_instance" "front" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("scripts/front.sh", {
+  user_data = templatefile("${path.module}/scripts/front.sh", {
     # API 리버스 프록시용 백엔드 인스턴스 IP
     COMMERCE_PRIVATE_IP = aws_instance.commerce.private_ip
     BILLING_PRIVATE_IP  = aws_instance.billing.private_ip

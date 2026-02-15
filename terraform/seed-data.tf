@@ -16,7 +16,7 @@ resource "null_resource" "seed_data" {
   ]
 
   provisioner "local-exec" {
-    command     = "bash scripts/seed-data.sh ${aws_instance.front.public_ip}"
+    command     = "bash ${path.module}/scripts/seed-data.sh ${aws_instance.front.public_ip}"
     working_dir = path.module
   }
 }

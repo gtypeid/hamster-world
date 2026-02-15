@@ -11,7 +11,7 @@ resource "aws_instance" "kafka" {
   }
 
   # templatefile 필요없음
-  user_data = file("scripts/kafka.sh")
+  user_data = file("${path.module}/scripts/kafka.sh")
 
   tags = {
     Name = "hamster-kafka"
