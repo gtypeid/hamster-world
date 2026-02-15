@@ -246,7 +246,8 @@ export function SessionBar() {
 
   const isActive = sessionPhase === 'triggering' || sessionPhase === 'applying' || sessionPhase === 'running' || sessionPhase === 'destroying';
   const totalSeconds = sessionDurationMin * 60;
-  const progressPercent = Math.min((elapsed / totalSeconds) * 100, 100);
+  const remaining = Math.max(totalSeconds - elapsed, 0);
+  const remainPercent = totalSeconds > 0 ? Math.max((remaining / totalSeconds) * 100, 0) : 100;
 
   return (
     <div className="relative">
@@ -335,26 +336,26 @@ export function SessionBar() {
           </>
         )}
 
-        {/* Timer */}
+        {/* Timer - remaining */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Timer</span>
+          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Remaining</span>
           <span className="font-mono text-base tabular-nums">
-            <span className={isActive ? 'text-accent-orange' : 'text-gray-600'}>
-              {formatTime(elapsed)}
-            </span>
-            <span className="text-gray-700 mx-0.5">/</span>
             <span className="text-gray-500">{formatTime(totalSeconds)}</span>
+            <span className="text-gray-700 mx-0.5">/</span>
+            <span className={remaining <= 120 && isActive ? 'text-red-400' : isActive ? 'text-accent-orange' : 'text-gray-600'}>
+              {formatTime(remaining)}
+            </span>
           </span>
         </div>
 
-        {/* Time progress bar */}
+        {/* Time progress bar - remaining life */}
         <div className="flex-1 min-w-0 max-w-xs">
           <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
             <div
               className="h-1.5 rounded-full transition-all duration-1000 relative"
               style={{
-                width: `${progressPercent}%`,
-                background: progressPercent > 90 ? '#ef4444' : progressPercent > 70 ? '#eab308' : '#6366f1',
+                width: `${remainPercent}%`,
+                background: remainPercent < 10 ? '#ef4444' : remainPercent < 30 ? '#eab308' : '#6366f1',
               }}
             >
               {isActive && (

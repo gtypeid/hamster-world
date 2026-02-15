@@ -8,7 +8,7 @@ resource "aws_instance" "front" {
   vpc_security_group_ids = [aws_security_group.front_sg.id]
 
   root_block_device {
-    volume_size           = 30
+    volume_size           = 8
     volume_type           = "gp3"
     delete_on_termination = true
   }

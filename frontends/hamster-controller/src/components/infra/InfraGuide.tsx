@@ -110,7 +110,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
     return {
       icon: '\u25B6',
       title: '\uC138\uC158 \uCD08\uAE30\uD654',
-      description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694. \uC624\uB298\uC758 \uC0AC\uC6A9\uB7C9\uC744 \uD655\uC778\uD558\uACE0, \uC0C8 \uC138\uC158\uC744 \uC2DC\uC791\uD560 \uC218 \uC788\uB294\uC9C0 \uD310\uB2E8\uD569\uB2C8\uB2E4.',
+      description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694. \uC67C\ucabd Plan Report \xB7 Architecture \xB7 Event Flow \uB124\uBE44\uAC8C\uC774\uC158\uC5D0\uC11C \uC778\uD504\uB77C \uC0C1\uC138 \uC815\uBCF4\uB97C \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
       detail: `\uB7F0\uD0C0\uC784: \uC138\uC158\uB2F9 ${ctx.sessionDurationMin}\uBD84 / \uC81C\uD55C: \uD558\uB8E8 ${ctx.maxSessionsPerDay}\uD68C / \uCFE8\uB2E4\uC6B4: \uC138\uC158 \uAC04 5\uBD84`,
       badge: '1\uB2E8\uACC4',
       bgClass: 'bg-[#0c1222]',

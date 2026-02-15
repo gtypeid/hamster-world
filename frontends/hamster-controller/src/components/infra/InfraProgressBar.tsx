@@ -34,7 +34,8 @@ export function InfraProgressBar() {
   }, [sessionStartedAt, sessionPhase]);
 
   const totalSeconds = sessionDurationMin * 60;
-  const progressPercent = Math.min((elapsed / totalSeconds) * 100, 100);
+  const remaining = Math.max(totalSeconds - elapsed, 0);
+  const remainPercent = totalSeconds > 0 ? Math.max((remaining / totalSeconds) * 100, 0) : 100;
   const instancePercent = (runningCount / totalInstances) * 100;
 
   const phaseLabel = getPhaseLabel(sessionPhase);
@@ -49,23 +50,23 @@ export function InfraProgressBar() {
           <span className="text-sm font-medium text-gray-300">{phaseLabel}</span>
         </div>
         <div className="font-mono text-lg text-gray-200">
-          <span className={sessionPhase !== 'idle' ? 'text-accent-orange' : 'text-gray-500'}>
-            {formatTime(elapsed)}
-          </span>
-          <span className="text-gray-600"> / </span>
           <span className="text-gray-400">{formatTime(totalSeconds)}</span>
+          <span className="text-gray-600"> / </span>
+          <span className={remaining <= 120 && sessionPhase !== 'idle' ? 'text-red-400' : sessionPhase !== 'idle' ? 'text-accent-orange' : 'text-gray-500'}>
+            {formatTime(remaining)}
+          </span>
         </div>
       </div>
 
-      {/* Time progress bar */}
+      {/* Time progress bar - remaining life */}
       <div className="w-full bg-dark-hover rounded-full h-2 mb-4">
         <div
           className="h-2 rounded-full transition-all duration-1000"
           style={{
-            width: `${progressPercent}%`,
-            background: progressPercent > 90
+            width: `${remainPercent}%`,
+            background: remainPercent < 10
               ? '#ef4444'
-              : progressPercent > 70
+              : remainPercent < 30
               ? '#eab308'
               : '#6366f1',
           }}

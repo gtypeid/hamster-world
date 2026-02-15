@@ -425,6 +425,8 @@ export function TopologyViewer({
         elementsSelectable={true}
         panOnDrag={true}
         zoomOnScroll={true}
+        minZoom={0.1}
+        maxZoom={4}
         fitView
         attributionPosition="bottom-left"
       >

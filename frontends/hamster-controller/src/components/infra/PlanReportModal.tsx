@@ -1,27 +1,66 @@
 /**
- * Terraform Plan 결과를 풍성한 인프라 레포트 모달로 표시.
- *
- * 구조:
- * 1. Plan Summary + Infra Spec + Entrypoint
- * 2. Security Groups (색상 범례 - 먼저 보여줘야 인스턴스 카드 색상 이해됨)
- * 3. Instance Topology (각 인스턴스 상세 정보 포함)
- * 4. API Routing
+ * Infrastructure Viewer Modal - 3 tabs:
+ *  1. Plan Report    (terraform plan 결과)
+ *  2. Architecture   (ReactFlow 시스템 다이어그램)
+ *  3. Event Flow     (Kafka 토폴로지 뷰어)
  */
-export function PlanReportModal({ onClose }: { onClose: () => void }) {
+import { useState, useMemo } from 'react';
+import ReactFlow, { Background, Controls, MiniMap, Position } from 'reactflow';
+import type { Node, Edge } from 'reactflow';
+import 'reactflow/dist/style.css';
+import { TopologyViewer } from '@common/topology';
+import type { TopologyResponse } from '@common/topology';
+import { useInfraStore } from '../../stores/useInfraStore';
+
+type ViewerTab = 'report' | 'architecture' | 'topology';
+
+export function PlanReportModal({ initialTab, onClose }: { initialTab?: ViewerTab; onClose: () => void }) {
+  const planResult = useInfraStore((s) => s.planResult);
+  const hasPlan = !!planResult;
+  const [activeTab, setActiveTab] = useState<ViewerTab>(initialTab ?? 'architecture');
+  const topology = useMemo(() => STATIC_TOPOLOGY, []);
+
+  const tabs: { key: ViewerTab; label: string; badge?: string; color: string; activeColor: string }[] = [
+    { key: 'architecture', label: 'System Architecture', color: 'text-purple-400', activeColor: 'border-purple-500 bg-purple-500/10' },
+    { key: 'topology', label: 'Event Flow Topology', color: 'text-amber-400', activeColor: 'border-amber-500 bg-amber-500/10' },
+    { key: 'report', label: 'Plan Report', badge: 'terraform plan', color: 'text-blue-400', activeColor: 'border-blue-500 bg-blue-500/10' },
+  ];
+
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#0b1120] border border-gray-700/60 rounded-xl shadow-2xl shadow-black/50 w-[92%] max-w-6xl max-h-[88vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-blue-400 animate-pulse" />
-            <h2 className="text-lg font-bold text-white">Infrastructure Plan Report</h2>
-            <span className="text-xs font-mono text-blue-400 bg-blue-900/30 px-2.5 py-1 rounded border border-blue-800/50">
-              terraform plan
-            </span>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-[#0b1120] border border-gray-700/60 rounded-xl shadow-2xl shadow-black/50 w-[96%] h-[94vh] flex flex-col overflow-hidden">
+
+        {/* Header: tabs + close */}
+        <div className="flex items-center justify-between px-4 border-b border-gray-800 shrink-0 bg-[#080e1a]">
+          <div className="flex items-center gap-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-2.5 px-5 py-3.5 text-sm font-semibold rounded-t-lg transition-all border-b-2 ${
+                    isActive
+                      ? `${tab.color} ${tab.activeColor}`
+                      : 'text-gray-500 border-transparent hover:text-gray-300 hover:bg-white/[0.02]'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isActive ? 'opacity-100' : 'opacity-30'} ${
+                    tab.key === 'architecture' ? 'bg-purple-400' :
+                    tab.key === 'topology' ? 'bg-amber-400' : 'bg-blue-400'
+                  }`} />
+                  {tab.label}
+                  {tab.badge && isActive && (
+                    <span className="text-[10px] font-mono text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/50">
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-600">
               확인 후 상단 <span className="text-green-400 font-semibold">Start</span>를 눌러 배포
             </span>
             <button
@@ -34,161 +73,260 @@ export function PlanReportModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-          {/* Row 1: Plan Summary + Infra Spec + Entrypoint */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card title="Plan Summary">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <CountBadge color="green">+</CountBadge>
-                  <span className="text-sm text-green-400 font-mono font-bold">12 to add</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CountBadge color="yellow">~</CountBadge>
-                  <span className="text-sm text-gray-500 font-mono">0 to change</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CountBadge color="red">-</CountBadge>
-                  <span className="text-sm text-gray-500 font-mono">0 to destroy</span>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-gray-800 text-[11px] text-gray-600 font-mono space-y-0.5">
-                <div>aws_instance &times; 8</div>
-                <div>aws_security_group &times; 3</div>
-                <div>aws_security_group_rule &times; 9</div>
-              </div>
-            </Card>
-
-            <Card title="Infrastructure Spec">
-              <table className="w-full text-xs">
-                <tbody className="divide-y divide-gray-800/50">
-                  <SpecRow label="Region" value="ap-northeast-2 (Seoul)" />
-                  <SpecRow label="Instance" value="t3.micro (2 vCPU, 1GB)" />
-                  <SpecRow label="Count" value="8 instances" />
-                  <SpecRow label="Storage" value="30GB gp3 x8 = 240GB" />
-                  <SpecRow label="VPC" value="172.31.0.0/16 (default)" />
-                  <SpecRow label="Session" value="apply → sleep → destroy" />
-                </tbody>
-              </table>
-            </Card>
-
-            <Card title="Entrypoint">
-              <div className="space-y-3">
-                <div>
-                  <div className="text-[11px] text-gray-500 mb-1">Front URL</div>
-                  <div className="text-xs font-mono text-blue-400 bg-blue-900/20 px-2.5 py-1.5 rounded border border-blue-800/30">
-                    http://&#123;public_ip&#125;
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-gray-500 mb-1">Keycloak URL</div>
-                  <div className="text-xs font-mono text-purple-400 bg-purple-900/20 px-2.5 py-1.5 rounded border border-purple-800/30">
-                    http://&#123;public_ip&#125;/keycloak
-                  </div>
-                </div>
-                <div className="text-[11px] text-gray-600">
-                  Public IP는 apply 후 확정
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Row 2: Security Groups (색상 범례 - 위에서 먼저 보여줌) */}
-          <Card title="Security Groups" subtitle="3-Tier Network Isolation">
-            <div className="grid grid-cols-3 gap-3">
-              {SECURITY_GROUPS.map((sg) => (
-                <div key={sg.name} className={`rounded-lg border p-3.5 ${sg.borderColor} ${sg.bgColor}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`w-3 h-3 rounded-sm ${sg.dotColor}`} />
-                    <span className={`text-sm font-bold ${sg.textColor}`}>{sg.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ml-auto ${sg.scopeBadge}`}>
-                      {sg.scope}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-2.5">{sg.purpose}</div>
-                  <div className="space-y-1 mb-2.5">
-                    {sg.rules.map((rule, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs font-mono">
-                        <span className="text-gray-600">{rule.source}</span>
-                        <span className="text-gray-700">&rarr;</span>
-                        <span className="text-gray-400">{rule.port}</span>
-                        <span className="text-gray-600 ml-auto">{rule.desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pt-2 border-t border-gray-800/50 text-[11px] text-gray-600">
-                    {sg.instances.join(', ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Row 3: Instance Topology (상세 정보 포함) */}
-          <Card title="Instance Topology" subtitle="8x t3.micro EC2">
-            <div className="grid grid-cols-4 gap-3">
-              {INSTANCES.map((inst) => (
-                <div
-                  key={inst.id}
-                  className={`rounded-lg border p-3.5 ${inst.borderColor} bg-gradient-to-b ${inst.bgGradient}`}
-                >
-                  {/* Instance header */}
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${inst.dotColor}`} />
-                    <span className="text-xs font-bold text-gray-200">{inst.id}</span>
-                  </div>
-                  <div className="text-[11px] text-gray-500 mb-2">{inst.role}</div>
-
-                  {/* Services detail */}
-                  <div className="space-y-1 mb-2.5">
-                    {inst.details.map((detail, i) => (
-                      <div key={i}>
-                        <div className="text-xs text-gray-300 font-mono">{detail.name}</div>
-                        {detail.sub && (
-                          <div className="pl-2 mt-0.5 space-y-px">
-                            {detail.sub.map((s, j) => (
-                              <div key={j} className="text-[10px] text-gray-600 font-mono">{s}</div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Footer: sg + ports */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-gray-800/50">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${inst.sgBadgeColor}`}>
-                      {inst.sg}
-                    </span>
-                    <span className="text-[11px] text-gray-600 font-mono ml-auto">{inst.ports}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Row 4: API Routing */}
-          <Card title="API Routing" subtitle="Nginx Reverse Proxy (hamster-front :80)">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-1">
-              {API_ROUTES.map((route) => (
-                <div key={route.path} className="flex items-center gap-2 text-xs">
-                  <span className="font-mono text-indigo-400 w-44 shrink-0 truncate">{route.path}</span>
-                  <span className="text-gray-700">&rarr;</span>
-                  <span className="font-mono text-gray-400">{route.backend}</span>
-                  <span className="text-gray-700 ml-auto text-[11px]">{route.desc}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {activeTab === 'report' && (hasPlan ? <PlanReportTab /> : <PlanPendingPlaceholder />)}
+          {activeTab === 'architecture' && <ArchitectureTab />}
+          {activeTab === 'topology' && <TopologyTab topology={topology} />}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── UI Components ───
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Tab 1: Plan Report
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function PlanPendingPlaceholder() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="text-gray-600 text-lg font-mono">terraform plan</div>
+        <div className="text-gray-500 text-sm">
+          Init 단계를 실행하면 Plan Report가 표시됩니다
+        </div>
+        <div className="text-gray-700 text-xs">
+          Connect &rarr; <span className="text-blue-400">Init</span> &rarr; Plan Report 자동 표시
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanReportTab() {
+  return (
+    <div className="h-full overflow-y-auto p-6 space-y-5">
+      {/* Row 1: Plan Summary + Infra Spec + Entrypoint */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card title="Plan Summary">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <CountBadge color="green">+</CountBadge>
+              <span className="text-sm text-green-400 font-mono font-bold">12 to add</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <CountBadge color="yellow">~</CountBadge>
+              <span className="text-sm text-gray-500 font-mono">0 to change</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <CountBadge color="red">-</CountBadge>
+              <span className="text-sm text-gray-500 font-mono">0 to destroy</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-800 text-[11px] text-gray-600 font-mono space-y-0.5">
+            <div>aws_instance &times; 8</div>
+            <div>aws_security_group &times; 3</div>
+            <div>aws_security_group_rule &times; 9</div>
+          </div>
+        </Card>
+
+        <Card title="Infrastructure Spec">
+          <table className="w-full text-xs">
+            <tbody className="divide-y divide-gray-800/50">
+              <SpecRow label="Region" value="ap-northeast-2 (Seoul)" />
+              <SpecRow label="Instance" value="t3.micro (2 vCPU, 1GB)" />
+              <SpecRow label="Count" value="8 instances" />
+              <SpecRow label="Storage" value="30GB gp3 x8 = 240GB" />
+              <SpecRow label="VPC" value="172.31.0.0/16 (default)" />
+              <SpecRow label="Session" value="apply → sleep → destroy" />
+            </tbody>
+          </table>
+        </Card>
+
+        <Card title="Entrypoint">
+          <div className="space-y-3">
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Front URL</div>
+              <div className="text-xs font-mono text-blue-400 bg-blue-900/20 px-2.5 py-1.5 rounded border border-blue-800/30">
+                http://&#123;public_ip&#125;
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Keycloak URL</div>
+              <div className="text-xs font-mono text-purple-400 bg-purple-900/20 px-2.5 py-1.5 rounded border border-purple-800/30">
+                http://&#123;public_ip&#125;/keycloak
+              </div>
+            </div>
+            <div className="text-[11px] text-gray-600">
+              Public IP는 apply 후 확정
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Row 2: Security Groups */}
+      <Card title="Security Groups" subtitle="3-Tier Network Isolation">
+        <div className="grid grid-cols-3 gap-3">
+          {SECURITY_GROUPS.map((sg) => (
+            <div key={sg.name} className={`rounded-lg border p-3.5 ${sg.borderColor} ${sg.bgColor}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-3 h-3 rounded-sm ${sg.dotColor}`} />
+                <span className={`text-sm font-bold ${sg.textColor}`}>{sg.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ml-auto ${sg.scopeBadge}`}>
+                  {sg.scope}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mb-2.5">{sg.purpose}</div>
+              <div className="space-y-1 mb-2.5">
+                {sg.rules.map((rule, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-gray-600">{rule.source}</span>
+                    <span className="text-gray-700">&rarr;</span>
+                    <span className="text-gray-400">{rule.port}</span>
+                    <span className="text-gray-600 ml-auto">{rule.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-2 border-t border-gray-800/50 text-[11px] text-gray-600">
+                {sg.instances.join(', ')}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Row 3: Instance Topology */}
+      <Card title="Instance Topology" subtitle="8x t3.micro EC2">
+        <div className="grid grid-cols-4 gap-3">
+          {INSTANCES.map((inst) => (
+            <div
+              key={inst.id}
+              className={`rounded-lg border p-3.5 ${inst.borderColor} bg-gradient-to-b ${inst.bgGradient}`}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`w-2.5 h-2.5 rounded-full ${inst.dotColor}`} />
+                <span className="text-xs font-bold text-gray-200">{inst.id}</span>
+              </div>
+              <div className="text-[11px] text-gray-500 mb-2">{inst.role}</div>
+              <div className="space-y-1 mb-2.5">
+                {inst.details.map((detail, i) => (
+                  <div key={i}>
+                    <div className="text-xs text-gray-300 font-mono">{detail.name}</div>
+                    {detail.sub && (
+                      <div className="pl-2 mt-0.5 space-y-px">
+                        {detail.sub.map((s, j) => (
+                          <div key={j} className="text-[10px] text-gray-600 font-mono">{s}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5 pt-2 border-t border-gray-800/50">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${inst.sgBadgeColor}`}>
+                  {inst.sg}
+                </span>
+                <span className="text-[11px] text-gray-600 font-mono ml-auto">{inst.ports}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Row 4: API Routing */}
+      <Card title="API Routing" subtitle="Nginx Reverse Proxy (hamster-front :80)">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+          {API_ROUTES.map((route) => (
+            <div key={route.path} className="flex items-center gap-2 text-xs">
+              <span className="font-mono text-indigo-400 w-44 shrink-0 truncate">{route.path}</span>
+              <span className="text-gray-700">&rarr;</span>
+              <span className="font-mono text-gray-400">{route.backend}</span>
+              <span className="text-gray-700 ml-auto text-[11px]">{route.desc}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Tab 2: Architecture
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function ArchitectureTab() {
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 min-h-0">
+        <ReactFlow
+          nodes={ARCH_NODES}
+          edges={ARCH_EDGES}
+          fitView
+          nodesDraggable={true}
+          nodesConnectable={false}
+          elementsSelectable={true}
+          panOnDrag={true}
+          zoomOnScroll={true}
+          minZoom={0.1}
+          maxZoom={4}
+          attributionPosition="bottom-left"
+        >
+          <Background />
+          <Controls position="top-right" />
+          <MiniMap
+            nodeColor={(node) => {
+              if (node.type === 'input') return '#FF9900';
+              const bg = node.style?.background;
+              return typeof bg === 'string' ? bg : '#3B82F6';
+            }}
+          />
+        </ReactFlow>
+      </div>
+
+      {/* Legend bar */}
+      <div className="shrink-0 flex items-center gap-6 px-6 py-3 border-t border-gray-800 bg-[#080e1a]">
+        {[
+          { color: 'bg-purple-600', label: 'Frontend', desc: 'React 19' },
+          { color: 'bg-green-600', label: 'Gateway', desc: 'Nginx' },
+          { color: 'bg-blue-600', label: 'Backend', desc: 'Spring Boot 3.x' },
+          { color: 'bg-red-600', label: 'Message Broker', desc: 'Apache Kafka' },
+          { color: 'bg-yellow-600', label: 'Database', desc: 'MySQL / MongoDB' },
+          { color: 'bg-indigo-600', label: 'Auth', desc: 'Keycloak' },
+        ].map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded ${item.color}`} />
+            <span className="text-xs text-gray-400">{item.label}</span>
+            <span className="text-[11px] text-gray-600">{item.desc}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Tab 3: Event Flow Topology
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function TopologyTab({ topology }: { topology: TopologyResponse }) {
+  return (
+    <div className="h-full bg-gray-800">
+      <TopologyViewer
+        topology={topology}
+        config={{
+          minimap: true,
+          controls: true,
+          background: true,
+          controlPanel: true,
+        }}
+      />
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Shared UI Components
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -224,7 +362,9 @@ function SpecRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ─── Data ───
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Data: Plan Report
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 interface InstanceDetail {
   name: string;
@@ -427,3 +567,194 @@ const API_ROUTES = [
   { path: '/api/notification/*', backend: 'support:8085', desc: 'Notify' },
   { path: '/keycloak/*', backend: 'auth:8090', desc: 'Auth' },
 ];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Data: Architecture diagram
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const ARCH_NODES: Node[] = [
+  {
+    id: 'user',
+    type: 'input',
+    data: { label: '사용자' },
+    position: { x: 250, y: 0 },
+    style: { background: '#FF9900', color: 'white', fontWeight: 'bold' },
+  },
+  {
+    id: 'ecommerce-fe',
+    data: { label: 'ecommerce FE' },
+    position: { x: 50, y: 100 },
+    style: { background: '#8B5CF6', color: 'white' },
+  },
+  {
+    id: 'admin-fe',
+    data: { label: 'internal-admin FE' },
+    position: { x: 250, y: 100 },
+    style: { background: '#8B5CF6', color: 'white' },
+  },
+  {
+    id: 'pg-fe',
+    data: { label: 'hamster-pg FE' },
+    position: { x: 450, y: 100 },
+    style: { background: '#8B5CF6', color: 'white' },
+  },
+  {
+    id: 'nginx',
+    data: { label: 'Nginx (Reverse Proxy)' },
+    position: { x: 250, y: 200 },
+    style: { background: '#10B981', color: 'white', fontWeight: 'bold' },
+  },
+  {
+    id: 'ecommerce-api',
+    data: { label: 'ecommerce-service' },
+    position: { x: 0, y: 320 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'payment',
+    data: { label: 'payment-service' },
+    position: { x: 180, y: 320 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'cash-gateway',
+    data: { label: 'cash-gateway-service' },
+    position: { x: 360, y: 320 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'hamster-pg',
+    data: { label: 'hamster-pg-service' },
+    position: { x: 540, y: 320 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'notification',
+    data: { label: 'notification-service' },
+    position: { x: 720, y: 320 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'progression',
+    data: { label: 'progression-service' },
+    position: { x: 720, y: 420 },
+    style: { background: '#3B82F6', color: 'white' },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  },
+  {
+    id: 'kafka',
+    data: { label: 'Apache Kafka (KRaft)' },
+    position: { x: 250, y: 480 },
+    style: { background: '#EF4444', color: 'white', fontWeight: 'bold', width: 200 },
+  },
+  {
+    id: 'mysql',
+    data: { label: 'MySQL 8.0' },
+    position: { x: 100, y: 620 },
+    style: { background: '#F59E0B', color: 'white' },
+  },
+  {
+    id: 'mongodb',
+    data: { label: 'MongoDB 7.0' },
+    position: { x: 300, y: 620 },
+    style: { background: '#10B981', color: 'white' },
+  },
+  {
+    id: 'keycloak',
+    data: { label: 'Keycloak 23.0' },
+    position: { x: 500, y: 620 },
+    style: { background: '#6366F1', color: 'white' },
+  },
+];
+
+const ARCH_EDGES: Edge[] = [
+  { id: 'e-user-ecommerce', source: 'user', target: 'ecommerce-fe', animated: true },
+  { id: 'e-user-admin', source: 'user', target: 'admin-fe', animated: true },
+  { id: 'e-user-pg', source: 'user', target: 'pg-fe', animated: true },
+  { id: 'e-ecommerce-nginx', source: 'ecommerce-fe', target: 'nginx' },
+  { id: 'e-admin-nginx', source: 'admin-fe', target: 'nginx' },
+  { id: 'e-pg-nginx', source: 'pg-fe', target: 'nginx' },
+  { id: 'e-nginx-ecommerce-api', source: 'nginx', target: 'ecommerce-api' },
+  { id: 'e-nginx-payment', source: 'nginx', target: 'payment' },
+  { id: 'e-nginx-cash', source: 'nginx', target: 'cash-gateway' },
+  { id: 'e-nginx-pg', source: 'nginx', target: 'hamster-pg' },
+  { id: 'e-ecommerce-kafka', source: 'ecommerce-api', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
+  { id: 'e-payment-kafka', source: 'payment', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
+  { id: 'e-cash-kafka', source: 'cash-gateway', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
+  { id: 'e-noti-kafka', source: 'notification', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
+  { id: 'e-prog-kafka', source: 'progression', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
+  { id: 'e-ecommerce-mysql', source: 'ecommerce-api', target: 'mysql' },
+  { id: 'e-payment-mysql', source: 'payment', target: 'mysql' },
+  { id: 'e-cash-mysql', source: 'cash-gateway', target: 'mysql' },
+  { id: 'e-pg-mysql', source: 'hamster-pg', target: 'mysql' },
+  { id: 'e-ecommerce-mongo', source: 'ecommerce-api', target: 'mongodb' },
+  { id: 'e-nginx-keycloak', source: 'nginx', target: 'keycloak', style: { strokeDasharray: '5,5' } },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Data: Event Flow Topology
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const STATIC_TOPOLOGY: TopologyResponse = {
+  services: [
+    {
+      serviceName: 'ecommerce-service',
+      subscribes: [
+        { topic: 'payment-events', events: ['PaymentApprovedEvent', 'PaymentFailedEvent'] },
+        { topic: 'cash-gateway-events', events: ['PaymentProcessCompletedEvent'] },
+      ],
+      publishes: [
+        { topic: 'ecommerce-events', events: ['OrderCreatedEvent', 'OrderCancelledEvent', 'ProductCreatedEvent'] },
+      ],
+    },
+    {
+      serviceName: 'payment-service',
+      subscribes: [
+        { topic: 'ecommerce-events', events: ['OrderCreatedEvent', 'ProductCreatedEvent'] },
+      ],
+      publishes: [
+        { topic: 'payment-events', events: ['PaymentApprovedEvent', 'PaymentFailedEvent', 'ProductStockChangedEvent', 'ProductCreatedEvent'] },
+      ],
+    },
+    {
+      serviceName: 'cash-gateway-service',
+      subscribes: [
+        { topic: 'ecommerce-events', events: ['OrderCreatedEvent'] },
+      ],
+      publishes: [
+        { topic: 'cash-gateway-events', events: ['PaymentRequestedEvent', 'PaymentProcessCompletedEvent'] },
+      ],
+    },
+    {
+      serviceName: 'progression-service',
+      subscribes: [
+        { topic: 'ecommerce-events', events: ['OrderCreatedEvent'] },
+        { topic: 'payment-events', events: ['PaymentApprovedEvent'] },
+      ],
+      publishes: [
+        { topic: 'progression-events', events: ['ArchiveClaimedEvent', 'QuotaUpdatedEvent'] },
+      ],
+    },
+    {
+      serviceName: 'notification-service',
+      subscribes: [
+        { topic: 'ecommerce-events-dlt', events: [] },
+        { topic: 'payment-events-dlt', events: [] },
+        { topic: 'cash-gateway-events-dlt', events: [] },
+        { topic: 'progression-events-dlt', events: [] },
+      ],
+      publishes: [],
+    },
+  ],
+};
