@@ -1,0 +1,363 @@
+{
+  "realm": "hamster-world",
+  "enabled": true,
+  "sslRequired": "NONE",
+  "registrationAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "id": "4c5fc5e0-8260-47c6-8afe-c81457c9d690",
+        "name": "MERCHANT",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      },
+      {
+        "id": "a287f2cd-a7f0-44cc-b7a2-03a217833947",
+        "name": "USER",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      },
+      {
+        "id": "c385287d-3ddc-4e8f-9550-8f557dd9663c",
+        "name": "DEVELOPER",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      },
+      {
+        "id": "e3ec3a00-38ce-471c-adc9-737d3b2c2519",
+        "name": "VENDOR",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      },
+      {
+        "id": "0db3a072-8e88-4454-8195-337be15bee22",
+        "name": "SYSTEM",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      },
+      {
+        "id": "aae89957-574c-4c70-9b11-50efaab789be",
+        "name": "ADMIN",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "f5baecbb-f67d-4ef6-acf8-6b0b98bc6eed",
+        "attributes": {}
+      }
+    ]
+  },
+  "clients": [
+    {
+      "id": "960de86f-b43e-49fa-b560-3f2102e22579",
+      "clientId": "content-creator",
+      "name": "content-creator",
+      "description": "content-creator",
+      "rootUrl": "http://localhost:3004",
+      "adminUrl": "http://localhost:3004",
+      "baseUrl": "http://localhost:3004",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "post.logout.redirect.uris": "*",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "464f084b-6609-4f1f-a919-f7152b34a6b2",
+      "clientId": "ecommerce",
+      "name": "ecommerce",
+      "description": "ecommerce",
+      "rootUrl": "http://localhost:3006",
+      "adminUrl": "http://localhost:3006",
+      "baseUrl": "http://localhost:3006",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "*",
+        "display.on.consent.screen": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "ac8044a2-83f7-4e08-89e4-b7e92690b1cd",
+      "clientId": "hamster-pg",
+      "name": "hamster-pg",
+      "description": "hamster-pg",
+      "rootUrl": "http://localhost:3009",
+      "adminUrl": "http://localhost:3009",
+      "baseUrl": "http://localhost:3009",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "post.logout.redirect.uris": "*",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "aedaab71-7029-4e0a-a2a3-275f32fe6901",
+      "clientId": "internal-admin",
+      "name": "internal-admin",
+      "description": "internal-admin",
+      "rootUrl": "http://localhost:3002",
+      "adminUrl": "http://localhost:3002",
+      "baseUrl": "http://localhost:3002",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "*",
+        "display.on.consent.screen": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "ac891ac5-82d8-4b72-bc7d-64807ffab5ea",
+      "createdTimestamp": 1770189610610,
+      "username": "dev@t",
+      "enabled": true,
+      "totp": false,
+      "emailVerified": false,
+      "firstName": "d",
+      "lastName": "d",
+      "email": "dev@t",
+      "credentials": [
+        {
+          "id": "c925762c-8b33-42d1-9c31-a6c882caeecb",
+          "type": "password",
+          "createdDate": 1770189610639,
+          "secretData": "{\"value\":\"DdJ7sBi4rfNH02PrB/hNfGd0n4zBTQ+/tjqONraQ6K0=\",\"salt\":\"70pNujijhGzAIZk3oOOJjw==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "requiredActions": [],
+      "realmRoles": [
+        "DEVELOPER",
+        "default-roles-hamster-world"
+      ],
+      "notBefore": 0,
+      "groups": []
+    },
+    {
+      "id": "43b1ff5b-6b76-4577-b39d-b6a5d6cd1466",
+      "createdTimestamp": 1769750157221,
+      "username": "test",
+      "enabled": true,
+      "totp": false,
+      "emailVerified": false,
+      "firstName": "t",
+      "lastName": "t",
+      "email": "test@t",
+      "credentials": [
+        {
+          "id": "cc14c0cf-a1ea-4bc3-b62a-05051005dc7a",
+          "type": "password",
+          "createdDate": 1769750157269,
+          "secretData": "{\"value\":\"wJtazjQ2mmCDarL1mzlQZyH1hkOjMD9VqWPCYgd7vw4=\",\"salt\":\"By5Op4Q3EXEqQ/0uGai0Dg==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "requiredActions": [],
+      "realmRoles": [
+        "USER",
+        "default-roles-hamster-world"
+      ],
+      "notBefore": 0,
+      "groups": []
+    },
+    {
+      "id": "05c9889c-4d7c-4622-843c-43fedec2768d",
+      "createdTimestamp": 1769994976596,
+      "username": "ve",
+      "enabled": true,
+      "totp": false,
+      "emailVerified": false,
+      "firstName": "ve",
+      "lastName": "ve",
+      "email": "ve@t",
+      "credentials": [
+        {
+          "id": "3a7501b3-1eae-4249-97d3-d0a0165bb2fb",
+          "type": "password",
+          "createdDate": 1769994976631,
+          "secretData": "{\"value\":\"EXZXbycDVXNXss5sTNzKfjU9txCGfacNiugoicpKFds=\",\"salt\":\"vRZ6BLTCLmvTpTV57LvBqg==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "requiredActions": [],
+      "realmRoles": [
+        "MERCHANT",
+        "USER",
+        "default-roles-hamster-world"
+      ],
+      "notBefore": 0,
+      "groups": []
+    }
+  ]
+}
