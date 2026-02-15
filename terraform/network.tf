@@ -1,6 +1,6 @@
 resource "aws_key_pair" "my_key" {
   key_name   = "hamster-key"
-  public_key = file("~/.ssh/aws_server.pub")
+  public_key = file("${path.module}/aws_server.pub")
 }
 
 # front_sg: 외부에서 사용자가 접근 → 0.0.0.0/0

@@ -57,3 +57,9 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/.terraform/
 terraform/.terraform.lock.hcl
+
+# 모든 종류의 개인키 파일 방지
+*.pem
+*.key
+id_rsa
+id_ed25519
