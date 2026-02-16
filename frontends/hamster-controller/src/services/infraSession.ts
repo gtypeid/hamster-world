@@ -27,7 +27,7 @@ export async function fetchInfraStatus(): Promise<InitResult> {
     method: 'GET',
     path: `/repos/_/_/actions/workflows/${WORKFLOW_APPLY}/runs`,
     params: {
-      per_page: '20',
+      per_page: '5',
       created: `>=${todayStart.toISOString()}`,
     },
   });
@@ -42,7 +42,9 @@ export async function fetchInfraStatus(): Promise<InitResult> {
     run_started_at: r.run_started_at,
   }));
 
-  const result = analyzeStatus(runs);
+  // total_count는 per_page와 무관하게 전체 매칭 수를 반환
+  const totalCount = data.total_count ?? runs.length;
+  const result = analyzeStatus(runs, totalCount);
 
   // active run이 있으면 steps 기반으로 세부 단계 감지
   if (result.status === 'running' && result.activeRunId) {
@@ -63,9 +65,9 @@ export async function fetchInfraStatus(): Promise<InitResult> {
 /**
  * 워크플로우 실행 이력으로 현재 상태를 분석
  */
-function analyzeStatus(runs: WorkflowRun[]): InitResult {
+function analyzeStatus(runs: WorkflowRun[], totalCount: number): InitResult {
   const now = new Date();
-  const sessionsUsedToday = runs.length;
+  const sessionsUsedToday = totalCount;
 
   // 현재 진행중인 런 (queued 또는 in_progress)
   const activeRun = runs.find(

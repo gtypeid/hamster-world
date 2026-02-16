@@ -11,7 +11,10 @@ ${report_script}
 REPORT_EOF
 source /tmp/report-status.sh
 
-# INFRA_STATUS push: GET → merge(자기 인스턴스만) → PATCH, 3회 반복
+# jq: push_infra_status에서 JSON merge에 필요. AL2023 기본 이미지에 미포함.
+yum install -y jq
+
+# INFRA_STATUS push: GET → merge(자기 인스턴스만) → PATCH × 3회 (레이스컨디션 수렴). 실패 시 스크립트 중단.
 _IVAR="https://api.github.com/repos/$${GH_REPO}/actions/variables/INFRA_STATUS"
 _AUTH="Authorization: Bearer $${GH_DEPLOY_TOKEN}"
 push_infra_status() {
@@ -19,10 +22,10 @@ push_infra_status() {
   local s="$1" ip="$${2:-}"
   local d; [ -n "$ip" ] && d="{\"status\":\"$s\",\"ip\":\"$ip\"}" || d="{\"status\":\"$s\"}"
   for i in 1 2 3; do
-    local c; c=$(curl -sf -H "$_AUTH" "$_IVAR" 2>/dev/null | jq -r '.value // "{}"' 2>/dev/null || echo '{}')
-    local m; m=$(echo "$c" | jq --arg n "$INSTANCE_NAME" --argjson d "$d" '.instances[$n]=$d|.updatedAt=(now|todate)' 2>/dev/null || echo "$c")
+    local c; c=$(curl -sf -H "$_AUTH" "$_IVAR" | jq -r '.value // "{}"')
+    local m; m=$(echo "$c" | jq --arg n "$INSTANCE_NAME" --argjson d "$d" '.instances[$n]=$d|.updatedAt=(now|todate)')
     local e; e=$(echo "$m" | jq -Rs '.')
-    curl -sf -X PATCH -H "$_AUTH" -H "Accept: application/vnd.github.v3+json" -d "{\"value\":$e}" "$_IVAR" >/dev/null 2>&1 || true
+    curl -sf -X PATCH -H "$_AUTH" -H "Accept: application/vnd.github.v3+json" -d "{\"value\":$e}" "$_IVAR"
     [ $i -lt 3 ] && sleep 1
   done
 }
