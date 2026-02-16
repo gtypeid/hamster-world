@@ -22,6 +22,18 @@ resource "aws_instance" "db" {
     })
   })
 
+  # cloud-init(user_data) 완료 대기. 실패 시 terraform apply 중단 → always() destroy로 정리.
+  # user_data는 비동기 실행이라 terraform이 결과를 모르므로, SSH로 직접 확인한다.
+  provisioner "remote-exec" {
+    inline = ["cloud-init status --wait"]
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = var.ssh_private_key_path != "" ? file(var.ssh_private_key_path) : ""
+      host        = self.public_ip
+    }
+  }
+
   tags = {
     Name = "hamster-db"
   }

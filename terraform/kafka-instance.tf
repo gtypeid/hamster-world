@@ -19,6 +19,17 @@ resource "aws_instance" "kafka" {
     deploy_script   = file("${path.module}/scripts/kafka.sh")
   })
 
+  # cloud-init(user_data) 완료 대기. 실패 시 terraform apply 중단 → always() destroy로 정리.
+  provisioner "remote-exec" {
+    inline = ["cloud-init status --wait"]
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = var.ssh_private_key_path != "" ? file(var.ssh_private_key_path) : ""
+      host        = self.public_ip
+    }
+  }
+
   tags = {
     Name = "hamster-kafka"
   }

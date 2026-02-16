@@ -26,7 +26,12 @@ push_infra_status() {
     local m; m=$(echo "$c" | jq --arg n "$INSTANCE_NAME" --argjson d "$d" '.instances[$n]=$d|.updatedAt=(now|todate)')
     local e; e=$(echo "$m" | jq -Rs '.')
     curl -sf -X PATCH -H "$_AUTH" -H "Accept: application/vnd.github.v3+json" -d "{\"value\":$e}" "$_IVAR"
-    [ $i -lt 3 ] && sleep 1
+    # 원래 코드: [ $i -lt 3 ] && sleep 1
+    # 문제: i=3일 때 [ 3 -lt 3 ]이 false(exit 1)를 반환하고, && 체인의 전체 exit code가 1이 된다.
+    #       이 1이 for 루프 → 함수 반환값으로 전파되어, 호출 지점에서 set -e가 스크립트를 종료시킨다.
+    #       (&&/|| 내부의 개별 명령은 set -e에서 보호되지만, 전체 표현식의 exit code는 보호되지 않는다)
+    # 수정: if 문은 조건이 false여도 전체 문장의 exit code가 0이므로 set -e를 발동시키지 않는다.
+    if [ $i -lt 3 ]; then sleep 1; fi
   done
 }
 

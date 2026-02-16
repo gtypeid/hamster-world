@@ -50,6 +50,9 @@ env:
   # VM이 INFRA_STATUS를 push하기 위한 토큰 + repo 정보
   TF_VAR_github_token: ${{ secrets.GH_DEPLOY_TOKEN }}
   TF_VAR_github_repo: ${{ github.repository }}
+  # provisioner "remote-exec"용 SSH 키 경로
+  # cloud-init 완료를 대기하여 user_data 실패 시 apply를 중단시킨다.
+  TF_VAR_ssh_private_key_path: /tmp/aws_ssh_key
   # destroying/idle INFRA_STATUS push용 (워크플로우 step에서 직접 사용)
   GH_API: https://api.github.com
   GH_REPO: ${{ github.repository }}
@@ -71,6 +74,15 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+
+      # provisioner "remote-exec"가 각 인스턴스에 SSH 접속하기 위한 키 설정.
+      # terraform apply 중 provisioner가 cloud-init status --wait를 실행하려면
+      # SSH 프라이빗 키가 러너 파일시스템에 있어야 한다.
+      # 키 경로는 TF_VAR_ssh_private_key_path(/tmp/aws_ssh_key)와 일치해야 한다.
+      - name: Setup SSH key for provisioner
+        run: |
+          echo "${{ secrets.AWS_SSH_KEY }}" > /tmp/aws_ssh_key
+          chmod 600 /tmp/aws_ssh_key
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false
