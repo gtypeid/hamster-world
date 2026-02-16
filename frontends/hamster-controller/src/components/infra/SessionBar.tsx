@@ -6,10 +6,12 @@ import {
   selectCanInit,
   selectCanStop,
   selectRunningCount,
-  selectTotalInstances,
   INSTANCE_IDS,
 } from '../../stores/useInfraStore';
 import { fetchInfraStatus, triggerPlan, triggerApply, cancelRun, getRunStatus } from '../../services/infraSession';
+import { parsePlanOutput } from '../../utils/parsePlan';
+import { COOLDOWN_MIN } from '../../config/infraConfig';
+import { startDestroyPolling, stopDestroyPolling } from '../../services/destroyPoller';
 
 /**
  * Apply 워크플로우 런 폴링 - 완료될 때까지 5초마다 상태 확인
@@ -27,7 +29,7 @@ async function pollApplyRun(runId: number) {
           for (const id of INSTANCE_IDS) {
             updateInstance(id, { status: 'running' });
           }
-          addLog({ message: '전체 8개 인스턴스 온라인 - 인프라 준비 완료', level: 'success' });
+          addLog({ message: `전체 ${INSTANCE_IDS.length}개 인스턴스 온라인 - 인프라 준비 완료`, level: 'success' });
           setSessionPhase('running');
         } else {
           addLog({ message: `Apply 워크플로우 종료: ${run.conclusion}`, level: 'error' });
@@ -47,23 +49,28 @@ async function pollApplyRun(runId: number) {
   setTimeout(poll, 5000);
 }
 
-function simulateDestroy() {
-  const { setSessionPhase, updateInstance, addLog, endSession, resetInstances } = useInfraStore.getState();
+/**
+ * Destroy phase 시작.
+ * runId가 있으면 실제 로그 폴링, 없으면 즉시 세션 종료(fallback).
+ */
+function enterDestroyPhase() {
+  const { activeWorkflowRunId } = useInfraStore.getState();
 
-  setSessionPhase('destroying');
-  addLog({ message: 'Terraform destroy 시작', level: 'warn' });
-
-  setTimeout(() => {
+  if (activeWorkflowRunId) {
+    startDestroyPolling(activeWorkflowRunId);
+  } else {
+    // runId 없는 fallback (Connect으로 감지된 세션 등)
+    const { setSessionPhase, updateInstance, addLog, endSession, resetInstances } = useInfraStore.getState();
+    setSessionPhase('destroying');
+    addLog({ message: 'Terraform destroy 진행 중 (로그 폴링 불가)', level: 'warn' });
     for (const id of INSTANCE_IDS) {
       updateInstance(id, { status: 'destroying' });
     }
-    addLog({ message: '전체 인스턴스 종료 중...', level: 'info' });
-  }, 1000);
-
-  setTimeout(() => {
-    resetInstances();
-    endSession();
-  }, 4000);
+    setTimeout(() => {
+      resetInstances();
+      endSession();
+    }, 5000);
+  }
 }
 
 // ─── Component ───
@@ -82,7 +89,7 @@ export function SessionBar() {
   const canStart = useInfraStore(selectCanStartSession);
   const canStop = useInfraStore(selectCanStop);
   const runningCount = useInfraStore(selectRunningCount);
-  const totalInstances = useInfraStore(selectTotalInstances);
+  const planEc2Count = useInfraStore((s) => s.planEc2Count);
 
   const setSessionPhase = useInfraStore((s) => s.setSessionPhase);
   const applyConnectResult = useInfraStore((s) => s.applyConnectResult);
@@ -114,6 +121,18 @@ export function SessionBar() {
     return () => clearInterval(interval);
   }, [sessionStartedAt, sessionPhase, initResult]);
 
+  // Active runtime 만료 → 자동 destroy phase 진입
+  useEffect(() => {
+    if (sessionPhase === 'running' && elapsed > 0 && elapsed >= sessionDurationMin * 60) {
+      enterDestroyPhase();
+    }
+  }, [sessionPhase, elapsed, sessionDurationMin]);
+
+  // Destroy poller cleanup on unmount
+  useEffect(() => {
+    return () => stopDestroyPolling();
+  }, []);
+
   // ─── Handlers ───
 
   const handleConnect = async () => {
@@ -136,7 +155,9 @@ export function SessionBar() {
       const result = await triggerPlan((message, level) => {
         addLog({ message, level: level || 'info' });
       });
-      applyPlanResult(result.logs, result.runUrl);
+      const parsed = parsePlanOutput(result.logs);
+      const ec2Count = parsed?.resources.find(r => r.type === 'aws_instance')?.count;
+      applyPlanResult(result.logs, result.runUrl, ec2Count);
     } catch (err) {
       setSessionPhase('failed');
       addLog({ message: `Plan 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
@@ -173,13 +194,20 @@ export function SessionBar() {
         addLog({ message: `취소 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
       }
     }
-    simulateDestroy();
+    enterDestroyPhase();
   };
 
   const isActive = sessionPhase === 'triggering' || sessionPhase === 'applying' || sessionPhase === 'running' || sessionPhase === 'destroying';
-  const totalSeconds = sessionDurationMin * 60;
-  const remaining = Math.max(totalSeconds - elapsed, 0);
-  const remainPercent = totalSeconds > 0 ? Math.max((remaining / totalSeconds) * 100, 0) : 100;
+  const isDestroying = sessionPhase === 'destroying';
+  // EC2 표시: Plan 결과에서 파싱된 값 사용, 없으면 '?'
+  const ec2Total = planEc2Count ?? null;
+  const activeSeconds = sessionDurationMin * 60; // ACTIVE_RUNTIME_MIN 기반
+  const cooldownSeconds = COOLDOWN_MIN * 60;
+  const remaining = isDestroying ? 0 : Math.max(activeSeconds - elapsed, 0);
+  const remainPercent = activeSeconds > 0 ? Math.max((remaining / activeSeconds) * 100, 0) : 100;
+  // Destroy phase: 경과 시간 = elapsed - activeSeconds (active runtime 이후 시간)
+  const destroyElapsed = isDestroying ? Math.max(elapsed - activeSeconds, 0) : 0;
+  const destroyPercent = cooldownSeconds > 0 ? Math.min((destroyElapsed / cooldownSeconds) * 100, 100) : 0;
 
   return (
     <div className="relative">
@@ -187,9 +215,11 @@ export function SessionBar() {
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
         style={{
-          background: isActive
-            ? 'linear-gradient(90deg, #6366f1, #d97706, #16a34a)'
-            : 'linear-gradient(90deg, #334155, #334155)',
+          background: isDestroying
+            ? 'linear-gradient(90deg, #f97316, #ef4444)'
+            : isActive
+              ? 'linear-gradient(90deg, #6366f1, #d97706, #16a34a)'
+              : 'linear-gradient(90deg, #334155, #334155)',
         }}
       />
 
@@ -268,32 +298,56 @@ export function SessionBar() {
           </>
         )}
 
-        {/* Timer - remaining */}
+        {/* Timer - remaining / destroying */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Remaining</span>
+          <span className={`text-[10px] font-semibold uppercase tracking-widest ${isDestroying ? 'text-orange-500' : 'text-gray-500'}`}>
+            {isDestroying ? 'Destroying' : 'Remaining'}
+          </span>
           <span className="font-mono text-base tabular-nums">
-            <span className="text-gray-500">{formatTime(totalSeconds)}</span>
-            <span className="text-gray-700 mx-0.5">/</span>
-            <span className={remaining <= 120 && isActive ? 'text-red-400' : isActive ? 'text-accent-orange' : 'text-gray-600'}>
-              {formatTime(remaining)}
-            </span>
+            {isDestroying ? (
+              <>
+                <span className="text-orange-400">{formatTime(destroyElapsed)}</span>
+                <span className="text-gray-700 mx-0.5">/</span>
+                <span className="text-gray-500">~{formatTime(cooldownSeconds)}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-gray-500">{formatTime(activeSeconds)}</span>
+                <span className="text-gray-700 mx-0.5">/</span>
+                <span className={remaining <= 120 && isActive ? 'text-red-400' : isActive ? 'text-accent-orange' : 'text-gray-600'}>
+                  {formatTime(remaining)}
+                </span>
+              </>
+            )}
           </span>
         </div>
 
-        {/* Time progress bar - remaining life */}
+        {/* Time progress bar - remaining life / destroy progress */}
         <div className="flex-1 min-w-0 max-w-xs">
           <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-1.5 rounded-full transition-all duration-1000 relative"
-              style={{
-                width: `${remainPercent}%`,
-                background: remainPercent < 10 ? '#ef4444' : remainPercent < 30 ? '#eab308' : '#6366f1',
-              }}
-            >
-              {isActive && (
+            {isDestroying ? (
+              <div
+                className="h-1.5 rounded-full transition-all duration-1000 relative"
+                style={{
+                  width: `${destroyPercent}%`,
+                  background: 'linear-gradient(90deg, #f97316, #ef4444)',
+                }}
+              >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-              )}
-            </div>
+              </div>
+            ) : (
+              <div
+                className="h-1.5 rounded-full transition-all duration-1000 relative"
+                style={{
+                  width: `${remainPercent}%`,
+                  background: remainPercent < 10 ? '#ef4444' : remainPercent < 30 ? '#eab308' : '#6366f1',
+                }}
+              >
+                {isActive && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -306,13 +360,13 @@ export function SessionBar() {
           <span className="font-mono text-base tabular-nums">
             <span className={runningCount > 0 ? 'text-green-400 font-bold' : 'text-gray-600'}>{runningCount}</span>
             <span className="text-gray-700 mx-0.5">/</span>
-            <span className="text-gray-500">{totalInstances}</span>
+            <span className="text-gray-500">{ec2Total ?? '?'}</span>
           </span>
           <div className="w-20 bg-gray-800 rounded-full h-1.5 overflow-hidden">
             <div
               className="h-1.5 rounded-full transition-all duration-500 relative"
               style={{
-                width: `${(runningCount / totalInstances) * 100}%`,
+                width: ec2Total ? `${(runningCount / ec2Total) * 100}%` : '0%',
                 background: 'linear-gradient(90deg, #16a34a, #4ade80)',
               }}
             >

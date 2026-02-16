@@ -10,15 +10,12 @@ import { proxyFetch } from './lambdaProxy';
 import type { InitResult } from './mockGithub';
 import type { WorkflowRun, WorkflowRunsResponse } from '../types/github';
 import { useInfraStore } from '../stores/useInfraStore';
+import { RUNTIME_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
 
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || 'gtypeid';
 const REPO  = import.meta.env.VITE_GITHUB_REPO  || 'hamster-world';
 const WORKFLOW_APPLY = 'terraform-apply.yml';
 const WORKFLOW_PLAN  = 'terraform-plan.yml';
-
-const RUNTIME_MIN = 20;
-const COOLDOWN_MIN = 5;
-const MAX_SESSIONS_PER_DAY = 5;
 
 // ─── Connect: 현재 상태 판단 ───
 
@@ -64,8 +61,8 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
     const startedAt = new Date(activeRun.run_started_at || activeRun.created_at);
     const elapsedMs = now.getTime() - startedAt.getTime();
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
-    const totalSeconds = RUNTIME_MIN * 60;
-    const remainingSeconds = Math.max(totalSeconds - elapsedSeconds, 0);
+    const activeSeconds = ACTIVE_RUNTIME_MIN * 60;
+    const remainingSeconds = Math.max(activeSeconds - elapsedSeconds, 0);
 
     return {
       status: 'running',
@@ -204,7 +201,7 @@ export async function triggerApply(): Promise<number> {
   await proxyFetch({
     method: 'POST',
     path: `/repos/_/_/actions/workflows/${WORKFLOW_APPLY}/dispatches`,
-    body: { ref: 'main' },
+    body: { ref: 'main', inputs: { duration: String(RUNTIME_MIN), cooldown: String(COOLDOWN_MIN) } },
   });
 
   await sleep(3000);
@@ -297,7 +294,7 @@ async function pollRunUntilDone(
  * 대신 /runs/{id}/jobs → /jobs/{jobId}/logs 경로를 사용하면
  * GitHub가 plain text 로그를 반환한다.
  */
-async function fetchRunLogs(runId: number): Promise<string | null> {
+export async function fetchRunLogs(runId: number): Promise<string | null> {
   try {
     // 1) 해당 run의 jobs 목록 조회
     const jobsData = await proxyFetch<{ jobs?: Array<{ id: number; status: string }> }>({

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useInfraStore } from '../../stores/useInfraStore';
 import type { InfraStatus, SessionPhase } from '../../stores/useInfraStore';
 import { parsePlanOutput, formatPlanSummary } from '../../utils/parsePlan';
+import { COOLDOWN_MIN } from '../../config/infraConfig';
 
 const PLAN_STEPS = ['Dispatch', 'Waiting', 'Running', 'Logs'];
 
@@ -43,6 +44,7 @@ export function InfraGuide() {
     sessionsUsedToday,
     maxSessionsPerDay,
     sessionDurationMin,
+    cooldownMin: COOLDOWN_MIN,
     remainingSeconds: initResult?.remainingSeconds,
     cooldownRemainingSeconds: initResult?.cooldownRemainingSeconds,
     runsCount: initResult?.runs.length ?? 0,
@@ -161,6 +163,7 @@ interface GuideCtx {
   sessionsUsedToday: number;
   maxSessionsPerDay: number;
   sessionDurationMin: number;
+  cooldownMin: number;
   remainingSeconds?: number;
   cooldownRemainingSeconds?: number;
   runsCount: number;
@@ -187,7 +190,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       icon: '\u25B6',
       title: '\uC138\uC158 \uCD08\uAE30\uD654',
       description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694.\n\uC67C\ucabd Plan Report \xB7 Architecture \xB7 Event Flow \uB124\uBE44\uAC8C\uC774\uC158\uC5D0\uC11C \uC778\uD504\uB77C \uC0C1\uC138 \uC815\uBCF4\uB97C \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-      detail: `\uB7F0\uD0C0\uC784: \uC138\uC158\uB2F9 ${ctx.sessionDurationMin}\uBD84 / \uC81C\uD55C: \uD558\uB8E8 ${ctx.maxSessionsPerDay}\uD68C / \uCFE8\uB2E4\uC6B4: \uC138\uC158 \uAC04 5\uBD84`,
+      detail: `\uB7F0\uD0C0\uC784: \uC138\uC158\uB2F9 ${ctx.sessionDurationMin}\uBD84 / \uC81C\uD55C: \uD558\uB8E8 ${ctx.maxSessionsPerDay}\uD68C / \uCFE8\uB2E4\uC6B4: \uC138\uC158 \uAC04 ${ctx.cooldownMin}\uBD84`,
       badge: '1\uB2E8\uACC4',
       bgClass: 'bg-[#0c1222]',
       iconBgClass: 'bg-indigo-500/20 text-indigo-400',
@@ -286,7 +289,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
     return {
       icon: '\u2713',
       title: '\uBC30\uD3EC \uC900\uBE44 \uC644\uB8CC',
-      description: `\uC778\uD504\uB77C \uACC4\uD68D\uC774 \uD655\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Start \uBC84\uD2BC\uC744 \uB20C\uB7EC Terraform Apply\uB85C EC2 \uC778\uC2A4\uD134\uC2A4 8\uAC1C\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4. ${ctx.sessionDurationMin}\uBD84 \uD6C4 \uC790\uB3D9 \uC885\uB8CC\uB429\uB2C8\uB2E4.`,
+      description: `\uC778\uD504\uB77C \uACC4\uD68D\uC774 \uD655\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Start \uBC84\uD2BC\uC744 \uB20C\uB7EC Terraform Apply\uB85C EC2 \uC778\uC2A4\uD134\uC2A4\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4. ${ctx.sessionDurationMin}\uBD84 \uD6C4 \uC790\uB3D9 \uD30C\uAD34\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4.`,
       detail: `\uC624\uB298: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9${ctx.planSummaryText ? ` / Plan: ${ctx.planSummaryText}` : ''}`,
       badge: '3\uB2E8\uACC4',
       bgClass: 'bg-[#0a1628]',
@@ -303,7 +306,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       title: phase === 'triggering' ? '\uC6CC\uD06C\uD50C\uB85C\uC6B0 \uD2B8\uB9AC\uAC70' : 'Terraform Apply',
       description: phase === 'triggering'
         ? 'GitHub Actions \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uC2E4\uD589\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. Terraform\uC774 \uCD08\uAE30\uD654\uB418\uACE0 EC2 \uC778\uC2A4\uD134\uC2A4 \uC0DD\uC131\uC774 \uC2DC\uC791\uB429\uB2C8\uB2E4.'
-        : 'Terraform\uC774 EC2 \uC778\uC2A4\uD134\uC2A4 8\uAC1C\uB97C \uC0DD\uC131\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uAC01 \uC778\uC2A4\uD134\uC2A4\uC5D0 Docker \uCEE8\uD14C\uC774\uB108\uAC00 \uBC30\uD3EC\uB429\uB2C8\uB2E4.',
+        : 'Terraform\uC774 EC2 \uC778\uC2A4\uD134\uC2A4\uB97C \uC0DD\uC131\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uAC01 \uC778\uC2A4\uD134\uC2A4\uC5D0 Docker \uCEE8\uD14C\uC774\uB108\uAC00 \uBC30\uD3EC\uB429\uB2C8\uB2E4.',
       badge: '\uBC30\uD3EC \uC911',
       bgClass: 'bg-[#1a1200]',
       iconBgClass: 'bg-amber-500/20 text-amber-400 animate-pulse',
@@ -318,8 +321,8 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       icon: '\u26A1',
       title: ctx.startedByMe ? '\uC778\uD504\uB77C \uC6B4\uC601 \uC911' : '\uAE30\uC874 \uC138\uC158 \uCC38\uC5EC',
       description: ctx.startedByMe
-        ? 'EC2 \uC778\uC2A4\uD134\uC2A4 8\uAC1C\uAC00 \uBAA8\uB450 \uC6B4\uC601 \uC911\uC785\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC \uC790\uB3D9\uC73C\uB85C \uC0AD\uC81C\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
-        : '\uD604\uC7AC \uC6B4\uC601 \uC911\uC778 \uC778\uD504\uB77C \uC138\uC158\uC5D0 \uCC38\uC5EC\uD569\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC \uC790\uB3D9\uC73C\uB85C \uC0AD\uC81C\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
+        ? `EC2 \uC778\uC2A4\uD134\uC2A4\uAC00 \uBAA8\uB450 \uC6B4\uC601 \uC911\uC785\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC Terraform Destroy\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`
+        : `\uD604\uC7AC \uC6B4\uC601 \uC911\uC778 \uC778\uD504\uB77C \uC138\uC158\uC5D0 \uCC38\uC5EC\uD569\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC Terraform Destroy\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`,
       badge: ctx.startedByMe ? 'LIVE' : '\uCC38\uC5EC',
       bgClass: 'bg-[#071a0e]',
       iconBgClass: 'bg-green-500/20 text-green-400',
@@ -333,7 +336,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
     return {
       icon: '\u26A0',
       title: '\uC778\uD504\uB77C \uC0AD\uC81C \uC911',
-      description: 'Terraform destroy\uAC00 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4. \uBAA8\uB4E0 EC2 \uC778\uC2A4\uD134\uC2A4\uC640 \uAD00\uB828 \uB9AC\uC18C\uC2A4\uAC00 \uC0AD\uC81C\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4.',
+      description: `Terraform destroy\uAC00 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4. \uBAA8\uB4E0 EC2 \uC778\uC2A4\uD134\uC2A4\uC640 \uAD00\uB828 \uB9AC\uC18C\uC2A4\uAC00 \uC0AD\uC81C\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uC608\uC0C1 \uC18C\uC694 \uC2DC\uAC04: ~${ctx.cooldownMin}\uBD84`,
       badge: '\uC815\uB9AC',
       bgClass: 'bg-[#1a0f00]',
       iconBgClass: 'bg-orange-500/20 text-orange-400 animate-pulse',

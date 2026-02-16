@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       duration:
-        description: 'Session duration (minutes)'
+        description: 'Total workflow duration including destroy (minutes)'
         required: true
         default: '20'
+        type: string
+      cooldown:
+        description: 'Cooldown buffer for destroy phase (minutes)'
+        required: true
+        default: '5'
         type: string
 
 defaults:
@@ -38,10 +43,11 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false
 
-      - name: Wait for session duration
+      - name: Wait for active runtime
         run: |
-          echo "Session started. Waiting ${{ inputs.duration }} minutes..."
-          sleep $(( ${{ inputs.duration }} * 60 ))
+          ACTIVE=$(( ${{ inputs.duration }} - ${{ inputs.cooldown }} ))
+          echo "Session started. Active runtime: ${ACTIVE} minutes (total ${{ inputs.duration }}, cooldown ${{ inputs.cooldown }})"
+          sleep $(( ACTIVE * 60 ))
 
       - name: Terraform Destroy
         if: always()

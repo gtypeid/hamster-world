@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { InitResult } from '../services/mockGithub';
+import { COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
 
 // ─── Instance definitions matching terraform ───
 
@@ -67,6 +68,7 @@ interface InfraState {
   // Plan result (terraform plan output)
   planResult: string | null;
   planRunUrl: string | null;
+  planEc2Count: number | null;  // Plan 파싱 결과: aws_instance 개수 (Plan 전에는 null)
 
   // Planning 진행 상태
   planStep: number;          // 0~4 (dispatch, waiting, running, logs, done)
@@ -91,7 +93,7 @@ interface InfraState {
   // Actions
   setSessionPhase: (phase: SessionPhase) => void;
   applyConnectResult: (result: InitResult) => void;
-  applyPlanResult: (planOutput: string, runUrl?: string) => void;
+  applyPlanResult: (planOutput: string, runUrl?: string, ec2Count?: number) => void;
   startSession: () => void;
   endSession: () => void;
   updateInstance: (id: InstanceId, update: Partial<InstanceState>) => void;
@@ -183,20 +185,21 @@ export const useInfraStore = create<InfraState>((set) => ({
   // Session
   sessionPhase: 'idle',
   sessionStartedAt: null,
-  sessionDurationMin: 20,
+  sessionDurationMin: ACTIVE_RUNTIME_MIN,
 
   // Connect result
   infraStatus: 'unknown',
   initResult: null,
   planResult: null,
   planRunUrl: null,
+  planEc2Count: null,
   planStep: 0,
   planStepLabel: '',
   startedByMe: false,
 
   // Budget
   sessionsUsedToday: 0,
-  maxSessionsPerDay: 5,
+  maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
 
   // Instances
   instances: cloneInstances(),
@@ -246,17 +249,18 @@ export const useInfraStore = create<InfraState>((set) => ({
       startedByMe: false, // Connect으로 감지된 세션 = 기존 세션 참여
       sessionsUsedToday: result.sessionsUsedToday,
       maxSessionsPerDay: result.maxSessionsPerDay,
-      sessionDurationMin: result.runtimeMin,
+      sessionDurationMin: result.runtimeMin - (result.cooldownMin ?? COOLDOWN_MIN),
       sessionStartedAt: result.sessionStartedAt ?? null,
       instances,
       logs,
     };
   }),
 
-  applyPlanResult: (planOutput, runUrl?) => set((state) => ({
+  applyPlanResult: (planOutput, runUrl?, ec2Count?) => set((state) => ({
     sessionPhase: 'planned',
     planResult: planOutput,
     planRunUrl: runUrl ?? null,
+    planEc2Count: ec2Count ?? null,
     logs: [
       ...state.logs,
       {
@@ -325,6 +329,7 @@ export const useInfraStore = create<InfraState>((set) => ({
     initResult: null,
     planResult: null,
     planRunUrl: null,
+    planEc2Count: null,
     planStep: 0,
     planStepLabel: '',
     startedByMe: false,

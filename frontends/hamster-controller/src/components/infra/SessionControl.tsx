@@ -124,7 +124,7 @@ function simulateDeployment() {
       action: () => {
         updateInstance('hamster-front', { status: 'running', ip: '3.35.42.117' });
         addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + React 앱 4개 배포 완료', level: 'success' });
-        addLog({ message: '전체 8개 인스턴스 온라인 - 인프라 준비 완료', level: 'success' });
+        addLog({ message: `전체 ${INSTANCE_IDS.length}개 인스턴스 온라인 - 인프라 준비 완료`, level: 'success' });
         setSessionPhase('running');
       },
     },

@@ -1,4 +1,5 @@
 import type { WorkflowRun } from '../types/github';
+import { RUNTIME_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
 
 /**
  * Init 결과 - GitHub Actions 이력 기반 상태 판단
@@ -26,10 +27,6 @@ export interface InitResult {
   runs: WorkflowRun[];
 }
 
-const RUNTIME_MIN = 20;
-const COOLDOWN_MIN = 5;
-const MAX_SESSIONS_PER_DAY = 5;
-
 /**
  * 목 데이터 - 랜덤 케이스 생성
  * 새로고침할 때마다 다른 케이스가 나옴
@@ -50,10 +47,10 @@ function generateCase(caseIndex: number): InitResult {
   switch (caseIndex) {
     // Case A: 현재 가동중 (startTime이 runtime 이내)
     case 0: {
-      const elapsedMin = Math.floor(Math.random() * RUNTIME_MIN); // 0~19분 경과
+      const elapsedMin = Math.floor(Math.random() * ACTIVE_RUNTIME_MIN); // 0~active분 경과
       const sessionStartedAt = new Date(now.getTime() - elapsedMin * 60 * 1000);
       const elapsedSeconds = elapsedMin * 60;
-      const remainingSeconds = (RUNTIME_MIN * 60) - elapsedSeconds;
+      const remainingSeconds = (ACTIVE_RUNTIME_MIN * 60) - elapsedSeconds;
       const sessionsUsedToday = Math.floor(Math.random() * 3) + 1; // 1~3
 
       return {
