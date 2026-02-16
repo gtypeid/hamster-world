@@ -11,6 +11,7 @@ import 'reactflow/dist/style.css';
 import { TopologyViewer } from '@common/topology';
 import type { TopologyResponse } from '@common/topology';
 import { useInfraStore } from '../../stores/useInfraStore';
+import { parsePlanOutput } from '../../utils/parsePlan';
 
 type ViewerTab = 'report' | 'architecture' | 'topology';
 
@@ -104,30 +105,72 @@ function PlanPendingPlaceholder() {
 }
 
 function PlanReportTab() {
+  const planRunUrl = useInfraStore((s) => s.planRunUrl);
+  const planResult = useInfraStore((s) => s.planResult);
+  const parsed = useMemo(() => parsePlanOutput(planResult), [planResult]);
+
+  const summary = parsed?.summary ?? { toAdd: 0, toChange: 0, toDestroy: 0 };
+  const resources = parsed?.resources ?? [];
+
   return (
     <div className="h-full overflow-y-auto p-6 space-y-5">
+      {/* GitHub Actions Run Link */}
+      {planRunUrl && (
+        <a
+          href={planRunUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg border border-indigo-700/40 bg-indigo-950/30 hover:bg-indigo-900/30 hover:border-indigo-600/50 transition-all group"
+        >
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-indigo-300 group-hover:text-indigo-200 transition-colors">
+              GitHub Actions에서 실행된 Terraform Plan
+            </div>
+            <div className="text-[11px] text-gray-500 font-mono truncate mt-0.5">
+              {planRunUrl}
+            </div>
+          </div>
+          <div className="shrink-0 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors font-semibold">
+            자세히 보기 &rarr;
+          </div>
+        </a>
+      )}
+
       {/* Row 1: Plan Summary + Infra Spec + Entrypoint */}
       <div className="grid grid-cols-3 gap-4">
         <Card title="Plan Summary">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <CountBadge color="green">+</CountBadge>
-              <span className="text-sm text-green-400 font-mono font-bold">12 to add</span>
+              <span className={`text-sm font-mono font-bold ${summary.toAdd > 0 ? 'text-green-400' : 'text-gray-500'}`}>
+                {summary.toAdd} to add
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <CountBadge color="yellow">~</CountBadge>
-              <span className="text-sm text-gray-500 font-mono">0 to change</span>
+              <span className={`text-sm font-mono ${summary.toChange > 0 ? 'text-yellow-400 font-bold' : 'text-gray-500'}`}>
+                {summary.toChange} to change
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <CountBadge color="red">-</CountBadge>
-              <span className="text-sm text-gray-500 font-mono">0 to destroy</span>
+              <span className={`text-sm font-mono ${summary.toDestroy > 0 ? 'text-red-400 font-bold' : 'text-gray-500'}`}>
+                {summary.toDestroy} to destroy
+              </span>
             </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-800 text-[11px] text-gray-600 font-mono space-y-0.5">
-            <div>aws_instance &times; 8</div>
-            <div>aws_security_group &times; 3</div>
-            <div>aws_security_group_rule &times; 9</div>
-          </div>
+          {resources.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-800 text-[11px] text-gray-600 font-mono space-y-0.5">
+              {resources.map((r) => (
+                <div key={r.type}>{r.type} &times; {r.count}</div>
+              ))}
+            </div>
+          )}
         </Card>
 
         <Card title="Infrastructure Spec">
@@ -136,7 +179,7 @@ function PlanReportTab() {
               <SpecRow label="Region" value="ap-northeast-2 (Seoul)" />
               <SpecRow label="Instance" value="t3.micro (2 vCPU, 1GB)" />
               <SpecRow label="Count" value="8 instances" />
-              <SpecRow label="Storage" value="30GB gp3 x8 = 240GB" />
+              <SpecRow label="Storage" value="8GB gp3 x8 = 64GB" />
               <SpecRow label="VPC" value="172.31.0.0/16 (default)" />
               <SpecRow label="Session" value="apply → sleep → destroy" />
             </tbody>

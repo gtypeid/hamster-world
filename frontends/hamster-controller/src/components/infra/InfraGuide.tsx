@@ -1,5 +1,9 @@
+import { useState, useEffect, useRef } from 'react';
 import { useInfraStore } from '../../stores/useInfraStore';
 import type { InfraStatus, SessionPhase } from '../../stores/useInfraStore';
+import { parsePlanOutput, formatPlanSummary } from '../../utils/parsePlan';
+
+const PLAN_STEPS = ['Dispatch', 'Waiting', 'Running', 'Logs'];
 
 export function InfraGuide() {
   const sessionPhase = useInfraStore((s) => s.sessionPhase);
@@ -9,6 +13,31 @@ export function InfraGuide() {
   const maxSessionsPerDay = useInfraStore((s) => s.maxSessionsPerDay);
   const sessionDurationMin = useInfraStore((s) => s.sessionDurationMin);
   const startedByMe = useInfraStore((s) => s.startedByMe);
+  const planStep = useInfraStore((s) => s.planStep);
+  const planStepLabel = useInfraStore((s) => s.planStepLabel);
+  const planResult = useInfraStore((s) => s.planResult);
+
+  // Planning 경과 시간 타이머
+  const [planElapsed, setPlanElapsed] = useState(0);
+  const planStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (sessionPhase === 'planning') {
+      if (planStartRef.current === null) {
+        planStartRef.current = Date.now();
+      }
+      setPlanElapsed(0);
+      const iv = setInterval(() => {
+        setPlanElapsed(Math.floor((Date.now() - planStartRef.current!) / 1000));
+      }, 1000);
+      return () => clearInterval(iv);
+    }
+    // planning 끝나면 리셋
+    planStartRef.current = null;
+    setPlanElapsed(0);
+  }, [sessionPhase]);
+
+  const parsedPlan = parsePlanOutput(planResult);
 
   const guide = getGuide(sessionPhase, infraStatus, {
     sessionsUsedToday,
@@ -18,6 +47,7 @@ export function InfraGuide() {
     cooldownRemainingSeconds: initResult?.cooldownRemainingSeconds,
     runsCount: initResult?.runs.length ?? 0,
     startedByMe,
+    planSummaryText: parsedPlan ? formatPlanSummary(parsedPlan.summary) : null,
   });
 
   return (
@@ -40,13 +70,58 @@ export function InfraGuide() {
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-400 leading-relaxed">
+          <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-line">
             {guide.description}
           </p>
           {guide.detail && (
             <p className="text-[11px] text-gray-500 mt-1 font-mono">
               {guide.detail}
             </p>
+          )}
+
+          {/* Planning progress bar */}
+          {sessionPhase === 'planning' && (
+            <div className="mt-2.5">
+              <div className="flex items-center gap-1 mb-1.5">
+                {PLAN_STEPS.map((step, i) => {
+                  const isActive = i === planStep;
+                  const isDone = i < planStep;
+                  return (
+                    <div key={step} className="flex items-center gap-1">
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                        isActive
+                          ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/40'
+                          : isDone
+                            ? 'bg-green-500/10 text-green-500'
+                            : 'bg-gray-800/50 text-gray-600'
+                      }`}>
+                        {isDone && <span>&#10003;</span>}
+                        {isActive && <span className="animate-pulse">&#9679;</span>}
+                        {step}
+                      </div>
+                      {i < PLAN_STEPS.length - 1 && (
+                        <div className={`w-3 h-px ${isDone ? 'bg-green-500/40' : 'bg-gray-700'}`} />
+                      )}
+                    </div>
+                  );
+                })}
+                <span className="text-[10px] text-gray-500 ml-2 tabular-nums">
+                  {planElapsed}s<span className="text-gray-600"> / ~30s</span>
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full bg-gray-800 rounded-full h-1 overflow-hidden">
+                <div
+                  className="h-1 rounded-full bg-indigo-500 transition-all duration-700"
+                  style={{ width: `${Math.min((planStep / PLAN_STEPS.length) * 100, 100)}%` }}
+                >
+                  <div className="h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                </div>
+              </div>
+              {planStepLabel && (
+                <div className="text-[10px] text-indigo-400/70 mt-1 font-mono">{planStepLabel}</div>
+              )}
+            </div>
           )}
         </div>
 
@@ -90,6 +165,7 @@ interface GuideCtx {
   cooldownRemainingSeconds?: number;
   runsCount: number;
   startedByMe: boolean;
+  planSummaryText: string | null;
 }
 
 interface GuideData {
@@ -110,7 +186,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
     return {
       icon: '\u25B6',
       title: '\uC138\uC158 \uCD08\uAE30\uD654',
-      description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694. \uC67C\ucabd Plan Report \xB7 Architecture \xB7 Event Flow \uB124\uBE44\uAC8C\uC774\uC158\uC5D0\uC11C \uC778\uD504\uB77C \uC0C1\uC138 \uC815\uBCF4\uB97C \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
+      description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694.\n\uC67C\ucabd Plan Report \xB7 Architecture \xB7 Event Flow \uB124\uBE44\uAC8C\uC774\uC158\uC5D0\uC11C \uC778\uD504\uB77C \uC0C1\uC138 \uC815\uBCF4\uB97C \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
       detail: `\uB7F0\uD0C0\uC784: \uC138\uC158\uB2F9 ${ctx.sessionDurationMin}\uBD84 / \uC81C\uD55C: \uD558\uB8E8 ${ctx.maxSessionsPerDay}\uD68C / \uCFE8\uB2E4\uC6B4: \uC138\uC158 \uAC04 5\uBD84`,
       badge: '1\uB2E8\uACC4',
       bgClass: 'bg-[#0c1222]',
@@ -211,7 +287,7 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       icon: '\u2713',
       title: '\uBC30\uD3EC \uC900\uBE44 \uC644\uB8CC',
       description: `\uC778\uD504\uB77C \uACC4\uD68D\uC774 \uD655\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Start \uBC84\uD2BC\uC744 \uB20C\uB7EC Terraform Apply\uB85C EC2 \uC778\uC2A4\uD134\uC2A4 8\uAC1C\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4. ${ctx.sessionDurationMin}\uBD84 \uD6C4 \uC790\uB3D9 \uC885\uB8CC\uB429\uB2C8\uB2E4.`,
-      detail: `\uC624\uB298: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9 / Plan: 12 to add, 0 to change, 0 to destroy`,
+      detail: `\uC624\uB298: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9${ctx.planSummaryText ? ` / Plan: ${ctx.planSummaryText}` : ''}`,
       badge: '3\uB2E8\uACC4',
       bgClass: 'bg-[#0a1628]',
       iconBgClass: 'bg-blue-500/20 text-blue-400',

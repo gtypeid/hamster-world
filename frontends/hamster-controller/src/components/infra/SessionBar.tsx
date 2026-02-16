@@ -9,149 +9,55 @@ import {
   selectTotalInstances,
   INSTANCE_IDS,
 } from '../../stores/useInfraStore';
-import { mockInit } from '../../services/mockGithub';
+import { fetchInfraStatus, triggerPlan, triggerApply, cancelRun, getRunStatus } from '../../services/infraSession';
 
-// ─── Demo simulation (Start 후 배포 시뮬레이션) ───
+/**
+ * Apply 워크플로우 런 폴링 - 완료될 때까지 5초마다 상태 확인
+ */
+async function pollApplyRun(runId: number) {
+  const { setSessionPhase, addLog, updateInstance } = useInfraStore.getState();
 
-// Mock: simulate terraform plan output
-const MOCK_PLAN_OUTPUT = `Plan: 12 to add, 0 to change, 0 to destroy.
+  const poll = async () => {
+    try {
+      const run = await getRunStatus(runId);
 
-Changes to Outputs:
-  + entrypoint          = { front_url, keycloak_url }
-  + instances           = { 8x t3.micro EC2 }
-  + security_groups     = { front-sg, auth-sg, internal-sg }
-  + api_routes          = { 7 reverse proxy routes }
-  + infrastructure_spec = { ap-northeast-2, 240GB total }`;
+      if (run.status === 'completed') {
+        if (run.conclusion === 'success') {
+          // 성공: 모든 인스턴스 running으로 전환
+          for (const id of INSTANCE_IDS) {
+            updateInstance(id, { status: 'running' });
+          }
+          addLog({ message: '전체 8개 인스턴스 온라인 - 인프라 준비 완료', level: 'success' });
+          setSessionPhase('running');
+        } else {
+          addLog({ message: `Apply 워크플로우 종료: ${run.conclusion}`, level: 'error' });
+          setSessionPhase('failed');
+        }
+        return; // 폴링 종료
+      }
 
-function mockPlan(): Promise<string> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(MOCK_PLAN_OUTPUT), 2000);
-  });
-}
+      // 아직 진행중 - 계속 폴링
+      setTimeout(poll, 5000);
+    } catch (err) {
+      addLog({ message: `폴링 오류: ${err instanceof Error ? err.message : err}`, level: 'error' });
+      setTimeout(poll, 10000); // 에러시 10초 후 재시도
+    }
+  };
 
-function simulateDeployment() {
-  const { setSessionPhase, updateInstance, addLog } = useInfraStore.getState();
-
-  const steps: { delay: number; action: () => void }[] = [
-    {
-      delay: 1500,
-      action: () => {
-        setSessionPhase('applying');
-        addLog({ message: 'Terraform apply started', level: 'info' });
-      },
-    },
-    {
-      delay: 2000,
-      action: () => {
-        updateInstance('hamster-db', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-db', message: '[internal-sg] Instance launching...', level: 'info' });
-      },
-    },
-    {
-      delay: 3000,
-      action: () => {
-        updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5' });
-        addLog({ instanceId: 'hamster-db', message: 'MySQL 8.0 started (:3306), 8 databases created', level: 'success' });
-        addLog({ instanceId: 'hamster-db', message: 'MongoDB 7.0 started (:27017)', level: 'success' });
-      },
-    },
-    {
-      delay: 1500,
-      action: () => {
-        updateInstance('hamster-kafka', { status: 'provisioning' });
-        updateInstance('hamster-auth', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-kafka', message: '[internal-sg] Instance launching...', level: 'info' });
-        addLog({ instanceId: 'hamster-auth', message: '[auth-sg] Instance launching...', level: 'info' });
-      },
-    },
-    {
-      delay: 2500,
-      action: () => {
-        updateInstance('hamster-kafka', { status: 'running', ip: '172.31.10.8' });
-        addLog({ instanceId: 'hamster-kafka', message: 'Kafka 7.5 KRaft broker ready (:9092, :9093)', level: 'success' });
-      },
-    },
-    {
-      delay: 2000,
-      action: () => {
-        updateInstance('hamster-auth', { status: 'running', ip: '172.31.10.6' });
-        addLog({ instanceId: 'hamster-auth', message: 'Keycloak 23.0 started (:8090), realm imported', level: 'success' });
-      },
-    },
-    {
-      delay: 1000,
-      action: () => {
-        updateInstance('hamster-commerce', { status: 'provisioning' });
-        updateInstance('hamster-billing', { status: 'provisioning' });
-        updateInstance('hamster-payment', { status: 'provisioning' });
-        updateInstance('hamster-support', { status: 'provisioning' });
-        addLog({ message: '[internal-sg] Application instances launching...', level: 'info' });
-      },
-    },
-    {
-      delay: 2500,
-      action: () => {
-        updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11' });
-        addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API ready (:8080)', level: 'success' });
-      },
-    },
-    {
-      delay: 1500,
-      action: () => {
-        updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12' });
-        addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway (:8082), Hamster PG (:8086)', level: 'success' });
-      },
-    },
-    {
-      delay: 1000,
-      action: () => {
-        updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13' });
-        addLog({ instanceId: 'hamster-payment', message: 'Payment Service (:8083)', level: 'success' });
-      },
-    },
-    {
-      delay: 1500,
-      action: () => {
-        updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14' });
-        addLog({ instanceId: 'hamster-support', message: 'Progression (:8084), Notification (:8085)', level: 'success' });
-      },
-    },
-    {
-      delay: 1000,
-      action: () => {
-        updateInstance('hamster-front', { status: 'provisioning' });
-        addLog({ instanceId: 'hamster-front', message: '[front-sg] Pulling frontend images...', level: 'info' });
-      },
-    },
-    {
-      delay: 3000,
-      action: () => {
-        updateInstance('hamster-front', { status: 'running', ip: '3.35.42.117' });
-        addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + 4 React apps deployed', level: 'success' });
-        addLog({ message: 'All 8 instances online - infrastructure ready', level: 'success' });
-        setSessionPhase('running');
-      },
-    },
-  ];
-
-  let totalDelay = 0;
-  for (const step of steps) {
-    totalDelay += step.delay;
-    setTimeout(step.action, totalDelay);
-  }
+  setTimeout(poll, 5000);
 }
 
 function simulateDestroy() {
   const { setSessionPhase, updateInstance, addLog, endSession, resetInstances } = useInfraStore.getState();
 
   setSessionPhase('destroying');
-  addLog({ message: 'Terraform destroy initiated', level: 'warn' });
+  addLog({ message: 'Terraform destroy 시작', level: 'warn' });
 
   setTimeout(() => {
     for (const id of INSTANCE_IDS) {
       updateInstance(id, { status: 'destroying' });
     }
-    addLog({ message: 'Terminating all instances...', level: 'info' });
+    addLog({ message: '전체 인스턴스 종료 중...', level: 'info' });
   }, 1000);
 
   setTimeout(() => {
@@ -183,6 +89,7 @@ export function SessionBar() {
   const applyPlanResult = useInfraStore((s) => s.applyPlanResult);
   const addLog = useInfraStore((s) => s.addLog);
   const startSession = useInfraStore((s) => s.startSession);
+  const setActiveWorkflowRunId = useInfraStore((s) => s.setActiveWorkflowRunId);
 
   const [elapsed, setElapsed] = useState(0);
 
@@ -211,36 +118,61 @@ export function SessionBar() {
 
   const handleConnect = async () => {
     setSessionPhase('connecting');
-    addLog({ message: 'Syncing with GitHub Actions...', level: 'info' });
+    addLog({ message: 'GitHub Actions 동기화 중...', level: 'info' });
 
     try {
-      const result = await mockInit();
+      const result = await fetchInfraStatus();
       applyConnectResult(result);
-    } catch {
+    } catch (err) {
       setSessionPhase('failed');
-      addLog({ message: 'Failed to sync with GitHub Actions', level: 'error' });
+      addLog({ message: `동기화 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
     }
   };
 
   const handleInit = async () => {
     setSessionPhase('planning');
-    addLog({ message: 'Triggering terraform plan...', level: 'info' });
 
     try {
-      const planOutput = await mockPlan();
-      applyPlanResult(planOutput);
-    } catch {
+      const result = await triggerPlan((message, level) => {
+        addLog({ message, level: level || 'info' });
+      });
+      applyPlanResult(result.logs, result.runUrl);
+    } catch (err) {
       setSessionPhase('failed');
-      addLog({ message: 'Terraform plan failed', level: 'error' });
+      addLog({ message: `Plan 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
     }
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     startSession();
-    simulateDeployment();
+
+    try {
+      addLog({ message: 'terraform-apply.yml 워크플로우 디스패치 중...', level: 'info' });
+      const runId = await triggerApply();
+      setActiveWorkflowRunId(runId);
+      addLog({ message: `Apply 워크플로우 시작 (run #${runId})`, level: 'success' });
+      setSessionPhase('applying');
+
+      // 워크플로우 완료까지 폴링
+      pollApplyRun(runId);
+    } catch (err) {
+      addLog({ message: `Apply 트리거 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
+      setSessionPhase('failed');
+    }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    const runId = useInfraStore.getState().activeWorkflowRunId;
+
+    if (runId) {
+      try {
+        addLog({ message: `워크플로우 run #${runId} 취소 중...`, level: 'warn' });
+        await cancelRun(runId);
+        addLog({ message: '취소 요청 전송 완료', level: 'info' });
+      } catch (err) {
+        addLog({ message: `취소 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
+      }
+    }
     simulateDestroy();
   };
 

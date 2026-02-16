@@ -158,8 +158,8 @@ output "infrastructure_spec" {
     region         = "ap-northeast-2 (Seoul)"
     instance_type  = "t3.micro (2 vCPU, 1GB RAM)"
     instance_count = 8
-    storage        = "30GB gp3 per instance"
-    total_storage  = "240GB"
+    storage        = "8GB gp3 per instance"
+    total_storage  = "64GB"
     vpc_cidr       = "172.31.0.0/16"
     databases      = "MySQL 8.0 (8 schemas) + MongoDB 7.0"
     event_broker   = "Kafka 7.5 KRaft (no Zookeeper)"

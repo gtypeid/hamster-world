@@ -15,5 +15,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      '/lambda': {
+        target: 'https://gm3zsv5tr3v6sguwllhyekjlsy0nymab.lambda-url.ap-northeast-2.on.aws',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/lambda/, ''),
+      },
+    },
   },
 })

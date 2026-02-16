@@ -66,6 +66,11 @@ interface InfraState {
 
   // Plan result (terraform plan output)
   planResult: string | null;
+  planRunUrl: string | null;
+
+  // Planning 진행 상태
+  planStep: number;          // 0~4 (dispatch, waiting, running, logs, done)
+  planStepLabel: string;     // 현재 단계 설명
 
   // 내가 Start를 눌러 시작한 세션인지 여부 (Connect으로 감지된 기존 세션이면 false)
   startedByMe: boolean;
@@ -86,13 +91,14 @@ interface InfraState {
   // Actions
   setSessionPhase: (phase: SessionPhase) => void;
   applyConnectResult: (result: InitResult) => void;
-  applyPlanResult: (planOutput: string) => void;
+  applyPlanResult: (planOutput: string, runUrl?: string) => void;
   startSession: () => void;
   endSession: () => void;
   updateInstance: (id: InstanceId, update: Partial<InstanceState>) => void;
   addLog: (log: Omit<InfraLog, 'timestamp'>) => void;
   setSessionsUsedToday: (count: number) => void;
   setActiveWorkflowRunId: (id: number | null) => void;
+  setPlanStep: (step: number, label: string) => void;
   resetInstances: () => void;
   resetAll: () => void;
 }
@@ -183,6 +189,9 @@ export const useInfraStore = create<InfraState>((set) => ({
   infraStatus: 'unknown',
   initResult: null,
   planResult: null,
+  planRunUrl: null,
+  planStep: 0,
+  planStepLabel: '',
   startedByMe: false,
 
   // Budget
@@ -205,19 +214,19 @@ export const useInfraStore = create<InfraState>((set) => ({
     const logs: InfraLog[] = [...state.logs];
     const now = new Date().toISOString();
 
-    logs.push({ timestamp: now, message: `Sync complete - status: ${result.status}`, level: 'info' });
-    logs.push({ timestamp: now, message: `Today: ${result.sessionsUsedToday}/${result.maxSessionsPerDay} sessions used`, level: 'info' });
+    logs.push({ timestamp: now, message: `동기화 완료 - 상태: ${result.status}`, level: 'info' });
+    logs.push({ timestamp: now, message: `오늘: ${result.sessionsUsedToday}/${result.maxSessionsPerDay}회 사용`, level: 'info' });
 
     if (result.status === 'running') {
       const remainMin = Math.ceil((result.remainingSeconds ?? 0) / 60);
-      logs.push({ timestamp: now, message: `Session active - ${remainMin}min remaining`, level: 'success' });
+      logs.push({ timestamp: now, message: `세션 운영 중 - ${remainMin}분 남음`, level: 'success' });
     } else if (result.status === 'cooldown') {
       const cooldownSec = result.cooldownRemainingSeconds ?? 0;
-      logs.push({ timestamp: now, message: `Cooldown - ${Math.ceil(cooldownSec / 60)}min until next session`, level: 'warn' });
+      logs.push({ timestamp: now, message: `쿨다운 - 다음 세션까지 ${Math.ceil(cooldownSec / 60)}분`, level: 'warn' });
     } else if (result.status === 'limit_exceeded') {
-      logs.push({ timestamp: now, message: 'Daily session limit reached', level: 'error' });
+      logs.push({ timestamp: now, message: '일일 세션 한도 초과', level: 'error' });
     } else {
-      logs.push({ timestamp: now, message: 'Infrastructure available - ready to init (terraform plan)', level: 'success' });
+      logs.push({ timestamp: now, message: '인프라 사용 가능 - Init(terraform plan) 준비됨', level: 'success' });
     }
 
     // running 상태면 인스턴스도 running으로 표시
@@ -244,14 +253,15 @@ export const useInfraStore = create<InfraState>((set) => ({
     };
   }),
 
-  applyPlanResult: (planOutput) => set((state) => ({
+  applyPlanResult: (planOutput, runUrl?) => set((state) => ({
     sessionPhase: 'planned',
     planResult: planOutput,
+    planRunUrl: runUrl ?? null,
     logs: [
       ...state.logs,
       {
         timestamp: new Date().toISOString(),
-        message: 'Terraform plan completed - review infrastructure report',
+        message: 'Terraform plan 완료 - 인프라 리포트를 확인하세요',
         level: 'success' as const,
       },
     ],
@@ -304,6 +314,8 @@ export const useInfraStore = create<InfraState>((set) => ({
 
   setActiveWorkflowRunId: (id) => set({ activeWorkflowRunId: id }),
 
+  setPlanStep: (step, label) => set({ planStep: step, planStepLabel: label }),
+
   resetInstances: () => set({ instances: cloneInstances() }),
 
   resetAll: () => set({
@@ -312,6 +324,9 @@ export const useInfraStore = create<InfraState>((set) => ({
     infraStatus: 'unknown',
     initResult: null,
     planResult: null,
+    planRunUrl: null,
+    planStep: 0,
+    planStepLabel: '',
     startedByMe: false,
     sessionsUsedToday: 0,
     instances: cloneInstances(),

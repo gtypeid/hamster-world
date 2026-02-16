@@ -9,7 +9,6 @@ import {
   type InstanceId,
   type InstanceStatus,
   type SecurityGroup,
-  type SessionPhase,
 } from '../../stores/useInfraStore';
 
 // ─── Colors ───
@@ -58,12 +57,15 @@ function statusLabel(status: InstanceStatus): string {
 
 // Column X positions
 const COL_GIT = 0;
-const COL_REPO = 260;
-const COL_ACTIONS = 520;
-const COL_AWS_START = 800;
+const COL_LAMBDA = 200;
+const COL_GITHUB_API = 420;
+const COL_ACTIONS = 620;
+const COL_TERRAFORM = 820;
+const COL_AWS_START = 1040;
 
-// Row Y for control nodes
-const ROW_CENTER = 250;
+// Row Y for control nodes (Plan row / Apply row)
+const ROW_PLAN = 200;
+const ROW_APPLY = 330;
 
 // Instance dimensions
 const INST_W = 160;
@@ -185,40 +187,112 @@ export function InfraFlowView() {
     n.push(makeSGLabel('sg-auth-label', { x: AUTH_SG_X + 12, y: AUTH_SG_Y + 6 }, 'auth-sg', ':8090 VPC'));
     n.push(makeSGLabel('sg-internal-label', { x: INTERNAL_SG_X + 12, y: INTERNAL_SG_Y + 6 }, 'internal-sg', '172.31.0.0/16'));
 
-    // ─── Git column (hamster icon) ───
+    // ─── Control pipeline nodes (L→R) ───
+    //
+    // 활성화 조건: 실제 해당 동작이 완료되었거나 진행 중일 때만 켜진다.
+    // 각 행(Plan/Apply)은 2단계 점진 활성화:
+    //
+    // idle                → 전부 비활성
+    // connecting          → IO 활성 (요청 보내는 중)
+    // connected           → IO → Lambda → API 연결 완료 (Connect 성공 응답)
+    // planning            → + Actions(Plan) 활성 (워크플로우 실행 중)
+    // planned             → + TF Plan 활성 (리소스 검증 완료)
+    // triggering          → + Actions(Apply) 활성 (워크플로우 디스패치)
+    // applying            → + TF Apply 활성 (인프라 생성 중)
+    // running/destroying  → 전체 유지
+
+    const phase = sessionPhase;
+
+    // IO는 connecting 이상이면 활성 (요청을 보내니까)
+    const ioActive = phase !== 'idle';
+    // Lambda, API는 Connect 응답을 받은 이후부터 활성
+    const proxyDone = phase !== 'idle' && phase !== 'connecting';
+    // Plan 경로 (2단계 활성화)
+    // planRunning: planning 시작 시 Actions(Plan) 노드 활성 (워크플로우 실행 중)
+    const planRunning = phase === 'planning' || phase === 'planned'
+      || phase === 'triggering' || phase === 'applying'
+      || phase === 'running' || phase === 'destroying';
+    // planDone: plan 완료 후 TF Plan 노드 활성 (리소스 검증 완료)
+    const planDone = phase === 'planned'
+      || phase === 'triggering' || phase === 'applying'
+      || phase === 'running' || phase === 'destroying';
+
+    // Apply 경로 (2단계 활성화)
+    // applyRunning: triggering 시작 시 Actions(Apply) 노드 활성
+    const applyRunning = phase === 'triggering' || phase === 'applying'
+      || phase === 'running' || phase === 'destroying';
+    // applyDone: apply 실제 진행 시 TF Apply 노드 활성
+    const applyDone = phase === 'applying'
+      || phase === 'running' || phase === 'destroying';
+
+    // GitHub IO (항상 표시)
+    const ROW_MID = (ROW_PLAN + ROW_APPLY) / 2;
     n.push(makeControlNode(
-      'github-pages', { x: COL_GIT, y: ROW_CENTER - 40 },
-      'GitHub IO', '🐹', 'hamster-controller', true,
+      'github-pages', { x: COL_GIT, y: ROW_MID - 38 },
+      'GitHub IO', '🐹', 'hamster-controller', ioActive,
     ));
 
-    // ─── Repo column ───
+    // Lambda Proxy
     n.push(makeControlNode(
-      'hamster-repo', { x: COL_REPO, y: ROW_CENTER - 40 },
-      'hamster-world', '📦', 'Repository',
-      sessionPhase !== 'idle',
+      'lambda-proxy', { x: COL_LAMBDA, y: ROW_MID - 38 },
+      'Lambda Proxy', '☁️', 'PAT 보관 · 토큰 보호',
+      proxyDone,
     ));
 
-    // ─── Actions/Terraform column ───
+    // GitHub API
     n.push(makeControlNode(
-      'github-actions', { x: COL_ACTIONS, y: ROW_CENTER - 80 },
-      'GitHub Actions', '⚙️', 'Workflow Runner',
-      isPhaseActive(sessionPhase, 'triggering'),
-    ));
-    n.push(makeControlNode(
-      'terraform', { x: COL_ACTIONS, y: ROW_CENTER + 20 },
-      'Terraform', '🏗️', 'IaC Engine',
-      isPhaseActive(sessionPhase, 'applying'),
+      'github-api', { x: COL_GITHUB_API, y: ROW_MID - 38 },
+      'GitHub API', '🔗', 'hamster-world repo',
+      proxyDone,
     ));
 
-    // ─── Control edges (LR flow) ───
+    // Plan row: Actions (Plan) → Terraform Plan (progressive)
+    n.push(makeControlNode(
+      'actions-plan', { x: COL_ACTIONS, y: ROW_PLAN - 38 },
+      'Actions', '⚙️', 'terraform-plan.yml',
+      planRunning,
+    ));
+    n.push(makeControlNode(
+      'tf-plan', { x: COL_TERRAFORM, y: ROW_PLAN - 38 },
+      'TF Plan', '📋', '리소스 검증',
+      planDone,
+    ));
+
+    // Apply row: Actions (Apply) → Terraform Apply (progressive)
+    n.push(makeControlNode(
+      'actions-apply', { x: COL_ACTIONS, y: ROW_APPLY - 38 },
+      'Actions', '⚙️', 'terraform-apply.yml',
+      applyRunning,
+    ));
+    n.push(makeControlNode(
+      'tf-apply', { x: COL_TERRAFORM, y: ROW_APPLY - 38 },
+      'TF Apply', '🏗️', '인프라 생성/삭제',
+      applyDone,
+    ));
+
+    // ─── Control edges ───
+    // IO → Lambda: connecting 이상이면 활성 (요청 보내는 중)
     e.push(
-      makeFlowEdge('github-pages', 'hamster-repo', 'API call', sessionPhase !== 'idle'),
-      makeFlowEdge('hamster-repo', 'github-actions', 'workflow_dispatch', isPhaseActive(sessionPhase, 'triggering')),
-      makeFlowEdge('github-actions', 'terraform', 'run', isPhaseActive(sessionPhase, 'applying')),
+      makeFlowEdge('github-pages', 'lambda-proxy', 'fetch', ioActive),
+    );
+    // Lambda → API: 응답 받은 이후 활성
+    e.push(
+      makeFlowEdge('lambda-proxy', 'github-api', 'proxy', proxyDone),
     );
 
-    // ─── Terraform → AWS instances ───
-    // terraform connects to front-sg, auth-sg, and internal-sg infra
+    // API → Plan row (progressive: dispatch 먼저, plan 완료 후 결과 연결)
+    e.push(
+      makeFlowEdge('github-api', 'actions-plan', 'dispatch', planRunning),
+      makeFlowEdge('actions-plan', 'tf-plan', 'run', planDone),
+    );
+
+    // API → Apply row (progressive: dispatch 먼저, apply 시작 후 연결)
+    e.push(
+      makeFlowEdge('github-api', 'actions-apply', 'dispatch', applyRunning),
+      makeFlowEdge('actions-apply', 'tf-apply', 'run', applyDone),
+    );
+
+    // ─── TF Apply → AWS instances ───
     const tfTargets: InstanceId[] = ['hamster-front', 'hamster-auth', 'hamster-db', 'hamster-kafka'];
     for (const id of tfTargets) {
       const inst = instances[id];
@@ -226,7 +300,7 @@ export function InfraFlowView() {
       const isProv = inst.status === 'provisioning';
       e.push({
         id: `e-tf-${id}`,
-        source: 'terraform',
+        source: 'tf-apply',
         target: id,
         animated: isProv,
         style: {
@@ -496,12 +570,3 @@ function makeFlowEdge(source: string, target: string, label: string, active: boo
   };
 }
 
-function isPhaseActive(current: SessionPhase, ...phases: SessionPhase[]): boolean {
-  const activePhases: SessionPhase[] = ['triggering', 'applying', 'running', 'destroying'];
-  if (phases.some((p) => p === current)) return true;
-  const currentIdx = activePhases.indexOf(current);
-  return phases.some((p) => {
-    const pIdx = activePhases.indexOf(p);
-    return pIdx >= 0 && currentIdx > pIdx;
-  });
-}
