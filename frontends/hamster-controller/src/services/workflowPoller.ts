@@ -133,6 +133,7 @@ function beginPolling(runId: number): void {
       }
 
       // 2) Repository Variable 기반 인스턴스별 실시간 업데이트
+      // 개별 인스턴스 상태 전환 로그는 applyInfraVariable 내부에서 처리
       if (infraVar) {
         applyInfraVariable(infraVar);
       }
@@ -144,6 +145,8 @@ function beginPolling(runId: number): void {
       }
     } catch (err) {
       console.warn('[workflowPoller] poll error:', err);
+      const { addLog } = useInfraStore.getState();
+      addLog({ message: `폴링 오류: ${err instanceof Error ? err.message : String(err)}`, level: 'warn' });
     }
 
     activePoller = window.setTimeout(poll, POLL_INTERVAL);
@@ -246,15 +249,18 @@ function handlePhaseTransition(detected: WorkflowPhase): void {
  * variable JSON 형태:
  *   { instances: { "hamster-db": { status: "running", ip: "10.0.1.5" }, ... } }
  */
-function applyInfraVariable(infraVar: InfraVariableStatus): void {
-  const { updateInstance, addLog } = useInfraStore.getState();
+function applyInfraVariable(infraVar: InfraVariableStatus): number {
+  const { updateInstance, addLog, instances } = useInfraStore.getState();
 
-  if (!infraVar.instances) return;
+  if (!infraVar.instances) return 0;
+
+  let changed = 0;
 
   for (const [id, info] of Object.entries(infraVar.instances)) {
     const instanceId = id as InstanceId;
     if (!INSTANCE_IDS.includes(instanceId)) continue;
 
+    const prevStatus = instances[instanceId]?.status ?? 'none';
     const update: Partial<{ status: InstanceStatus; ip: string; detail: string }> = {};
 
     // status 매핑: variable의 status → store의 InstanceStatus
@@ -286,19 +292,60 @@ function applyInfraVariable(infraVar: InfraVariableStatus): void {
       updateInstance(instanceId, update);
     }
 
-    // IP 할당 로그 (최초 1회)
+    // 상태 전환 로그 (최초 1회): none→provisioning, provisioning→running 등
+    if (update.status && update.status !== prevStatus) {
+      const transKey = `transition-${instanceId}-${update.status}`;
+      if (!loggedEvents.has(transKey)) {
+        loggedEvents.add(transKey);
+        changed++;
+
+        if (prevStatus === 'none' && update.status === 'provisioning') {
+          addLog({
+            instanceId,
+            message: `인스턴스 생성 시작${info.ip ? ` (${info.ip})` : ''}`,
+            level: 'info',
+          });
+        } else if (update.status === 'running') {
+          addLog({
+            instanceId,
+            message: `인스턴스 온라인${info.ip ? ` (${info.ip})` : ''}`,
+            level: 'success',
+          });
+        } else if (update.status === 'failed') {
+          addLog({
+            instanceId,
+            message: `인스턴스 실패`,
+            level: 'error',
+          });
+        } else if (update.status === 'destroying') {
+          addLog({
+            instanceId,
+            message: `인스턴스 종료 중`,
+            level: 'warn',
+          });
+        }
+      }
+    }
+
+    // IP 할당 로그 (최초 1회) — 상태 전환 로그와 별개로, IP만 새로 받은 경우
     if (info.ip) {
       const ipKey = `ip-${instanceId}`;
       if (!loggedEvents.has(ipKey)) {
         loggedEvents.add(ipKey);
-        addLog({
-          instanceId,
-          message: `IP 할당: ${info.ip}`,
-          level: 'info',
-        });
+        // 상태 전환 로그에서 이미 IP를 포함했으면 중복 방지
+        const transKey = `transition-${instanceId}-${update.status}`;
+        if (!loggedEvents.has(transKey) || !update.status || update.status === prevStatus) {
+          addLog({
+            instanceId,
+            message: `IP 할당: ${info.ip}`,
+            level: 'info',
+          });
+        }
       }
     }
   }
+
+  return changed;
 }
 
 // ─── Job Completed Handler ───

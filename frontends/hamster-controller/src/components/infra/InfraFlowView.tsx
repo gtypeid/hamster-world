@@ -292,23 +292,25 @@ export function InfraFlowView() {
       makeFlowEdge('actions-apply', 'tf-apply', 'run', applyDone),
     );
 
-    // ─── TF Apply → AWS instances ───
-    const tfTargets: InstanceId[] = ['hamster-front', 'hamster-auth', 'hamster-db', 'hamster-kafka'];
-    for (const id of tfTargets) {
+    // ─── TF Apply → AWS instances (전체 8개) ───
+    // none이면 엣지 없음, provisioning이면 주황 애니메이션, running이면 초록 실선
+    for (const id of INSTANCE_IDS) {
       const inst = instances[id];
-      const isIdle = inst.status === 'none';
+      if (inst.status === 'none') continue; // 미생성 상태면 엣지 없음
+
       const isProv = inst.status === 'provisioning';
+      const isRunning = inst.status === 'running';
       e.push({
         id: `e-tf-${id}`,
         source: 'tf-apply',
         target: id,
         animated: isProv,
         style: {
-          stroke: isIdle ? '#334155' : isProv ? '#d97706' : '#16a34a',
-          strokeWidth: isIdle ? 1 : 2,
-          opacity: isIdle ? 0.15 : 0.6,
+          stroke: isProv ? '#d97706' : isRunning ? '#16a34a' : '#ea580c',
+          strokeWidth: 2,
+          opacity: 0.6,
         },
-        markerEnd: { type: MarkerType.ArrowClosed, color: isIdle ? '#334155' : isProv ? '#d97706' : '#16a34a' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: isProv ? '#d97706' : isRunning ? '#16a34a' : '#ea580c' },
       });
     }
 
@@ -428,27 +430,28 @@ export function InfraFlowView() {
 
 // ─── Helpers ───
 
+/**
+ * Traffic edge: 양쪽 다 running일 때만 표시.
+ * none/provisioning/destroying 등 그 외 상태에서는 엣지 자체를 렌더링하지 않는다.
+ */
 function addTrafficEdge(
   edges: Edge[],
   instances: Record<InstanceId, { status: InstanceStatus }>,
   src: InstanceId,
   tgt: InstanceId,
 ) {
-  const srcRunning = instances[src].status === 'running';
-  const tgtRunning = instances[tgt].status === 'running';
-  const active = srcRunning && tgtRunning;
-  const anyActive = instances[src].status !== 'none' && instances[tgt].status !== 'none';
+  const bothRunning = instances[src].status === 'running' && instances[tgt].status === 'running';
+  if (!bothRunning) return;
 
   edges.push({
     id: `e-traffic-${src}-${tgt}`,
     source: src,
     target: tgt,
-    animated: active,
+    animated: true,
     style: {
-      stroke: active ? '#475569' : '#1e293b',
-      strokeWidth: active ? 1.5 : 0.5,
-      opacity: active ? 0.5 : anyActive ? 0.15 : 0.06,
-      strokeDasharray: active ? undefined : '4,4',
+      stroke: '#475569',
+      strokeWidth: 1.5,
+      opacity: 0.5,
     },
   });
 }
