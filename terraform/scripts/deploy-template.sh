@@ -27,7 +27,9 @@ push_infra_status() {
   done
 }
 
-PRIVATE_IP=$(curl -sf --max-time 5 http://169.254.169.254/latest/meta-data/local-ipv4 || echo "unknown")
+# IMDSv2: 토큰 발급 → 메타데이터 조회 (Amazon Linux 2023 기본값이 IMDSv2 required)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
 
 report_status "인스턴스 시작 (IP: $PRIVATE_IP)"
 push_infra_status "provisioning" "$PRIVATE_IP"
