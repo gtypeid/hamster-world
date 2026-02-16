@@ -1,3 +1,26 @@
+# ============================================================================
+# Terraform Apply — 인프라 생성 및 시한부 운영 워크플로우
+# ============================================================================
+#
+# 이 워크플로우의 역할은 두 가지뿐이다:
+#   1. terraform apply  — 인프라 생성
+#   2. terraform destroy — 인프라 파괴 (정상 완료, 실패, cancel 모든 경우)
+#
+# Destroy를 같은 워크플로우에서 실행하는 이유:
+#   - terraform state가 local backend(러너 파일시스템)에 저장된다.
+#   - apply가 생성한 state 파일이 같은 러너에 남아있어야 destroy가 가능하다.
+#   - 별도 워크플로우로 분리하면 state가 없어 어떤 리소스를 파괴해야 하는지 모른다.
+#
+# 인스턴스별 실시간 상태(INFRA_STATUS)를 이 워크플로우가 직접 관리하지 않는 이유:
+#   - 인스턴스 생성(provisioning/running) 상태는 각 VM이 부팅 시 user_data
+#     (deploy-template.sh)에서 직접 GitHub Variables API에 push한다.
+#     워크플로우는 apply 명령을 실행할 뿐, 개별 인스턴스의 부팅 완료 시점을 모른다.
+#   - 초기화(pending 리셋)는 클라이언트(프론트엔드)가 디스패치 직전에 수행한다.
+#     워크플로우의 관심사가 아니다.
+#   - 단, destroying/idle는 VM이 죽은 후에는 보고할 수 없으므로
+#     워크플로우에서만 push할 수 있다. 이 두 단계만 여기서 처리한다.
+# ============================================================================
+
 name: Terraform Apply
 
 on:
@@ -24,7 +47,7 @@ env:
   TF_VAR_db_root_password: ${{ secrets.DB_ROOT_PASSWORD }}
   TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
   TF_VAR_mongo_password: ${{ secrets.MONGO_PASSWORD }}
-  # INFRA_STATUS push용
+  # destroying/idle INFRA_STATUS push용
   GH_API: https://api.github.com
   GH_REPO: ${{ github.repository }}
 
@@ -40,8 +63,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
-          # wrapper 기본값(true)이면 terraform output -json 결과에 메타데이터가 섞여
-          # jq 파싱이 깨진다. INFRA_STATUS push step에서 IP 추출용으로 필요.
+          # wrapper 기본값(true)이면 terraform 명령 출력에 메타데이터가 섞인다.
           terraform_wrapper: false
 
       - name: Terraform Init
@@ -49,59 +71,6 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false
-
-      - name: Push instance status (apply complete)
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
-        run: |
-          cd $GITHUB_WORKSPACE/terraform
-
-          # terraform output에서 인스턴스별 IP 추출
-          INSTANCES_JSON=$(terraform output -json instances 2>/dev/null || echo '{}')
-
-          # 인스턴스 ID 목록과 terraform 리소스명 매핑
-          declare -A TF_NAMES=(
-            [hamster-db]=db
-            [hamster-auth]=auth
-            [hamster-kafka]=kafka
-            [hamster-commerce]=commerce
-            [hamster-billing]=billing
-            [hamster-payment]=payment
-            [hamster-support]=support
-            [hamster-front]=front
-          )
-
-          # INFRA_STATUS JSON 구성
-          STATUS_INSTANCES="{"
-          FIRST=true
-          for INST_ID in "${!TF_NAMES[@]}"; do
-            TF_NAME="${TF_NAMES[$INST_ID]}"
-            IP=$(echo "$INSTANCES_JSON" | jq -r ".\"${INST_ID}\".ip // empty" 2>/dev/null || echo "")
-
-            if [ "$FIRST" = true ]; then FIRST=false; else STATUS_INSTANCES+=","; fi
-            STATUS_INSTANCES+="\"${INST_ID}\":{\"status\":\"running\""
-            if [ -n "$IP" ]; then
-              STATUS_INSTANCES+=",\"ip\":\"${IP}\""
-            fi
-            STATUS_INSTANCES+="}"
-          done
-          STATUS_INSTANCES+="}"
-
-          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          PAYLOAD=$(jq -n --arg inst "$STATUS_INSTANCES" --arg ts "$TIMESTAMP" \
-            '{phase: "running", instances: ($inst | fromjson), updatedAt: $ts}')
-
-          # INFRA_STATUS variable 업데이트 (PATCH)
-          ESCAPED=$(echo "$PAYLOAD" | jq -Rs '.')
-          curl -sf -X PATCH \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"value\": ${ESCAPED}}" \
-            "${GH_API}/repos/${GH_REPO}/actions/variables/INFRA_STATUS" \
-            || echo "::warning::Failed to update INFRA_STATUS variable"
-
-          echo "INFRA_STATUS updated: phase=running"
 
       - name: Wait for active runtime
         run: |

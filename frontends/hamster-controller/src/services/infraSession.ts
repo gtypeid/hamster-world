@@ -9,7 +9,7 @@
 import { proxyFetch } from './lambdaProxy';
 import type { InitResult } from './mockGithub';
 import type { WorkflowRun, WorkflowRunsResponse, JobsResponse, WorkflowJob } from '../types/github';
-import { useInfraStore } from '../stores/useInfraStore';
+import { useInfraStore, INSTANCE_IDS } from '../stores/useInfraStore';
 import { WORKFLOW_DURATION_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
 
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || 'gtypeid';
@@ -237,6 +237,11 @@ export async function triggerPlan(onProgress?: ProgressCallback): Promise<PlanRe
 // ─── Start: Terraform Apply 트리거 ───
 
 export async function triggerApply(): Promise<number> {
+  // 디스패치 전 INFRA_STATUS를 pending으로 초기화한다.
+  // 이전 세션의 idle 데이터가 남아있으면 클라이언트가 잘못된 상태를 보게 된다.
+  // 각 VM이 부팅되면서 자기 상태를 직접 push하므로, 여기서는 빈 상태로 리셋만 한다.
+  await initializeInfraStatus();
+
   await proxyFetch({
     method: 'POST',
     path: `/repos/_/_/actions/workflows/${WORKFLOW_APPLY}/dispatches`,
@@ -251,6 +256,27 @@ export async function triggerApply(): Promise<number> {
   }
 
   return run.id;
+}
+
+const INFRA_STATUS_VAR = 'INFRA_STATUS';
+
+async function initializeInfraStatus(): Promise<void> {
+  const instances: Record<string, { status: string }> = {};
+  for (const id of INSTANCE_IDS) {
+    instances[id] = { status: 'pending' };
+  }
+
+  const payload = JSON.stringify({
+    phase: 'applying',
+    instances,
+    updatedAt: new Date().toISOString(),
+  });
+
+  await proxyFetch({
+    method: 'PATCH',
+    path: `/repos/_/_/actions/variables/${INFRA_STATUS_VAR}`,
+    body: { value: payload },
+  });
 }
 
 // ─── Stop: 실행중인 워크플로우 취소 ───
@@ -380,8 +406,6 @@ export async function fetchRunLogs(runId: number): Promise<string | null> {
 }
 
 // ─── Repository Variables: 인스턴스 상태 실시간 poll ───
-
-const INFRA_STATUS_VAR = 'INFRA_STATUS';
 
 export interface InfraVariableStatus {
   phase?: string;

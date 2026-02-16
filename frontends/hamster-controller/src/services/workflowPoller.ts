@@ -259,6 +259,7 @@ function applyInfraVariable(infraVar: InfraVariableStatus): void {
 
     // status 매핑: variable의 status → store의 InstanceStatus
     switch (info.status) {
+      case 'pending':
       case 'creating':
       case 'provisioning':
         update.status = 'provisioning';
@@ -271,7 +272,7 @@ function applyInfraVariable(infraVar: InfraVariableStatus): void {
         break;
       case 'destroyed':
       case 'idle':
-        update.status = 'idle';
+        update.status = 'none';
         break;
       case 'failed':
         update.status = 'failed';
@@ -361,7 +362,7 @@ function applyResourceState(res: ResourceState): void {
       break;
 
     case 'destroyed':
-      updateInstance(res.instanceId, { status: 'idle' });
+      updateInstance(res.instanceId, { status: 'none' });
       if (!loggedEvents.has(key)) {
         loggedEvents.add(key);
         addLog({

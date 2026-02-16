@@ -14,7 +14,7 @@ export type InstanceId =
   | 'hamster-support'
   | 'hamster-front';
 
-export type InstanceStatus = 'idle' | 'provisioning' | 'running' | 'failed' | 'destroying';
+export type InstanceStatus = 'none' | 'provisioning' | 'running' | 'failed' | 'destroying';
 
 export type SecurityGroup = 'front-sg' | 'auth-sg' | 'internal-sg';
 
@@ -114,7 +114,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-db': {
     id: 'hamster-db',
     label: 'Database',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['MySQL 8.0', 'MongoDB 7.0'],
     ports: [':3306', ':27017'],
@@ -123,7 +123,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-auth': {
     id: 'hamster-auth',
     label: 'Auth',
-    status: 'idle',
+    status: 'none',
     sg: 'auth-sg',
     services: ['Keycloak 23.0'],
     ports: [':8090'],
@@ -131,7 +131,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-kafka': {
     id: 'hamster-kafka',
     label: 'Kafka',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['Kafka 7.5 (KRaft)'],
     ports: [':9092', ':9093'],
@@ -139,7 +139,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-commerce': {
     id: 'hamster-commerce',
     label: 'Commerce',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['eCommerce API'],
     ports: [':8080'],
@@ -147,7 +147,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-billing': {
     id: 'hamster-billing',
     label: 'Billing',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['Cash Gateway', 'Hamster PG'],
     ports: [':8082', ':8086'],
@@ -155,7 +155,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-payment': {
     id: 'hamster-payment',
     label: 'Payment',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['Payment Service'],
     ports: [':8083'],
@@ -163,7 +163,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-support': {
     id: 'hamster-support',
     label: 'Support',
-    status: 'idle',
+    status: 'none',
     sg: 'internal-sg',
     services: ['Progression', 'Notification'],
     ports: [':8084', ':8085'],
@@ -171,7 +171,7 @@ const DEFAULT_INSTANCES: Record<InstanceId, InstanceState> = {
   'hamster-front': {
     id: 'hamster-front',
     label: 'Front',
-    status: 'idle',
+    status: 'none',
     sg: 'front-sg',
     services: ['Nginx', '4 React Apps'],
     ports: [':80'],

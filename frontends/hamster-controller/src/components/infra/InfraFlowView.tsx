@@ -14,7 +14,7 @@ import {
 // ─── Colors ───
 
 const STATUS_COLORS: Record<InstanceStatus, { bg: string; border: string; text: string }> = {
-  idle:         { bg: '#1e293b', border: '#334155', text: '#94a3b8' },
+  none:         { bg: '#1e293b', border: '#334155', text: '#94a3b8' },
   provisioning: { bg: '#422006', border: '#d97706', text: '#fbbf24' },
   running:      { bg: '#052e16', border: '#16a34a', text: '#4ade80' },
   failed:       { bg: '#450a0a', border: '#dc2626', text: '#f87171' },
@@ -40,7 +40,7 @@ const INSTANCE_ICONS: Record<InstanceId, string> = {
 
 function statusLabel(status: InstanceStatus): string {
   switch (status) {
-    case 'idle': return 'Standby';
+    case 'none': return 'Standby';
     case 'provisioning': return 'Starting...';
     case 'running': return 'Online';
     case 'failed': return 'Failed';
@@ -296,7 +296,7 @@ export function InfraFlowView() {
     const tfTargets: InstanceId[] = ['hamster-front', 'hamster-auth', 'hamster-db', 'hamster-kafka'];
     for (const id of tfTargets) {
       const inst = instances[id];
-      const isIdle = inst.status === 'idle';
+      const isIdle = inst.status === 'none';
       const isProv = inst.status === 'provisioning';
       e.push({
         id: `e-tf-${id}`,
@@ -437,7 +437,7 @@ function addTrafficEdge(
   const srcRunning = instances[src].status === 'running';
   const tgtRunning = instances[tgt].status === 'running';
   const active = srcRunning && tgtRunning;
-  const anyActive = instances[src].status !== 'idle' && instances[tgt].status !== 'idle';
+  const anyActive = instances[src].status !== 'none' && instances[tgt].status !== 'none';
 
   edges.push({
     id: `e-traffic-${src}-${tgt}`,
