@@ -25,6 +25,7 @@ const ALLOWED_PATTERNS = [
   /^\/repos\/[^/]+\/[^/]+\/actions\/runs\/\d+\/jobs$/,         // GET run jobs
   /^\/repos\/[^/]+\/[^/]+\/actions\/jobs\/\d+\/logs$/,         // GET job logs
   /^\/repos\/[^/]+\/[^/]+\/actions\/runs\/\d+\/logs$/,         // GET run logs
+  /^\/repos\/[^/]+\/[^/]+\/actions\/variables\/[A-Z_]+$/,      // GET/PATCH repo variable
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -122,7 +123,7 @@ async function proxyToGitHub({ method = 'GET', path, params, body }) {
 
   const fetchOpts = { method, headers };
 
-  if (body && method === 'POST') {
+  if (body && (method === 'POST' || method === 'PATCH')) {
     fetchOpts.headers['Content-Type'] = 'application/json';
     fetchOpts.body = JSON.stringify(body);
   }

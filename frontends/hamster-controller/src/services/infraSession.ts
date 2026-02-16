@@ -379,6 +379,37 @@ export async function fetchRunLogs(runId: number): Promise<string | null> {
   }
 }
 
+// ─── Repository Variables: 인스턴스 상태 실시간 poll ───
+
+const INFRA_STATUS_VAR = 'INFRA_STATUS';
+
+export interface InfraVariableStatus {
+  phase?: string;
+  instances?: Record<string, {
+    status: string;
+    ip?: string;
+    detail?: string;
+  }>;
+  updatedAt?: string;
+}
+
+/**
+ * GitHub Repository Variables에서 INFRA_STATUS를 가져온다.
+ * 워크플로우 sh가 PATCH로 업데이트한 인스턴스별 실시간 상태를 poll하는 용도.
+ */
+export async function fetchInfraVariable(): Promise<InfraVariableStatus | null> {
+  try {
+    const data = await proxyFetch<{ value?: string }>({
+      method: 'GET',
+      path: `/repos/_/_/actions/variables/${INFRA_STATUS_VAR}`,
+    });
+    if (!data.value) return null;
+    return JSON.parse(data.value) as InfraVariableStatus;
+  } catch {
+    return null;
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

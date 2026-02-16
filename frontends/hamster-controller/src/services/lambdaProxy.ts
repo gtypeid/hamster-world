@@ -10,7 +10,7 @@
 const LAMBDA_URL = import.meta.env.DEV ? '/lambda' : (import.meta.env.VITE_LAMBDA_URL || '');
 
 interface ProxyRequest {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PATCH';
   path: string;
   params?: Record<string, string>;
   body?: unknown;
