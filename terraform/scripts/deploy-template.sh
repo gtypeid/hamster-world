@@ -12,9 +12,10 @@ REPORT_EOF
 source /tmp/report-status.sh
 
 # INFRA_STATUS push: GET → merge(자기 인스턴스만) → PATCH, 3회 반복
-_IVAR="https://api.github.com/repos/${gh_repo}/actions/variables/INFRA_STATUS"
+_IVAR="https://api.github.com/repos/$${GH_REPO}/actions/variables/INFRA_STATUS"
 _AUTH="Authorization: Bearer $${GH_DEPLOY_TOKEN}"
 push_infra_status() {
+  [ -z "$${GH_DEPLOY_TOKEN}" ] && return 0
   local s="$1" ip="$${2:-}"
   local d; [ -n "$ip" ] && d="{\"status\":\"$s\",\"ip\":\"$ip\"}" || d="{\"status\":\"$s\"}"
   for i in 1 2 3; do
