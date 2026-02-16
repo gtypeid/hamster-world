@@ -105,12 +105,14 @@ export function SessionBar() {
     startSession();
 
     try {
+      const { setApplyStep } = useInfraStore.getState();
+      setApplyStep(0, 'Workflow Dispatch');
       addLog({ message: 'terraform-apply.yml 워크플로우 디스패치 중...', level: 'info' });
       const runId = await triggerApply();
       setActiveWorkflowRunId(runId);
+      setApplyStep(1, 'Run 생성 완료');
       addLog({ message: `Apply 워크플로우 시작 (run #${runId})`, level: 'success' });
-      setSessionPhase('applying');
-
+      // triggering 유지 — 폴러가 로그에서 실제 apply 시작을 감지하면 applying으로 전환
       // 워크플로우 전체 라이프사이클 폴링 (apply → running → destroy → completed)
       startWorkflowPolling(runId);
     } catch (err) {

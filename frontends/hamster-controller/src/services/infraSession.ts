@@ -8,10 +8,9 @@
 
 import { proxyFetch } from './lambdaProxy';
 import type { InitResult } from './mockGithub';
-import type { WorkflowRun, WorkflowRunsResponse } from '../types/github';
+import type { WorkflowRun, WorkflowRunsResponse, JobsResponse, WorkflowJob } from '../types/github';
 import { useInfraStore } from '../stores/useInfraStore';
 import { WORKFLOW_DURATION_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
-import { parseWorkflowLog } from '../utils/parseWorkflowLog';
 
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || 'gtypeid';
 const REPO  = import.meta.env.VITE_GITHUB_REPO  || 'hamster-world';
@@ -45,16 +44,16 @@ export async function fetchInfraStatus(): Promise<InitResult> {
 
   const result = analyzeStatus(runs);
 
-  // active run이 있으면 로그를 가져와서 세부 단계 감지
+  // active run이 있으면 steps 기반으로 세부 단계 감지
   if (result.status === 'running' && result.activeRunId) {
     try {
-      const logs = await fetchRunLogs(result.activeRunId);
-      const parsed = parseWorkflowLog(logs);
-      if (parsed.phase === 'applying' || parsed.phase === 'running' || parsed.phase === 'destroying') {
-        result.detectedPhase = parsed.phase;
+      const job = await fetchRunJobs(result.activeRunId);
+      if (job) {
+        const phase = detectPhaseFromJobSteps(job);
+        if (phase) result.detectedPhase = phase;
       }
     } catch {
-      // 로그 가져오기 실패해도 기본 running으로 진행
+      // steps 가져오기 실패해도 기본 running으로 진행
     }
   }
 
@@ -141,6 +140,29 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
     cooldownMin: COOLDOWN_MIN,
     runs,
   };
+}
+
+/**
+ * Job steps에서 현재 워크플로우 phase를 감지한다.
+ * Connect 시 기존 세션의 세부 단계를 판단하는 데 사용.
+ */
+function detectPhaseFromJobSteps(job: WorkflowJob): 'applying' | 'running' | 'destroying' | null {
+  const steps = job.steps || [];
+
+  const destroyStep = steps.find((s) => s.name === 'Terraform Destroy');
+  const waitStep = steps.find((s) => s.name === 'Wait for active runtime');
+  const applyStep = steps.find((s) => s.name === 'Terraform Apply');
+
+  if (destroyStep && (destroyStep.status === 'in_progress' || destroyStep.status === 'completed')) {
+    return 'destroying';
+  }
+  if (waitStep && (waitStep.status === 'in_progress' || waitStep.status === 'completed')) {
+    return 'running';
+  }
+  if (applyStep && (applyStep.status === 'in_progress' || applyStep.status === 'completed')) {
+    return 'applying';
+  }
+  return null;
 }
 
 // ─── Init: Terraform Plan 트리거 + 결과 대기 ───
@@ -305,11 +327,31 @@ async function pollRunUntilDone(
 }
 
 /**
+ * 워크플로우 런의 jobs 목록을 가져온다.
+ * 진행 중(in_progress)인 런에서도 동작하며, 각 step의 status/started_at/completed_at를 반환한다.
+ */
+export async function fetchRunJobs(runId: number): Promise<WorkflowJob | null> {
+  try {
+    const data = await proxyFetch<JobsResponse>({
+      method: 'GET',
+      path: `/repos/_/_/actions/runs/${runId}/jobs`,
+    });
+    const jobs = data.jobs || [];
+    return jobs.length > 0 ? jobs[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 워크플로우 런의 로그를 plain text로 가져온다.
  *
  * /runs/{id}/logs 는 ZIP 바이너리를 반환하므로 사용하지 않는다.
  * 대신 /runs/{id}/jobs → /jobs/{jobId}/logs 경로를 사용하면
  * GitHub가 plain text 로그를 반환한다.
+ *
+ * 주의: 진행 중(in_progress)인 job에서는 로그가 사용 불가능할 수 있다.
+ * 진행 중인 워크플로우의 phase 감지에는 fetchRunJobs의 steps를 사용할 것.
  */
 export async function fetchRunLogs(runId: number): Promise<string | null> {
   try {

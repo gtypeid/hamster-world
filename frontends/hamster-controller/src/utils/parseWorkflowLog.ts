@@ -77,6 +77,12 @@ export interface WorkflowLogResult {
 
 // ─── Parser ───
 
+/** ANSI escape 코드 제거 (GitHub Actions 로그에 포함됨) */
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 /**
  * 워크플로우 job logs 전체를 파싱하여 현재 상태를 반환한다.
  * 매 폴링마다 전체 로그를 파싱하는 방식 (idempotent).
@@ -90,6 +96,9 @@ export function parseWorkflowLog(raw: string | null): WorkflowLogResult {
   };
 
   if (!raw) return result;
+
+  // ANSI escape 코드 제거 — GitHub Actions 로그에 Terraform 출력의 색상 코드가 포함됨
+  raw = stripAnsi(raw);
 
   const resourceMap = new Map<string, ResourceState>();
 

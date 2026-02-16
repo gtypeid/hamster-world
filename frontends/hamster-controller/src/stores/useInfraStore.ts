@@ -74,6 +74,10 @@ interface InfraState {
   planStep: number;          // 0~4 (dispatch, waiting, running, logs, done)
   planStepLabel: string;     // 현재 단계 설명
 
+  // Apply 워크플로우 진행 상태
+  applyStep: number;         // 0~5 (dispatch, waiting, applying, running, destroying, done)
+  applyStepLabel: string;    // 현재 단계 설명
+
   // 내가 Start를 눌러 시작한 세션인지 여부 (Connect으로 감지된 기존 세션이면 false)
   startedByMe: boolean;
 
@@ -101,6 +105,7 @@ interface InfraState {
   setSessionsUsedToday: (count: number) => void;
   setActiveWorkflowRunId: (id: number | null) => void;
   setPlanStep: (step: number, label: string) => void;
+  setApplyStep: (step: number, label: string) => void;
   resetInstances: () => void;
   resetAll: () => void;
 }
@@ -195,6 +200,8 @@ export const useInfraStore = create<InfraState>((set) => ({
   planEc2Count: null,
   planStep: 0,
   planStepLabel: '',
+  applyStep: 0,
+  applyStepLabel: '',
   startedByMe: false,
 
   // Budget
@@ -345,6 +352,8 @@ export const useInfraStore = create<InfraState>((set) => ({
 
   setPlanStep: (step, label) => set({ planStep: step, planStepLabel: label }),
 
+  setApplyStep: (step, label) => set({ applyStep: step, applyStepLabel: label }),
+
   resetInstances: () => set({ instances: cloneInstances() }),
 
   resetAll: () => set({
@@ -357,6 +366,8 @@ export const useInfraStore = create<InfraState>((set) => ({
     planEc2Count: null,
     planStep: 0,
     planStepLabel: '',
+    applyStep: 0,
+    applyStepLabel: '',
     startedByMe: false,
     sessionsUsedToday: 0,
     instances: cloneInstances(),

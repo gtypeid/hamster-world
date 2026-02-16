@@ -5,6 +5,7 @@ import { parsePlanOutput, formatPlanSummary } from '../../utils/parsePlan';
 import { COOLDOWN_MIN } from '../../config/infraConfig';
 
 const PLAN_STEPS = ['Dispatch', 'Waiting', 'Running', 'Logs'];
+const APPLY_STEPS = ['Dispatch', 'Waiting', 'Apply', 'Running', 'Destroy'];
 
 export function InfraGuide() {
   const sessionPhase = useInfraStore((s) => s.sessionPhase);
@@ -17,6 +18,8 @@ export function InfraGuide() {
   const planStep = useInfraStore((s) => s.planStep);
   const planStepLabel = useInfraStore((s) => s.planStepLabel);
   const planResult = useInfraStore((s) => s.planResult);
+  const applyStep = useInfraStore((s) => s.applyStep);
+  const applyStepLabel = useInfraStore((s) => s.applyStepLabel);
 
   // Planning 경과 시간 타이머
   const [planElapsed, setPlanElapsed] = useState(0);
@@ -33,10 +36,29 @@ export function InfraGuide() {
       }, 1000);
       return () => clearInterval(iv);
     }
-    // planning 끝나면 리셋
     planStartRef.current = null;
     setPlanElapsed(0);
   }, [sessionPhase]);
+
+  // Apply 경과 시간 타이머
+  const [applyElapsed, setApplyElapsed] = useState(0);
+  const applyStartRef = useRef<number | null>(null);
+  const showApplyProgress = sessionPhase === 'triggering' || sessionPhase === 'applying'
+    || sessionPhase === 'running' || sessionPhase === 'destroying';
+
+  useEffect(() => {
+    if (showApplyProgress) {
+      if (applyStartRef.current === null) {
+        applyStartRef.current = Date.now();
+      }
+      const iv = setInterval(() => {
+        setApplyElapsed(Math.floor((Date.now() - applyStartRef.current!) / 1000));
+      }, 1000);
+      return () => clearInterval(iv);
+    }
+    applyStartRef.current = null;
+    setApplyElapsed(0);
+  }, [showApplyProgress]);
 
   const parsedPlan = parsePlanOutput(planResult);
 
@@ -122,6 +144,61 @@ export function InfraGuide() {
               </div>
               {planStepLabel && (
                 <div className="text-[10px] text-indigo-400/70 mt-1 font-mono">{planStepLabel}</div>
+              )}
+            </div>
+          )}
+
+          {/* Apply workflow progress bar */}
+          {showApplyProgress && (
+            <div className="mt-2.5">
+              <div className="flex items-center gap-1 mb-1.5">
+                {APPLY_STEPS.map((step, i) => {
+                  const isActive = i === applyStep;
+                  const isDone = i < applyStep;
+                  // 색상: Apply/Running은 amber, Destroy는 orange
+                  const activeColor = i >= 4
+                    ? 'bg-orange-500/20 text-orange-300 ring-1 ring-orange-500/40'
+                    : i >= 3
+                      ? 'bg-green-500/20 text-green-300 ring-1 ring-green-500/40'
+                      : 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40';
+                  return (
+                    <div key={step} className="flex items-center gap-1">
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                        isActive
+                          ? activeColor
+                          : isDone
+                            ? 'bg-green-500/10 text-green-500'
+                            : 'bg-gray-800/50 text-gray-600'
+                      }`}>
+                        {isDone && <span>&#10003;</span>}
+                        {isActive && <span className="animate-pulse">&#9679;</span>}
+                        {step}
+                      </div>
+                      {i < APPLY_STEPS.length - 1 && (
+                        <div className={`w-3 h-px ${isDone ? 'bg-green-500/40' : 'bg-gray-700'}`} />
+                      )}
+                    </div>
+                  );
+                })}
+                <span className="text-[10px] text-gray-500 ml-2 tabular-nums">
+                  {applyElapsed}s
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full bg-gray-800 rounded-full h-1 overflow-hidden">
+                <div
+                  className={`h-1 rounded-full transition-all duration-700 ${
+                    applyStep >= 4 ? 'bg-orange-500' : applyStep >= 3 ? 'bg-green-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${Math.min((applyStep / APPLY_STEPS.length) * 100, 100)}%` }}
+                >
+                  <div className="h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                </div>
+              </div>
+              {applyStepLabel && (
+                <div className={`text-[10px] mt-1 font-mono ${
+                  applyStep >= 4 ? 'text-orange-400/70' : applyStep >= 3 ? 'text-green-400/70' : 'text-amber-400/70'
+                }`}>{applyStepLabel}</div>
               )}
             </div>
           )}
