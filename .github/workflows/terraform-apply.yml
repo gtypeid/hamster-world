@@ -140,9 +140,23 @@ jobs:
 
           echo "INFRA_STATUS updated: phase=destroying"
 
+      - name: Force unlock state
+        if: cancelled()
+        run: |
+          # terraform은 state 파일 동시 수정 방지를 위해 lock을 건다.
+          # Apply 시작 → lock 획득 → 리소스 생성(1개마다 즉시 state 기록) → lock 해제
+          # cancel로 Apply가 중단되면 lock 해제를 못 한 채 프로세스가 종료된다.
+          # 이 상태에서 Destroy가 실행되면 "state가 사용 중"으로 판단하여 거부한다.
+          # 실제로는 Apply 프로세스가 이미 죽었으므로 lock은 무의미 — 강제 삭제.
+          # (local backend는 .terraform.tfstate.lock.info 파일로 lock 관리)
+          rm -f .terraform.tfstate.lock.info 2>/dev/null || true
+
       - name: Terraform Destroy
         if: always()
-        run: terraform destroy -auto-approve -input=false
+        run: |
+          # always: 정상 완료, 실패, cancel 모든 경우에 실행
+          # state에 기록된 리소스만 파괴 (13개 중 4개만 생성됐으면 4개만 destroy)
+          terraform destroy -auto-approve -input=false
 
       - name: Push instance status (idle)
         if: always()
