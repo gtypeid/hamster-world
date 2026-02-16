@@ -143,20 +143,27 @@ jobs:
       - name: Force unlock state
         if: cancelled()
         run: |
-          # terraform은 state 파일 동시 수정 방지를 위해 lock을 건다.
-          # Apply 시작 → lock 획득 → 리소스 생성(1개마다 즉시 state 기록) → lock 해제
-          # cancel로 Apply가 중단되면 lock 해제를 못 한 채 프로세스가 종료된다.
-          # 이 상태에서 Destroy가 실행되면 "state가 사용 중"으로 판단하여 거부한다.
-          # 실제로는 Apply 프로세스가 이미 죽었으므로 lock은 무의미 — 강제 삭제.
-          # (local backend는 .terraform.tfstate.lock.info 파일로 lock 관리)
+          # terraform은 state 파일 동시 수정 방지를 위해 두 가지 lock을 건다:
+          #   1. .terraform.tfstate.lock.info 파일 (lock 메타데이터)
+          #   2. terraform.tfstate 파일 자체에 OS 레벨 flock (파일 잠금)
+          #
+          # cancel로 Apply가 중단되면:
+          #   - SIGINT → terraform graceful shutdown 시도 → 프로세스 종료
+          #   - 하지만 flock은 프로세스가 완전히 종료되어야 해제됨
+          #   - 다음 step이 즉시 시작되면 flock이 아직 남아있을 수 있음
+          #
+          # 해결: lock 파일 삭제 + terraform 프로세스 완전 종료 대기
           rm -f .terraform.tfstate.lock.info 2>/dev/null || true
+          # terraform 프로세스가 완전히 종료될 때까지 대기 (flock 해제)
+          sleep 5
 
       - name: Terraform Destroy
         if: always()
         run: |
           # always: 정상 완료, 실패, cancel 모든 경우에 실행
           # state에 기록된 리소스만 파괴 (13개 중 4개만 생성됐으면 4개만 destroy)
-          terraform destroy -auto-approve -input=false
+          # -lock=false: cancel 후 OS flock이 남아있을 경우를 대비한 안전장치
+          terraform destroy -auto-approve -input=false -lock=false
 
       - name: Push instance status (idle)
         if: always()

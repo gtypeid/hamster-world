@@ -264,11 +264,11 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // idle - Connect 전
   if (phase === 'idle') {
     return {
-      icon: '\u25B6',
-      title: '\uC138\uC158 \uCD08\uAE30\uD654',
-      description: 'Connect \uBC84\uD2BC\uC744 \uB20C\uB7EC GitHub Actions\uC640 \uB3D9\uAE30\uD654\uD558\uC138\uC694.\n\uC67C\ucabd Plan Report \xB7 Architecture \xB7 Event Flow \uB124\uBE44\uAC8C\uC774\uC158\uC5D0\uC11C \uC778\uD504\uB77C \uC0C1\uC138 \uC815\uBCF4\uB97C \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-      detail: `\uB7F0\uD0C0\uC784: \uC138\uC158\uB2F9 ${ctx.sessionDurationMin}\uBD84 / \uC81C\uD55C: \uD558\uB8E8 ${ctx.maxSessionsPerDay}\uD68C / \uCFE8\uB2E4\uC6B4: \uC138\uC158 \uAC04 ${ctx.cooldownMin}\uBD84`,
-      badge: '1\uB2E8\uACC4',
+      icon: '▶',
+      title: '세션 초기화',
+      description: 'Connect 버튼을 눌러 GitHub Actions와 동기화하세요.\n왼쪽 Plan Report · Architecture · Event Flow 네비게이션에서 인프라 상세 정보를 미리 확인할 수 있습니다.',
+      detail: `런타임: 세션당 ${ctx.sessionDurationMin}분 / 제한: 하루 ${ctx.maxSessionsPerDay}회 / 쿨다운: 세션 간 ${ctx.cooldownMin}분`,
+      badge: '1단계',
       bgClass: 'bg-[#0c1222]',
       iconBgClass: 'bg-indigo-500/20 text-indigo-400',
       titleClass: 'text-indigo-400',
@@ -279,9 +279,9 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // connecting
   if (phase === 'connecting') {
     return {
-      icon: '\u21BB',
-      title: '\uB3D9\uAE30\uD654 \uC911...',
-      description: 'GitHub Actions API\uC5D0\uC11C \uC6CC\uD06C\uD50C\uB85C\uC6B0 \uC2E4\uD589 \uC774\uB825\uC744 \uAC00\uC838\uC624\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uC624\uB298\uC758 \uC0AC\uC6A9\uB7C9\uACFC \uD65C\uC131 \uC138\uC158\uC744 \uD655\uC778\uD558\uB294 \uC911\uC785\uB2C8\uB2E4.',
+      icon: '↻',
+      title: '동기화 중...',
+      description: 'GitHub Actions API에서 워크플로우 실행 이력을 가져오고 있습니다. 오늘의 사용량과 활성 세션을 확인하는 중입니다.',
       bgClass: 'bg-[#0c1222]',
       iconBgClass: 'bg-purple-500/20 text-purple-300 animate-spin',
       titleClass: 'text-purple-300',
@@ -293,11 +293,11 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
     switch (status) {
       case 'available':
         return {
-          icon: '\u2713',
-          title: '\uC778\uD504\uB77C \uC810\uAC80 \uAC00\uB2A5',
-          description: 'Init \uBC84\uD2BC\uC744 \uB20C\uB7EC Terraform Plan\uC744 \uC2E4\uD589\uD558\uC138\uC694. \uC778\uD504\uB77C \uBC30\uD3EC \uC804 \uB9AC\uC18C\uC2A4 \uAD6C\uC131\uC744 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-          detail: `\uC624\uB298: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9 / ${ctx.runsCount > 0 ? `\uC6CC\uD06C\uD50C\uB85C\uC6B0 ${ctx.runsCount}\uAC74 \uD655\uC778` : '\uC624\uB298 \uC2E4\uD589 \uC774\uB825 \uC5C6\uC74C'}`,
-          badge: '2\uB2E8\uACC4',
+          icon: '✓',
+          title: '인프라 점검 가능',
+          description: 'Init 버튼을 눌러 Terraform Plan을 실행하세요. 인프라 배포 전 리소스 구성을 확인할 수 있습니다.',
+          detail: `오늘: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용 / ${ctx.runsCount > 0 ? `워크플로우 ${ctx.runsCount}건 확인` : '오늘 실행 이력 없음'}`,
+          badge: '2단계',
           bgClass: 'bg-[#0a1628]',
           iconBgClass: 'bg-blue-500/20 text-blue-400',
           titleClass: 'text-blue-400',
@@ -307,11 +307,11 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       case 'running': {
         const remainMin = Math.ceil((ctx.remainingSeconds ?? 0) / 60);
         return {
-          icon: '\u26A1',
-          title: '\uAE30\uC874 \uC138\uC158 \uCC38\uC5EC',
-          description: `\uD604\uC7AC \uC6B4\uC601 \uC911\uC778 \uC778\uD504\uB77C \uC138\uC158\uC5D0 \uCC38\uC5EC\uD569\uB2C8\uB2E4. \uC790\uB3D9 \uC885\uB8CC\uAE4C\uC9C0 ${remainMin}\uBD84 \uB0A8\uC558\uC2B5\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`,
-          detail: `\uAE30\uC874 \uC138\uC158 \uAC10\uC9C0\uB428 / ${remainMin}\uBD84 \uD6C4 \uC790\uB3D9 \uC0AD\uC81C / \uC624\uB298 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9`,
-          badge: '\uCC38\uC5EC',
+          icon: '⚡',
+          title: '기존 세션 참여',
+          description: `현재 운영 중인 인프라 세션에 참여합니다. 자동 종료까지 ${remainMin}분 남았습니다. Stop을 눌러 조기 종료할 수 있습니다.`,
+          detail: `기존 세션 감지됨 / ${remainMin}분 후 자동 삭제 / 오늘 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용`,
+          badge: '참여',
           bgClass: 'bg-[#071a0e]',
           iconBgClass: 'bg-green-500/20 text-green-400',
           titleClass: 'text-green-400',
@@ -322,25 +322,25 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
       case 'cooldown': {
         const cdMin = Math.ceil((ctx.cooldownRemainingSeconds ?? 0) / 60);
         return {
-          icon: '\u23F3',
-          title: '\uCFE8\uB2E4\uC6B4 \uAE30\uAC04',
-          description: `\uC774\uC804 \uC138\uC158\uC774 \uCD5C\uADFC\uC5D0 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC0C8 \uC138\uC158 \uC2DC\uC791\uAE4C\uC9C0 ${cdMin}\uBD84 \uB300\uAE30\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uB9AC\uC18C\uC2A4 \uCDA9\uB3CC\uC744 \uBC29\uC9C0\uD558\uAE30 \uC704\uD55C \uC548\uC804 \uC7A5\uCE58\uC785\uB2C8\uB2E4.`,
-          detail: `\uCFE8\uB2E4\uC6B4 \uB0A8\uC740 \uC2DC\uAC04: ~${cdMin}\uBD84 / \uC624\uB298 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9`,
+          icon: '⏳',
+          title: '쿨다운 기간',
+          description: `이전 세션이 최근에 종료되었습니다. 새 세션 시작까지 ${cdMin}분 대기가 필요합니다.`,
+          detail: `쿨다운 남은 시간: ~${cdMin}분 / 오늘 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용`,
           bgClass: 'bg-[#1a1600]',
           iconBgClass: 'bg-yellow-500/20 text-yellow-400',
           titleClass: 'text-yellow-400',
           badgeClass: 'bg-yellow-500/20 text-yellow-400',
-          badge: '\uB300\uAE30',
+          badge: '대기',
         };
       }
 
       case 'limit_exceeded':
         return {
-          icon: '\u2715',
-          title: '\uC77C\uC77C \uD55C\uB3C4 \uCD08\uACFC',
-          description: `\uC624\uB298 ${ctx.maxSessionsPerDay}\uD68C \uC138\uC158\uC744 \uBAA8\uB450 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4. \uC790\uC815(UTC) \uC774\uD6C4 \uCD08\uAE30\uD654\uB429\uB2C8\uB2E4. \uB0B4\uC77C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.`,
-          detail: `${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9 \uC644\uB8CC / \uD504\uB9AC\uD2F0\uC5B4 \uC608\uC0B0 \uBCF4\uD638`,
-          badge: '\uC81C\uD55C',
+          icon: '✕',
+          title: '일일 한도 초과',
+          description: `오늘 ${ctx.maxSessionsPerDay}회 세션을 모두 사용했습니다. 자정(UTC) 이후 초기화됩니다. 내일 다시 시도해주세요.`,
+          detail: `${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용 완료 / 프리티어 예산 보호`,
+          badge: '제한',
           bgClass: 'bg-[#1a0a0a]',
           iconBgClass: 'bg-red-500/20 text-red-400',
           titleClass: 'text-red-400',
@@ -352,9 +352,9 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // planning - terraform plan 진행 중
   if (phase === 'planning') {
     return {
-      icon: '\u21BB',
-      title: 'Terraform Plan \uC2E4\uD589 \uC911...',
-      description: 'Terraform Plan\uC744 \uC2E4\uD589\uD558\uC5EC \uC778\uD504\uB77C \uAD6C\uC131\uC744 \uBD84\uC11D\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uBCF4\uC548 \uADF8\uB8F9, \uC778\uC2A4\uD134\uC2A4 \uD1A0\uD3F4\uB85C\uC9C0, API \uB77C\uC6B0\uD305\uC744 \uC810\uAC80\uD569\uB2C8\uB2E4.',
+      icon: '↻',
+      title: 'Terraform Plan 실행 중...',
+      description: 'Terraform Plan을 실행하여 인프라 구성을 분석하고 있습니다. 보안 그룹, 인스턴스 토폴로지, API 라우팅을 점검합니다.',
       bgClass: 'bg-[#0c1222]',
       iconBgClass: 'bg-indigo-500/20 text-indigo-300 animate-spin',
       titleClass: 'text-indigo-300',
@@ -364,11 +364,11 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // planned - plan 완료, Start 가능
   if (phase === 'planned') {
     return {
-      icon: '\u2713',
-      title: '\uBC30\uD3EC \uC900\uBE44 \uC644\uB8CC',
-      description: `\uC778\uD504\uB77C \uACC4\uD68D\uC774 \uD655\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Start \uBC84\uD2BC\uC744 \uB20C\uB7EC Terraform Apply\uB85C EC2 \uC778\uC2A4\uD134\uC2A4\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4. ${ctx.sessionDurationMin}\uBD84 \uD6C4 \uC790\uB3D9 \uD30C\uAD34\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4.`,
-      detail: `\uC624\uB298: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9${ctx.planSummaryText ? ` / Plan: ${ctx.planSummaryText}` : ''}`,
-      badge: '3\uB2E8\uACC4',
+      icon: '✓',
+      title: '배포 준비 완료',
+      description: `인프라 계획이 확인되었습니다. Start 버튼을 눌러 Terraform Apply로 EC2 인스턴스를 생성합니다. ${ctx.sessionDurationMin}분 후 자동 파괴가 시작됩니다.`,
+      detail: `오늘: ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용${ctx.planSummaryText ? ` / Plan: ${ctx.planSummaryText}` : ''}`,
+      badge: '3단계',
       bgClass: 'bg-[#0a1628]',
       iconBgClass: 'bg-blue-500/20 text-blue-400',
       titleClass: 'text-blue-400',
@@ -379,12 +379,12 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // triggering / applying
   if (phase === 'triggering' || phase === 'applying') {
     return {
-      icon: '\u2692',
-      title: phase === 'triggering' ? '\uC6CC\uD06C\uD50C\uB85C\uC6B0 \uD2B8\uB9AC\uAC70' : 'Terraform Apply',
+      icon: '⚒',
+      title: phase === 'triggering' ? '워크플로우 트리거' : 'Terraform Apply',
       description: phase === 'triggering'
-        ? 'GitHub Actions \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uC2E4\uD589\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. Terraform\uC774 \uCD08\uAE30\uD654\uB418\uACE0 EC2 \uC778\uC2A4\uD134\uC2A4 \uC0DD\uC131\uC774 \uC2DC\uC791\uB429\uB2C8\uB2E4.'
-        : 'Terraform\uC774 EC2 \uC778\uC2A4\uD134\uC2A4\uB97C \uC0DD\uC131\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uAC01 \uC778\uC2A4\uD134\uC2A4\uC5D0 Docker \uCEE8\uD14C\uC774\uB108\uAC00 \uBC30\uD3EC\uB429\uB2C8\uB2E4.',
-      badge: '\uBC30\uD3EC \uC911',
+        ? 'GitHub Actions 워크플로우를 실행하고 있습니다. Terraform이 초기화되고 EC2 인스턴스 생성이 시작됩니다.'
+        : 'Terraform이 EC2 인스턴스를 생성하고 있습니다. 각 인스턴스에 Docker 컨테이너가 배포됩니다.',
+      badge: '배포 중',
       bgClass: 'bg-[#1a1200]',
       iconBgClass: 'bg-amber-500/20 text-amber-400 animate-pulse',
       titleClass: 'text-amber-400',
@@ -395,12 +395,12 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // running (after Start deploy OR Connect detected)
   if (phase === 'running') {
     return {
-      icon: '\u26A1',
-      title: ctx.startedByMe ? '\uC778\uD504\uB77C \uC6B4\uC601 \uC911' : '\uAE30\uC874 \uC138\uC158 \uCC38\uC5EC',
+      icon: '⚡',
+      title: ctx.startedByMe ? '인프라 운영 중' : '기존 세션 참여',
       description: ctx.startedByMe
-        ? `EC2 \uC778\uC2A4\uD134\uC2A4\uAC00 \uBAA8\uB450 \uC6B4\uC601 \uC911\uC785\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC Terraform Destroy\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`
-        : `\uD604\uC7AC \uC6B4\uC601 \uC911\uC778 \uC778\uD504\uB77C \uC138\uC158\uC5D0 \uCC38\uC5EC\uD569\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uB9CC\uB8CC \uC2DC Terraform Destroy\uAC00 \uC2DC\uC791\uB429\uB2C8\uB2E4. Stop\uC744 \uB20C\uB7EC \uC870\uAE30 \uC885\uB8CC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`,
-      badge: ctx.startedByMe ? 'LIVE' : '\uCC38\uC5EC',
+        ? `EC2 인스턴스가 모두 운영 중입니다. 타이머 만료 시 Terraform Destroy가 시작됩니다. Stop을 눌러 조기 종료할 수 있습니다.`
+        : `현재 운영 중인 인프라 세션에 참여합니다. 타이머 만료 시 Terraform Destroy가 시작됩니다. Stop을 눌러 조기 종료할 수 있습니다.`,
+      badge: ctx.startedByMe ? 'LIVE' : '참여',
       bgClass: 'bg-[#071a0e]',
       iconBgClass: 'bg-green-500/20 text-green-400',
       titleClass: 'text-green-400',
@@ -411,10 +411,10 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // destroying
   if (phase === 'destroying') {
     return {
-      icon: '\u26A0',
-      title: '\uC778\uD504\uB77C \uC0AD\uC81C \uC911',
-      description: `Terraform destroy\uAC00 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4. \uBAA8\uB4E0 EC2 \uC778\uC2A4\uD134\uC2A4\uC640 \uAD00\uB828 \uB9AC\uC18C\uC2A4\uAC00 \uC0AD\uC81C\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uC608\uC0C1 \uC18C\uC694 \uC2DC\uAC04: ~${ctx.cooldownMin}\uBD84`,
-      badge: '\uC815\uB9AC',
+      icon: '⚠',
+      title: '인프라 삭제 중',
+      description: `Terraform destroy가 진행 중입니다. 모든 EC2 인스턴스와 관련 리소스가 삭제되고 있습니다. 예상 소요 시간: ~${ctx.cooldownMin}분`,
+      badge: '정리',
       bgClass: 'bg-[#1a0f00]',
       iconBgClass: 'bg-orange-500/20 text-orange-400 animate-pulse',
       titleClass: 'text-orange-400',
@@ -425,10 +425,10 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // completed
   if (phase === 'completed') {
     return {
-      icon: '\u2713',
-      title: '\uC138\uC158 \uC644\uB8CC',
-      description: '\uBAA8\uB4E0 \uB9AC\uC18C\uC2A4\uAC00 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Connect\uC744 \uB20C\uB7EC \uB3D9\uAE30\uD654 \uD6C4 \uC0C8 \uC138\uC158\uC744 \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-      detail: `\uC624\uB298 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}\uD68C \uC0AC\uC6A9`,
+      icon: '✓',
+      title: '세션 완료',
+      description: '모든 리소스가 삭제되었습니다. Connect을 눌러 동기화 후 새 세션을 시작할 수 있습니다.',
+      detail: `오늘 ${ctx.sessionsUsedToday}/${ctx.maxSessionsPerDay}회 사용`,
       bgClass: 'bg-[#0c1222]',
       iconBgClass: 'bg-green-500/20 text-green-400',
       titleClass: 'text-green-400',
@@ -438,9 +438,9 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // failed
   if (phase === 'failed') {
     return {
-      icon: '\u2715',
-      title: '\uC5F0\uACB0 \uC2E4\uD328',
-      description: 'GitHub Actions API \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uC640 \uD1A0\uD070\uC744 \uD655\uC778\uD55C \uD6C4 Connect\uC744 \uB20C\uB7EC \uC7AC\uC2DC\uB3C4\uD558\uC138\uC694.',
+      icon: '✕',
+      title: '연결 실패',
+      description: 'GitHub Actions API 연결에 실패했습니다. 네트워크와 토큰을 확인한 후 Connect을 눌러 재시도하세요.',
       bgClass: 'bg-[#1a0a0a]',
       iconBgClass: 'bg-red-500/20 text-red-400',
       titleClass: 'text-red-400',
@@ -450,8 +450,8 @@ function getGuide(phase: SessionPhase, status: InfraStatus, ctx: GuideCtx): Guid
   // fallback
   return {
     icon: '?',
-    title: '\uC54C \uC218 \uC5C6\uB294 \uC0C1\uD0DC',
-    description: 'Connect\uC744 \uB20C\uB7EC \uB3D9\uAE30\uD654\uD558\uC138\uC694.',
+    title: '알 수 없는 상태',
+    description: 'Connect을 눌러 동기화하세요.',
     bgClass: 'bg-[#0c1222]',
     iconBgClass: 'bg-gray-500/20 text-gray-400',
     titleClass: 'text-gray-400',
