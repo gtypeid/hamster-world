@@ -6,72 +6,11 @@ import {
   selectCanInit,
   selectCanStop,
   selectRunningCount,
-  INSTANCE_IDS,
 } from '../../stores/useInfraStore';
-import { fetchInfraStatus, triggerPlan, triggerApply, cancelRun, getRunStatus } from '../../services/infraSession';
+import { fetchInfraStatus, triggerPlan, triggerApply, cancelRun } from '../../services/infraSession';
 import { parsePlanOutput } from '../../utils/parsePlan';
 import { COOLDOWN_MIN } from '../../config/infraConfig';
-import { startDestroyPolling, stopDestroyPolling } from '../../services/destroyPoller';
-
-/**
- * Apply 워크플로우 런 폴링 - 완료될 때까지 5초마다 상태 확인
- */
-async function pollApplyRun(runId: number) {
-  const { setSessionPhase, addLog, updateInstance } = useInfraStore.getState();
-
-  const poll = async () => {
-    try {
-      const run = await getRunStatus(runId);
-
-      if (run.status === 'completed') {
-        if (run.conclusion === 'success') {
-          // 성공: 모든 인스턴스 running으로 전환
-          for (const id of INSTANCE_IDS) {
-            updateInstance(id, { status: 'running' });
-          }
-          addLog({ message: `전체 ${INSTANCE_IDS.length}개 인스턴스 온라인 - 인프라 준비 완료`, level: 'success' });
-          setSessionPhase('running');
-        } else {
-          addLog({ message: `Apply 워크플로우 종료: ${run.conclusion}`, level: 'error' });
-          setSessionPhase('failed');
-        }
-        return; // 폴링 종료
-      }
-
-      // 아직 진행중 - 계속 폴링
-      setTimeout(poll, 5000);
-    } catch (err) {
-      addLog({ message: `폴링 오류: ${err instanceof Error ? err.message : err}`, level: 'error' });
-      setTimeout(poll, 10000); // 에러시 10초 후 재시도
-    }
-  };
-
-  setTimeout(poll, 5000);
-}
-
-/**
- * Destroy phase 시작.
- * runId가 있으면 실제 로그 폴링, 없으면 즉시 세션 종료(fallback).
- */
-function enterDestroyPhase() {
-  const { activeWorkflowRunId } = useInfraStore.getState();
-
-  if (activeWorkflowRunId) {
-    startDestroyPolling(activeWorkflowRunId);
-  } else {
-    // runId 없는 fallback (Connect으로 감지된 세션 등)
-    const { setSessionPhase, updateInstance, addLog, endSession, resetInstances } = useInfraStore.getState();
-    setSessionPhase('destroying');
-    addLog({ message: 'Terraform destroy 진행 중 (로그 폴링 불가)', level: 'warn' });
-    for (const id of INSTANCE_IDS) {
-      updateInstance(id, { status: 'destroying' });
-    }
-    setTimeout(() => {
-      resetInstances();
-      endSession();
-    }, 5000);
-  }
-}
+import { startWorkflowPolling, resumeWorkflowPolling, stopWorkflowPolling } from '../../services/workflowPoller';
 
 // ─── Component ───
 
@@ -121,16 +60,9 @@ export function SessionBar() {
     return () => clearInterval(interval);
   }, [sessionStartedAt, sessionPhase, initResult]);
 
-  // Active runtime 만료 → 자동 destroy phase 진입
+  // Workflow poller cleanup on unmount
   useEffect(() => {
-    if (sessionPhase === 'running' && elapsed > 0 && elapsed >= sessionDurationMin * 60) {
-      enterDestroyPhase();
-    }
-  }, [sessionPhase, elapsed, sessionDurationMin]);
-
-  // Destroy poller cleanup on unmount
-  useEffect(() => {
-    return () => stopDestroyPolling();
+    return () => stopWorkflowPolling();
   }, []);
 
   // ─── Handlers ───
@@ -142,6 +74,11 @@ export function SessionBar() {
     try {
       const result = await fetchInfraStatus();
       applyConnectResult(result);
+
+      // active run 감지 시 워크플로우 폴링 시작 (실시간 추적)
+      if (result.status === 'running' && result.activeRunId) {
+        resumeWorkflowPolling(result.activeRunId);
+      }
     } catch (err) {
       setSessionPhase('failed');
       addLog({ message: `동기화 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
@@ -174,8 +111,8 @@ export function SessionBar() {
       addLog({ message: `Apply 워크플로우 시작 (run #${runId})`, level: 'success' });
       setSessionPhase('applying');
 
-      // 워크플로우 완료까지 폴링
-      pollApplyRun(runId);
+      // 워크플로우 전체 라이프사이클 폴링 (apply → running → destroy → completed)
+      startWorkflowPolling(runId);
     } catch (err) {
       addLog({ message: `Apply 트리거 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
       setSessionPhase('failed');
@@ -189,12 +126,19 @@ export function SessionBar() {
       try {
         addLog({ message: `워크플로우 run #${runId} 취소 중...`, level: 'warn' });
         await cancelRun(runId);
-        addLog({ message: '취소 요청 전송 완료', level: 'info' });
+        addLog({ message: '취소 요청 전송 완료 - 워크플로우가 destroy를 실행합니다', level: 'info' });
+        // 폴러가 이미 돌고 있으면 자동으로 workflow completed를 감지
+        // 안 돌고 있으면 (Connect으로 참여한 경우) 시작
+        resumeWorkflowPolling(runId);
       } catch (err) {
         addLog({ message: `취소 실패: ${err instanceof Error ? err.message : err}`, level: 'error' });
       }
+    } else {
+      // runId 없는 경우 즉시 종료
+      const { setSessionPhase, endSession, resetInstances } = useInfraStore.getState();
+      setSessionPhase('destroying');
+      setTimeout(() => { resetInstances(); endSession(); }, 3000);
     }
-    enterDestroyPhase();
   };
 
   const isActive = sessionPhase === 'triggering' || sessionPhase === 'applying' || sessionPhase === 'running' || sessionPhase === 'destroying';

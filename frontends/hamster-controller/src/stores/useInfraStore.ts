@@ -221,8 +221,15 @@ export const useInfraStore = create<InfraState>((set) => ({
     logs.push({ timestamp: now, message: `오늘: ${result.sessionsUsedToday}/${result.maxSessionsPerDay}회 사용`, level: 'info' });
 
     if (result.status === 'running') {
-      const remainMin = Math.ceil((result.remainingSeconds ?? 0) / 60);
-      logs.push({ timestamp: now, message: `세션 운영 중 - ${remainMin}분 남음`, level: 'success' });
+      const phase = result.detectedPhase ?? 'running';
+      if (phase === 'applying') {
+        logs.push({ timestamp: now, message: '세션 감지 - Terraform Apply 진행 중', level: 'info' });
+      } else if (phase === 'destroying') {
+        logs.push({ timestamp: now, message: '세션 감지 - Terraform Destroy 진행 중', level: 'warn' });
+      } else {
+        const remainMin = Math.ceil((result.remainingSeconds ?? 0) / 60);
+        logs.push({ timestamp: now, message: `세션 운영 중 - ${remainMin}분 남음`, level: 'success' });
+      }
     } else if (result.status === 'cooldown') {
       const cooldownSec = result.cooldownRemainingSeconds ?? 0;
       logs.push({ timestamp: now, message: `쿨다운 - 다음 세션까지 ${Math.ceil(cooldownSec / 60)}분`, level: 'warn' });
@@ -232,25 +239,43 @@ export const useInfraStore = create<InfraState>((set) => ({
       logs.push({ timestamp: now, message: '인프라 사용 가능 - Init(terraform plan) 준비됨', level: 'success' });
     }
 
-    // running 상태면 인스턴스도 running으로 표시
+    // 감지된 단계에 따라 인스턴스 상태 설정
     let instances = state.instances;
+    let sessionPhase: SessionPhase = 'connected';
+
     if (result.status === 'running') {
+      const phase = result.detectedPhase ?? 'running';
       const updated = { ...state.instances };
-      for (const id of INSTANCE_IDS) {
-        updated[id] = { ...updated[id], status: 'running' };
+
+      if (phase === 'destroying') {
+        for (const id of INSTANCE_IDS) {
+          updated[id] = { ...updated[id], status: 'destroying' };
+        }
+        sessionPhase = 'destroying';
+      } else if (phase === 'applying') {
+        for (const id of INSTANCE_IDS) {
+          updated[id] = { ...updated[id], status: 'provisioning' };
+        }
+        sessionPhase = 'applying';
+      } else {
+        for (const id of INSTANCE_IDS) {
+          updated[id] = { ...updated[id], status: 'running' };
+        }
+        sessionPhase = 'running';
       }
       instances = updated;
     }
 
     return {
-      sessionPhase: result.status === 'running' ? 'running' : 'connected',
+      sessionPhase,
       infraStatus: result.status,
       initResult: result,
       startedByMe: false, // Connect으로 감지된 세션 = 기존 세션 참여
       sessionsUsedToday: result.sessionsUsedToday,
       maxSessionsPerDay: result.maxSessionsPerDay,
-      sessionDurationMin: result.runtimeMin - (result.cooldownMin ?? COOLDOWN_MIN),
+      sessionDurationMin: result.workflowDurationMin - (result.cooldownMin ?? COOLDOWN_MIN),
       sessionStartedAt: result.sessionStartedAt ?? null,
+      activeWorkflowRunId: result.activeRunId ?? null,
       instances,
       logs,
     };

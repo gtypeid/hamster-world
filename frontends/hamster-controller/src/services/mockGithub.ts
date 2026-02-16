@@ -1,5 +1,5 @@
 import type { WorkflowRun } from '../types/github';
-import { RUNTIME_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
+import { WORKFLOW_DURATION_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
 
 /**
  * Init 결과 - GitHub Actions 이력 기반 상태 판단
@@ -11,8 +11,8 @@ export interface InitResult {
   sessionsUsedToday: number;
   /** 일일 최대 횟수 */
   maxSessionsPerDay: number;
-  /** 런타임 시간(분) */
-  runtimeMin: number;
+  /** 워크플로우 전체 라이프타임(분) — 실제 가동 시간은 workflowDurationMin - cooldownMin */
+  workflowDurationMin: number;
   /** 쿨다운 시간(분) */
   cooldownMin: number;
   /** running일 때: 세션 시작 시각 (ISO) */
@@ -23,6 +23,10 @@ export interface InitResult {
   elapsedSeconds?: number;
   /** cooldown일 때: 쿨다운 남은 초 */
   cooldownRemainingSeconds?: number;
+  /** running일 때: 로그 기반 감지된 세부 단계 */
+  detectedPhase?: 'applying' | 'running' | 'destroying';
+  /** running일 때: 활성 워크플로우 run ID */
+  activeRunId?: number;
   /** 오늘 워크플로우 실행 이력 */
   runs: WorkflowRun[];
 }
@@ -57,7 +61,7 @@ function generateCase(caseIndex: number): InitResult {
         status: 'running',
         sessionsUsedToday,
         maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-        runtimeMin: RUNTIME_MIN,
+        workflowDurationMin: WORKFLOW_DURATION_MIN,
         cooldownMin: COOLDOWN_MIN,
         sessionStartedAt: sessionStartedAt.toISOString(),
         remainingSeconds,
@@ -70,7 +74,7 @@ function generateCase(caseIndex: number): InitResult {
     case 1: {
       const cooldownElapsedMin = Math.floor(Math.random() * COOLDOWN_MIN); // 0~4분 경과
       const sessionStartedAt = new Date(
-        now.getTime() - (RUNTIME_MIN + cooldownElapsedMin) * 60 * 1000
+        now.getTime() - (WORKFLOW_DURATION_MIN + cooldownElapsedMin) * 60 * 1000
       );
       const cooldownRemainingSeconds = (COOLDOWN_MIN - cooldownElapsedMin) * 60;
       const sessionsUsedToday = Math.floor(Math.random() * 3) + 1;
@@ -79,7 +83,7 @@ function generateCase(caseIndex: number): InitResult {
         status: 'cooldown',
         sessionsUsedToday,
         maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-        runtimeMin: RUNTIME_MIN,
+        workflowDurationMin: WORKFLOW_DURATION_MIN,
         cooldownMin: COOLDOWN_MIN,
         sessionStartedAt: sessionStartedAt.toISOString(),
         cooldownRemainingSeconds,
@@ -95,7 +99,7 @@ function generateCase(caseIndex: number): InitResult {
         status: 'available',
         sessionsUsedToday,
         maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-        runtimeMin: RUNTIME_MIN,
+        workflowDurationMin: WORKFLOW_DURATION_MIN,
         cooldownMin: COOLDOWN_MIN,
         runs: generateRuns(sessionsUsedToday, now),
       };
@@ -107,7 +111,7 @@ function generateCase(caseIndex: number): InitResult {
         status: 'limit_exceeded',
         sessionsUsedToday: MAX_SESSIONS_PER_DAY,
         maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-        runtimeMin: RUNTIME_MIN,
+        workflowDurationMin: WORKFLOW_DURATION_MIN,
         cooldownMin: COOLDOWN_MIN,
         runs: generateRuns(MAX_SESSIONS_PER_DAY, now),
       };
@@ -142,7 +146,7 @@ function generateRuns(
       status: isActive ? 'in_progress' : 'completed',
       conclusion: isActive ? null : 'success',
       created_at: startTime.toISOString(),
-      updated_at: isActive ? now.toISOString() : new Date(startTime.getTime() + RUNTIME_MIN * 60 * 1000).toISOString(),
+      updated_at: isActive ? now.toISOString() : new Date(startTime.getTime() + WORKFLOW_DURATION_MIN * 60 * 1000).toISOString(),
       run_started_at: startTime.toISOString(),
     });
   }

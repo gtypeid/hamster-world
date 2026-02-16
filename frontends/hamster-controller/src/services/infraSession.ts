@@ -10,7 +10,8 @@ import { proxyFetch } from './lambdaProxy';
 import type { InitResult } from './mockGithub';
 import type { WorkflowRun, WorkflowRunsResponse } from '../types/github';
 import { useInfraStore } from '../stores/useInfraStore';
-import { RUNTIME_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
+import { WORKFLOW_DURATION_MIN, COOLDOWN_MIN, ACTIVE_RUNTIME_MIN, MAX_SESSIONS_PER_DAY } from '../config/infraConfig';
+import { parseWorkflowLog } from '../utils/parseWorkflowLog';
 
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || 'gtypeid';
 const REPO  = import.meta.env.VITE_GITHUB_REPO  || 'hamster-world';
@@ -42,7 +43,22 @@ export async function fetchInfraStatus(): Promise<InitResult> {
     run_started_at: r.run_started_at,
   }));
 
-  return analyzeStatus(runs);
+  const result = analyzeStatus(runs);
+
+  // active run이 있으면 로그를 가져와서 세부 단계 감지
+  if (result.status === 'running' && result.activeRunId) {
+    try {
+      const logs = await fetchRunLogs(result.activeRunId);
+      const parsed = parseWorkflowLog(logs);
+      if (parsed.phase === 'applying' || parsed.phase === 'running' || parsed.phase === 'destroying') {
+        result.detectedPhase = parsed.phase;
+      }
+    } catch {
+      // 로그 가져오기 실패해도 기본 running으로 진행
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -68,11 +84,12 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
       status: 'running',
       sessionsUsedToday,
       maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-      runtimeMin: RUNTIME_MIN,
+      workflowDurationMin: WORKFLOW_DURATION_MIN,
       cooldownMin: COOLDOWN_MIN,
       sessionStartedAt: startedAt.toISOString(),
       elapsedSeconds,
       remainingSeconds,
+      activeRunId: activeRun.id,
       runs,
     };
   }
@@ -94,7 +111,7 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
         status: 'cooldown',
         sessionsUsedToday,
         maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-        runtimeMin: RUNTIME_MIN,
+        workflowDurationMin: WORKFLOW_DURATION_MIN,
         cooldownMin: COOLDOWN_MIN,
         sessionStartedAt: latestCompleted.run_started_at,
         cooldownRemainingSeconds,
@@ -109,7 +126,7 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
       status: 'limit_exceeded',
       sessionsUsedToday,
       maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-      runtimeMin: RUNTIME_MIN,
+      workflowDurationMin: WORKFLOW_DURATION_MIN,
       cooldownMin: COOLDOWN_MIN,
       runs,
     };
@@ -120,7 +137,7 @@ function analyzeStatus(runs: WorkflowRun[]): InitResult {
     status: 'available',
     sessionsUsedToday,
     maxSessionsPerDay: MAX_SESSIONS_PER_DAY,
-    runtimeMin: RUNTIME_MIN,
+    workflowDurationMin: WORKFLOW_DURATION_MIN,
     cooldownMin: COOLDOWN_MIN,
     runs,
   };
@@ -201,7 +218,7 @@ export async function triggerApply(): Promise<number> {
   await proxyFetch({
     method: 'POST',
     path: `/repos/_/_/actions/workflows/${WORKFLOW_APPLY}/dispatches`,
-    body: { ref: 'main', inputs: { duration: String(RUNTIME_MIN), cooldown: String(COOLDOWN_MIN) } },
+    body: { ref: 'main', inputs: { duration: String(WORKFLOW_DURATION_MIN), cooldown: String(COOLDOWN_MIN) } },
   });
 
   await sleep(3000);
