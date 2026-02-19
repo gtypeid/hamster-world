@@ -11,9 +11,9 @@ data class PaymentCancelledEventDto(
     val paymentPublicId: String,
     val originPaymentPublicId: String,
     val orderPublicId: String?,  // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,
+    val userKeycloakId: String?,       // nullable (외부 거래) - User의 Keycloak Subject ID
     val provider: String,
-    val mid: String,
+    val cashGatewayMid: String,        // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val pgTransaction: String,
     val pgApprovalNo: String,

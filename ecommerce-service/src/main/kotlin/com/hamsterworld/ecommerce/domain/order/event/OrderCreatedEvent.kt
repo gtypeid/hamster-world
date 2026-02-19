@@ -20,7 +20,8 @@ import java.time.LocalDateTime
  */
 data class OrderCreatedEvent(
     val orderPublicId: String,        // Order의 Public ID (Snowflake Base62)
-    val userPublicId: String,         // User의 Public ID (Snowflake Base62)
+    val userPublicId: String,         // User의 Public ID (Snowflake Base62, 내부 서비스용)
+    val userKeycloakId: String,       // User의 Keycloak Subject ID (외부 시스템 UUID)
     val orderNumber: String,
     val totalPrice: BigDecimal,
     val items: List<OrderItemDto>,
@@ -42,7 +43,8 @@ data class OrderCreatedEvent(
  * 주문 항목 DTO (OrderCreatedEvent 내부용)
  */
 data class OrderItemDto(
-    val productPublicId: String,  // Product의 Public ID (Snowflake Base62)
+    val productPublicId: String,      // Product의 Public ID (Snowflake Base62)
+    val merchantPublicId: String,     // Merchant의 Public ID (Snowflake Base62)
     val quantity: Int,
     val price: BigDecimal
 )

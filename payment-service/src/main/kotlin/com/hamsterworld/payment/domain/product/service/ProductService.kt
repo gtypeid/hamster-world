@@ -290,7 +290,8 @@ class ProductService(
      *
      * @param orderPublicId E-commerce Service의 Order Public ID (Snowflake Base62)
      * @param orderNumber 주문 번호
-     * @param userPublicId User Public ID (Snowflake Base62)
+     * @param userPublicId User의 Public ID (Snowflake Base62, 내부 서비스용)
+     * @param userKeycloakId User의 Keycloak Subject ID (외부 시스템 UUID)
      * @param totalPrice 총 주문 금액
      * @param couponDiscount 쿠폰 할인 금액 (ecommerce가 계산한 값, 신뢰)
      * @param pointsToUse 사용할 포인트 금액
@@ -301,6 +302,7 @@ class ProductService(
         orderPublicId: String,
         orderNumber: String,
         userPublicId: String,
+        userKeycloakId: String,
         totalPrice: BigDecimal,
         couponDiscount: BigDecimal,
         pointsToUse: BigDecimal,
@@ -313,6 +315,7 @@ class ProductService(
 
         sortedItems.forEach { item ->
             // ecommerceProductPublicId로 Product 조회
+            // TODO N+1
             val product = productRepository.findByEcommerceProductId(item.productPublicId)
 
             // 비관 락 획득 + 재고 재집계 (writeRecord = 락 + 재집계 + 저장)
@@ -346,7 +349,7 @@ class ProductService(
             return
         }
 
-        // Phase 3: 포인트 검증 및 차감
+        // Phase 3: 포인트 검증 및 차감 (Account는 내부 서비스 → userPublicId 사용)
         var actualPointsUsed = BigDecimal.ZERO
         if (pointsToUse.compareTo(BigDecimal.ZERO) > 0) {
             val account = accountService.findAccountByUserPublicIdAndType(userPublicId, AccountType.CONSUMER)
@@ -393,6 +396,7 @@ class ProductService(
             orderPublicId = orderPublicId,
             orderNumber = orderNumber,
             userPublicId = userPublicId,
+            userKeycloakId = userKeycloakId,
             totalPrice = totalPrice,
             couponDiscount = couponDiscount,
             pointsUsed = actualPointsUsed,
@@ -436,7 +440,7 @@ class ProductService(
             productRepository.saveAndPublish(adjusted)
         }
 
-        // Phase 2: 포인트 환원 (OrderSnapshot에서 pointsUsed 조회)
+        // Phase 2: 포인트 환원 (OrderSnapshot에서 pointsUsed 조회, Account는 내부 서비스 → userPublicId 사용)
         val snapshot = orderSnapshotRepository.findByOrderPublicId(orderPublicId)
         if (snapshot != null && snapshot.pointsUsed.compareTo(BigDecimal.ZERO) > 0) {
             accountService.updateBalanceFromEvent(

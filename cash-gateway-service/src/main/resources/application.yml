@@ -19,7 +19,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
@@ -43,6 +43,7 @@ payment:
     dummy-pg:
       url: http://localhost:8083
       timeout: 5000
+      default-pg-mid: hamster_dummy_mid_001  # CashGatewayMid 자동 생성 시 매핑할 기본 PG MID
     retry:
       maxAttempts: 3
       backoffDelay: 1000

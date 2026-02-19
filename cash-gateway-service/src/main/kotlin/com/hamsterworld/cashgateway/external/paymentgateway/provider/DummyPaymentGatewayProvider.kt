@@ -1,5 +1,6 @@
 package com.hamsterworld.cashgateway.external.paymentgateway.provider
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.hamsterworld.cashgateway.domain.payment.constant.PaymentStatus
 import com.hamsterworld.cashgateway.external.paymentgateway.abs.PaymentGatewayProvider
@@ -11,6 +12,7 @@ import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentRequest
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentResponse
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.dummy.DummyAcknowledgementResponse
+import com.hamsterworld.cashgateway.domain.cashgatewaymid.repository.CashGatewayMidRepository
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hamsterworld.common.web.exception.CustomRuntimeException
@@ -21,44 +23,54 @@ import java.math.BigDecimal
 @Component
 class DummyPaymentGatewayProvider(
     private val objectMapper: ObjectMapper,
-    @Value("\${payment.gateway.dummy-pg.url}") private val pgBaseUrl: String
+    private val cashGatewayMidRepository: CashGatewayMidRepository,
+    @Value("\${payment.gateway.dummy-pg.url}") private val pgBaseUrl: String,
+    @Value("\${payment.gateway.dummy-pg.default-pg-mid}") private val defaultPgMid: String
 ) : PaymentGatewayProvider {
 
     companion object {
         private const val ENDPOINT_PATH = "/api/payment-process"
         private const val SUCCESS_CODE = "0000"
-        private const val MID = "hamster_dummy_mid_001"  // Dummy PG MID
     }
 
     override fun getProvider(): Provider = Provider.DUMMY
 
     override fun getEndpoint(): String = "${pgBaseUrl}${ENDPOINT_PATH}"
 
-    override fun getMid(): String = MID
+    /**
+     * Cash Gateway MID → PG MID 변환
+     *
+     * @param cashGatewayMid Cash Gateway MID (ctx.cashGatewayMid)
+     * @return PG MID (PG사에 등록된 실제 가맹점 ID)
+     */
+    private fun resolvePgMid(cashGatewayMid: String): String {
+        val mapping = cashGatewayMidRepository.findByProviderAndMidOrThrow(Provider.DUMMY, cashGatewayMid)
+        return mapping.pgMid
+    }
 
     override fun prepareRequest(paymentCtx: PaymentCtx): PaymentRequest {
+        val pgMid = resolvePgMid(paymentCtx.cashGatewayMid)
+
         return if (paymentCtx.paymentStatus == PaymentStatus.APPROVED) {
             DummyPaymentRequest(
-                userPublicId = paymentCtx.userPublicId,
+                midId = pgMid,
+                userKeycloakId = paymentCtx.userKeycloakId,
                 orderId = paymentCtx.orderNumber,
                 amount = paymentCtx.amount,
                 echo = mapOf(
-                    "mid" to paymentCtx.mid,
                     "orderNumber" to paymentCtx.orderNumber
-                    // gatewayReferenceId는 PaymentProcess 생성 시 자동 생성되므로 여기서는 포함하지 않음
-                    // 폴링 서비스에서 별도로 echo에 추가할 예정
                 )
             )
         } else {
             val cancelCtx = paymentCtx as CancelPaymentCtx
             DummyPaymentCancelRequest(
-                userPublicId = paymentCtx.userPublicId,
+                midId = pgMid,
+                userKeycloakId = paymentCtx.userKeycloakId,
                 orderId = paymentCtx.orderNumber,
                 amount = paymentCtx.amount,
                 tid = cancelCtx.originTid,
                 cancel = "CANCEL",
                 echo = mapOf(
-                    "mid" to paymentCtx.mid,
                     "orderNumber" to paymentCtx.orderNumber
                 )
             )
@@ -75,7 +87,7 @@ class DummyPaymentGatewayProvider(
 
     override fun isSuccess(response: PaymentResponse): Boolean {
         if (response !is DummyPaymentResponse) return false
-        return SUCCESS_CODE == response.getCode()
+        return response.isSuccess()
     }
 
     /**
@@ -86,19 +98,23 @@ class DummyPaymentGatewayProvider(
     override fun isSynchronousApproval(): Boolean = false
 
     /**
-     * Webhook/PG 응답에서 MID 추출
+     * PG 응답으로부터 Cash Gateway MID 후보 목록을 추출
      *
-     * DummyPaymentResponse의 echo 필드에서 MID를 추출
-     * echo에 없으면 기본 MID 반환
+     * Dummy PG의 추적 전략:
+     * 1. webhook 응답의 midId 필드에서 PG MID를 추출
+     * 2. PG MID → CashGatewayMid 테이블 역추적 (N:1이므로 복수 결과 가능)
+     * 3. 매핑된 Cash Gateway MID 목록을 반환
+     *
+     * 호출자가 반환된 후보 목록 + orderNumber 등의 context를 조합하여
+     * 정확한 Cash Gateway MID를 특정해야 함.
      */
-    override fun extractMid(response: PaymentResponse): String? {
-        if (response !is DummyPaymentResponse) return null
+    override fun extractCashGatewayMidCandidates(response: PaymentResponse): List<String> {
+        if (response !is DummyPaymentResponse) return emptyList()
 
-        // echo에서 MID 추출 시도
-        return response.echo["mid"] as? String
-            ?: MID  // echo에 없으면 기본 MID 반환
+        // PG MID → Cash Gateway MID 후보 목록 역추적 (N:1)
+        val mappings = cashGatewayMidRepository.findAllByProviderAndPgMid(Provider.DUMMY, response.midId)
+        return mappings.map { it.mid }
     }
-
 
     /**
      * Dummy PG 승인(Acknowledgement) 응답 파싱
@@ -128,26 +144,35 @@ class DummyPaymentGatewayProvider(
         }
     }
 
+    override fun getDefaultPgMid(): String = defaultPgMid
+
     data class DummyPaymentRequest(
-        val userPublicId: String?,  // E-commerce Service의 User Public ID (Snowflake Base62)
+        val midId: String,
+        @JsonProperty("userId")
+        val userKeycloakId: String,
         val orderId: String,
         private val amount: BigDecimal,
-        val echo: Map<String, Any?> = emptyMap()  // orderNumber, mid 포함
+        val echo: Map<String, Any?> = emptyMap()
     ) : PaymentRequest {
-        // PaymentRequest 규약 일단 강제 오버라이드
+        override fun getMid(): String = midId
+
         override fun getAmount(): BigDecimal = amount
 
         override fun getRequestType(): PaymentStatus = PaymentStatus.APPROVED
     }
 
     data class DummyPaymentCancelRequest(
-        val userPublicId: String?,  // E-commerce Service의 User Public ID (Snowflake Base62)
+        val midId: String,
+        @JsonProperty("userId")
+        val userKeycloakId: String,
         val orderId: String,
         private val amount: BigDecimal,
         val tid: String,
         private val cancel: String,
-        val echo: Map<String, Any?> = emptyMap()  // orderNumber, mid 포함
+        val echo: Map<String, Any?> = emptyMap()
     ) : PaymentCancelRequest {
+        override fun getMid(): String = midId
+
         override fun getAmount(): BigDecimal = amount
 
         override fun getPgTransaction(): String = tid
@@ -157,41 +182,87 @@ class DummyPaymentGatewayProvider(
         override fun getRequestType(): PaymentStatus = PaymentStatus.CANCELLED
     }
 
+    /**
+     * Hamster PG Webhook 응답 DTO
+     *
+     * hamster-pg가 보내는 실제 스펙:
+     * - tid: PG 거래 ID (e.g., DUMMY_20260219_12345678)
+     * - orderId: 주문 ID
+     * - amount: 금액
+     * - status: "COMPLETED" / "FAILED"
+     * - approvalNo: 승인번호 (성공 시)
+     * - failureReason: 실패 사유
+     * - echo: JSON 문자열 (요청 시 보낸 echo를 직렬화한 형태)
+     *
+     * Cash Gateway에서는 echo JSON String을 파싱하여 gatewayReferenceId 등을 추출한다.
+     */
     data class DummyPaymentResponse(
 
+        @JsonProperty("tid")
+        private val tidValue: String,
+
+        @JsonProperty("midId")
+        val midId: String,
+
+        @JsonProperty("userId")
+        private val userKeycloakId: String,  // PG 응답의 userId = Cash Gateway의 keycloakId
+
+        @JsonProperty("orderId")
+        val orderId: String,
+
+        @JsonProperty("amount")
+        private val amountValue: BigDecimal,
+
         @JsonProperty("status")
-        val status: String = "",
-
-        @JsonProperty("code")
-        private val codeValue: String = "",
-
-        @JsonProperty("transactionId")
-        private val transactionIdValue: String? = null,
+        val status: String,
 
         @JsonProperty("approvalNo")
         private val approvalNoValue: String? = null,
 
-        @JsonProperty("amount")
-        private val amountValue: BigDecimal? = null,
+        @JsonProperty("failureReason")
+        val failureReason: String? = null,
 
         @JsonProperty("echo")
-        val echo: Map<String, Any?> = emptyMap(),
-
-        @JsonProperty("message")
-        private val messageValue: String = ""
+        val echoRaw: Any? = null  // hamster-pg는 JSON String으로 보냄
 
     ) : PaymentResponse {
 
-        override fun getCode(): String = codeValue
+        override fun getCode(): String = if (status == "COMPLETED") SUCCESS_CODE else "9999"
 
-        override fun getMessage(): String = messageValue
+        override fun getMessage(): String = failureReason ?: if (status == "COMPLETED") "승인 완료" else "결제 실패"
 
-        override fun getPgTransaction(): String? = transactionIdValue
+        override fun getPgTransaction(): String = tidValue
 
         override fun getPgApprovalNo(): String? = approvalNoValue
 
-        override fun getAmount(): BigDecimal? = amountValue
+        override fun getAmount(): BigDecimal = amountValue
 
-        override fun isSuccess(): Boolean = codeValue == "0000"
+        override fun getMid(): String = midId
+
+        override fun getUserId(): String = userKeycloakId
+
+        override fun isSuccess(): Boolean = status == "COMPLETED"
+
+        /**
+         * echo를 Map으로 반환
+         *
+         * hamster-pg는 echo를 JSON String으로 보내므로, Jackson ObjectMapper로 파싱한다.
+         * 이미 Map으로 역직렬화된 경우 그대로 반환한다.
+         */
+        @JsonIgnore
+        override fun getEcho(): Map<String, Any?> {
+            return when (echoRaw) {
+                is Map<*, *> -> echoRaw as Map<String, Any?>
+                is String -> {
+                    try {
+                        com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(echoRaw, Map::class.java) as Map<String, Any?>
+                    } catch (e: Exception) {
+                        emptyMap()
+                    }
+                }
+                else -> emptyMap()
+            }
+        }
     }
 }

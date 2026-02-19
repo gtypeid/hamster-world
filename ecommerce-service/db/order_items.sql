@@ -7,7 +7,7 @@ CREATE TABLE `order_items` (
     `public_id`         VARCHAR(20)    NOT NULL COMMENT 'Public ID (Snowflake ID - Base62)',
     `order_id`          BIGINT(20)     NOT NULL COMMENT '주문 ID',
     `product_id`        BIGINT(20)     NOT NULL COMMENT '상품 Internal ID (FK)',
-    `product_public_id` VARCHAR(20)    NULL COMMENT 'Product Public ID (Kafka 이벤트용)',
+    `merchant_id`       BIGINT(20)     NOT NULL COMMENT '판매자 Internal ID (Product에서 비정규화)',
     `quantity`           INT           NULL COMMENT '수량',
     `price`             DECIMAL(10, 2) NULL COMMENT '주문 당시 단가',
     `created_at`        DATETIME       NOT NULL,
@@ -15,6 +15,7 @@ CREATE TABLE `order_items` (
     PRIMARY KEY (`id`) USING BTREE,
     UNIQUE KEY `idx_order_items_public_id` (`public_id`) USING BTREE,
     KEY `idx_order_items_order_id` (`order_id`),
-    KEY `idx_order_items_product_id` (`product_id`)
+    KEY `idx_order_items_product_id` (`product_id`),
+    KEY `idx_order_items_merchant_id` (`merchant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='주문 상품 항목';

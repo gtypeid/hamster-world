@@ -77,14 +77,14 @@ class PaymentApprovedRequestToProcessConverter(
             val providerEnum = provider.getProvider()
             return PaymentProcess(
                 orderPublicId = ctx.orderPublicId,
-                userPublicId = ctx.userPublicId,
+                userKeycloakId = ctx.userKeycloakId,
                 orderNumber = ctx.orderNumber,
                 provider = providerEnum,
-                mid = ctx.mid,
+                cashGatewayMid = ctx.cashGatewayMid,
                 amount = ctx.amount,
                 status = PaymentProcessStatus.UNKNOWN,
-                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.mid),
-                activeRequestKey = "${ctx.userPublicId}-${ctx.orderPublicId}-${providerEnum}",
+                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.cashGatewayMid),
+                activeRequestKey = "${ctx.userKeycloakId}-${ctx.orderPublicId}-${providerEnum}",
                 requestPayload = objectMapper.writeValueAsString(paymentRequest),
                 // [2026-02-09] Claude Opus 4: DB에 저장되어 Webhook에서 trace 복원 시 parent로 사용됨
                 traceId = capturedTraceId,

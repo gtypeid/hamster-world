@@ -9,7 +9,6 @@ import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentRespo
 interface PaymentGatewayProvider {
     fun getProvider(): Provider
     fun getEndpoint(): String
-    fun getMid(): String  // 이 Provider의 MID (Merchant ID) 반환
     fun isSuccess(response: PaymentResponse): Boolean
     fun prepareRequest(paymentCtx: PaymentCtx): PaymentRequest
     fun parsePaymentResponse(payload: String): PaymentResponse
@@ -25,16 +24,25 @@ interface PaymentGatewayProvider {
     fun isSynchronousApproval(): Boolean = false
 
     /**
-     * Webhook/PG 응답에서 MID 추출
+     * PG 응답으로부터 Cash Gateway MID 후보 목록을 추출
      *
-     * 외부 거래 판별에 사용:
-     * - 내부 거래: getMid()와 일치
-     * - 외부 거래: getMid()와 불일치 → PgMerchantMapping에서 originSource 조회
+     * **핵심 의도**:
+     * PG사마다 응답 구조가 다르므로, 각 Provider가 자신의 방식으로
+     * PG 응답에서 PG MID를 추출하고, 이를 Cash Gateway MID 후보 목록으로 변환하는 추상화.
+     *
+     * **PG MID ≠ Cash Gateway MID (N:1 관계)**:
+     * - PG MID: PG사에 등록된 가맹점 ID (예: hamster_dummy_mid_001)
+     * - Cash Gateway MID: Cash Gateway가 발급한 식별자 (예: CGW_MID_001)
+     * - 하나의 PG MID에 여러 Cash Gateway MID가 매핑될 수 있음
+     * - 따라서 PG MID 하나로는 Cash Gateway MID를 특정할 수 없으므로 후보 목록을 반환
+     *
+     * 호출자가 반환된 후보 목록 + 기타 context(orderNumber 등)를 조합하여
+     * 정확한 Cash Gateway MID를 특정해야 함.
      *
      * @param response 파싱된 PG 응답
-     * @return MID (Merchant ID), 추출 실패 시 null
+     * @return Cash Gateway MID 후보 목록, 추출 실패 시 빈 리스트
      */
-    fun extractMid(response: PaymentResponse): String?
+    fun extractCashGatewayMidCandidates(response: PaymentResponse): List<String>
 
     /**
      * PG 요청 승인(Acknowledgement) 응답 파싱
@@ -53,4 +61,16 @@ interface PaymentGatewayProvider {
      * @return 파싱된 승인 응답
      */
     fun parseAcknowledgementResponse(payload: String, httpStatusCode: String): AcknowledgementResponse
+
+    /**
+     * CashGatewayMid 자동 생성 시 매핑할 기본 PG MID
+     *
+     * 유저가 처음 결제 요청 시 CashGatewayMid가 존재하지 않으면,
+     * 이 메서드가 반환하는 PG MID로 자동 생성된다.
+     *
+     * Provider마다 application.yml에서 설정된 기본 PG MID를 반환한다.
+     *
+     * @return 기본 PG MID (PG사에 등록된 실제 가맹점 ID)
+     */
+    fun getDefaultPgMid(): String
 }

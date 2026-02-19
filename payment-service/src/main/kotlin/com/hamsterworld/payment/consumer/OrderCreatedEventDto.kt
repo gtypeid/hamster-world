@@ -12,7 +12,8 @@ import java.math.BigDecimal
  * - Payment Service에서 재고 차감 및 ProductRecord 생성에 필요한 정보 포함
  *
  * @property orderPublicId E-commerce Service Order의 Public ID
- * @property userPublicId User의 Public ID (Snowflake Base62)
+ * @property userPublicId User의 Public ID (Snowflake Base62, 내부 서비스용)
+ * @property userKeycloakId User의 Keycloak Subject ID (외부 시스템 UUID)
  * @property orderNumber 주문 번호
  * @property totalPrice 총 주문 금액
  * @property items 주문 항목 리스트
@@ -20,6 +21,7 @@ import java.math.BigDecimal
 data class OrderCreatedEventDto(
     val orderPublicId: String,
     val userPublicId: String,
+    val userKeycloakId: String,
     val orderNumber: String,
     val totalPrice: BigDecimal,
     val items: List<OrderItemDto>,
@@ -32,11 +34,13 @@ data class OrderCreatedEventDto(
  * 주문 항목 DTO
  *
  * @property productPublicId E-commerce Service Product의 Public ID
+ * @property merchantPublicId E-commerce Service Merchant의 Public ID
  * @property quantity 주문 수량
  * @property price 단가
  */
 data class OrderItemDto(
     val productPublicId: String,
+    val merchantPublicId: String,
     val quantity: Int,
     val price: BigDecimal
 )

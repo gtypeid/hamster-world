@@ -21,7 +21,8 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_snapshot_id", columnList = "snapshot_id"),
         Index(name = "idx_product_id", columnList = "product_id"),
-        Index(name = "idx_ecommerce_product_public_id", columnList = "ecommerce_product_public_id")
+        Index(name = "idx_ecommerce_product_public_id", columnList = "ecommerce_product_public_id"),
+        Index(name = "idx_merchant_public_id", columnList = "merchant_public_id")
     ]
 )
 class OrderSnapshotItem(
@@ -32,7 +33,10 @@ class OrderSnapshotItem(
     var productId: Long,  // Payment Service Product의 Internal PK (서비스 내부 FK)
 
     @Column(name = "ecommerce_product_public_id", nullable = false, length = 20)
-    var ecommerceProductPublicId: String,  // E-commerce Service Product의 Public ID (Kafka 이벤트용, Snowflake Base62)
+    var ecommerceProductPublicId: String,  // E-commerce Service Product의 Public ID (Snowflake Base62)
+
+    @Column(name = "merchant_public_id", nullable = false, length = 20)
+    var merchantPublicId: String,  // E-commerce Service Merchant의 Public ID (Snowflake Base62, 정산용)
 
     @Column(nullable = false)
     var quantity: Int,
@@ -44,5 +48,5 @@ class OrderSnapshotItem(
     /**
      * AbsDomain 생성자 호출용
      */
-    constructor() : this(0, 0, "", 0, BigDecimal.ZERO)
+    constructor() : this(0, 0, "", "", 0, BigDecimal.ZERO)
 }

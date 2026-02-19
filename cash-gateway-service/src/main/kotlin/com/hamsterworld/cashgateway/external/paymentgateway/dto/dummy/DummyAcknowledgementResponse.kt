@@ -8,22 +8,20 @@ import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.Acknowledgem
  *
  * ## Dummy PG 특성
  * - 비동기 처리: 202 Accepted 반환
- * - 요청 접수 시 즉시 tid 발급
- * - 실제 결과는 Webhook으로 전달
+ * - ACK에는 tid를 발급하지 않음 (아직 거래가 생성된 것이 아님)
+ * - tid는 실제 승인/실패 Webhook에서 전달됨
  *
- * ## 응답 예시
+ * ## 실제 hamster-pg ACK 응답 예시
  * ```json
  * {
- *   "status": "PENDING",
  *   "code": "ACK_OK",
- *   "transactionId": "DUMMY_20260201_123456",
- *   "message": "Payment request received",
- *   "echo": {
- *     "mid": "hamster_dummy_mid_001",
- *     "gatewayReferenceId": "CGW_DUMMY_..."
- *   }
+ *   "amount": 10000,
+ *   "message": "Payment request accepted"
  * }
  * ```
+ *
+ * 참고: hamster-pg는 ACK에 status, transactionId, echo를 반환하지 않음.
+ * 해당 필드들은 다른 PG사 연동을 위한 확장 필드로, null/empty 기본값으로 동작함.
  */
 data class DummyAcknowledgementResponse(
     @JsonProperty("status")

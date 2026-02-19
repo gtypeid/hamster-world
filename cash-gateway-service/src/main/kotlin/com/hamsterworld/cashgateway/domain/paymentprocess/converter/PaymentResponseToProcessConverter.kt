@@ -48,13 +48,13 @@ class PaymentResponseToProcessConverter(
             val providerEnum = provider.getProvider()
             val process = PaymentProcess(
                 orderPublicId = ctx.orderPublicId,
-                userPublicId = ctx.userPublicId,
+                userKeycloakId = ctx.userKeycloakId,
                 provider = providerEnum,
-                mid = ctx.mid,
+                cashGatewayMid = ctx.cashGatewayMid,
                 amount = ctx.amount,
                 orderNumber = ctx.orderNumber,
                 status = status,
-                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.mid),
+                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.cashGatewayMid),
                 code = paymentResponse.getCode(),
                 message = paymentResponse.getMessage(),
                 pgTransaction = paymentResponse.getPgTransaction(),

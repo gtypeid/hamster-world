@@ -5,6 +5,8 @@ import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentApprovedR
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentCancelledRequestWithCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.PaymentResponseWithCtx
 import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
+import com.hamsterworld.cashgateway.domain.cashgatewaymid.model.CashGatewayMid
+import com.hamsterworld.cashgateway.domain.cashgatewaymid.repository.CashGatewayMidRepository
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.ApprovePaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.CancelPaymentCtx
 import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.PaymentRequest
@@ -43,7 +45,8 @@ abstract class PaymentGatewayClientProtocolCore(
     private val domainConverterAdapter: DomainConverterAdapter,
     private val paymentGatewayCoreService: PaymentGatewayCoreService,
     private val provider: PaymentGatewayProvider,
-    private val traceContextHolder: TraceContextHolder
+    private val traceContextHolder: TraceContextHolder,
+    private val cashGatewayMidRepository: CashGatewayMidRepository
 ) : PaymentGatewayClientProtocol {
 
     private val log = LoggerFactory.getLogger(PaymentGatewayClientProtocolCore::class.java)
@@ -67,14 +70,10 @@ abstract class PaymentGatewayClientProtocolCore(
      */
     @Transactional(propagation = Propagation.MANDATORY)
     override fun payment(paymentCtx: ApprovePaymentCtx) {
-        // TODO: Webhook 전용 정책 적용
-        // - 배경: 동기/비동기 혼재 시 복잡도 증가 (응답 처리 vs Webhook 처리 중복)
-        //   1) 동기 PG라도 Webhook도 보낼 수 있음 (중복 처리 문제)
-        //   2) Webhook이 응답보다 먼저 올 수 있음 (Race Condition)
-        //   3) tid 기반 조회는 응답 처리 후에만 가능 (UNKNOWN 상태는 tid 없음)
-        // - 해결: 모든 PG를 비동기로 간주, 승인/거절은 Webhook에서만 처리
-        // - 장점: 단일 처리 경로, 멱등성 보장 용이, 상태 관리 단순화
-        // - 단점: 응답 즉시 결과 확인 불가 (Webhook 대기 필요)
+        // Webhook 전용 정책:
+        // - 모든 PG를 비동기로 간주, 승인/거절은 Webhook에서만 처리
+        // - 응답 성공 = 요청 접수 완료 (승인 완료 아님)
+        // - PaymentProcess는 UNKNOWN 상태 유지, Webhook에서 SUCCESS/FAILED로 CAS 업데이트
 
         val request: PaymentRequest = provider.prepareRequest(paymentCtx)
 
@@ -109,7 +108,7 @@ abstract class PaymentGatewayClientProtocolCore(
         } catch (e: Exception) {
             log.error("[{}] PG 서버 통신 실패 (서버 다운 또는 네트워크 오류): {}", provider.getProvider().name, e.message, e)
 
-            // PG 서버 다운 시 PaymentProcess를 FAILED로 기록하고 null 반환
+            // PG 서버 다운 시 PaymentProcess를 FAILED로 기록
             // 예외를 던지지 않아 트랜잭션 커밋되며, Kafka 재시도 방지
             requestPaymentProcess.status = PaymentProcessStatus.FAILED
             requestPaymentProcess.code = "PG_SERVER_DOWN"
@@ -124,46 +123,11 @@ abstract class PaymentGatewayClientProtocolCore(
         val rawResponse = responseEntity.body
         log.info("[{}] 결제 응답 <- {}", provider.getProvider().name, rawResponse)
 
-        val response: PaymentResponse = provider.parsePaymentResponse(rawResponse!!)
-            ?: throw CustomRuntimeException("PG 응답 파싱 실패: null 응답")
-
-        /**
-         * **Webhook 전용 정책 적용** (MANDATORY 트랜잭션 전파 정책과 연계)
-         *
-         * **배경**:
-         * - 기존: 동기 PG 응답 처리 (성공/실패 분기)
-         *   - 성공: Payment 생성 + 커밋
-         *   - 실패: handleResponseFailure() + 예외 던짐 → 롤백
-         *
-         * **문제점** (MANDATORY 전파 정책 도입 후):
-         * - PG 응답 실패 (code != "0000") = "정상적인 실패" (비즈니스 결과)
-         * - 예외 던지면 전체 롤백 (PaymentAttempt FAILED 기록 소실)
-         * - Kafka 재시도 → 동일한 실패 반복 → 무한 재시도
-         *
-         * **해결**:
-         * - PG 응답은 단순히 "요청 접수 완료" 의미만 가짐
-         * - 성공/실패 분기 제거, 항상 PaymentAttempt는 UNKNOWN 상태 유지
-         * - 실제 승인/거절은 Webhook에서만 처리 (handleInternalWebhook)
-         * - 장점:
-         *   1. 단일 처리 경로 (응답 vs Webhook 중복 제거)
-         *   2. Race Condition 방지 (Webhook이 응답보다 먼저 올 수 있음)
-         *   3. 멱등성 보장 용이 (tid 기반 CAS)
-         *   4. 트랜잭션 경계 단순화 (정상 흐름만 커밋)
-         *
-         * **기존 코드** (제거됨):
-         * ```kotlin
-         * if (!provider.isSuccess(response)) {
-         *     handleResponseFailure(responseAttempt)  // FAILED 기록
-         *     throw CustomRuntimeException(...)       // 롤백 유발 (문제!)
-         * }
-         * ```
-         */
+        // Webhook 전용 정책: 응답은 "접수 완료" 의미만. 승인/거절은 Webhook에서 처리.
         log.info(
             "[{}] PG 요청 접수 완료 - Webhook으로 최종 결과 수신 예정",
             provider.getProvider().name
         )
-
-        // 이벤트는 Webhook에서만 발행
     }
 
     override fun cancel(paymentCtx: CancelPaymentCtx) {
@@ -242,79 +206,116 @@ abstract class PaymentGatewayClientProtocolCore(
     }
 
     /**
-     * Webhook 처리 메인 로직
+     * Webhook 처리 메인 로직 (3단계 파이프라인)
      *
      * **트랜잭션 전파 정책**:
      * - `MANDATORY`: 반드시 부모 트랜잭션 내에서 호출되어야 함
      * - 호출 경로: PgWebhookService.handleWebhook(MANDATORY) → handleWebhook(MANDATORY)
      * - 목적: Webhook 처리 전체가 하나의 트랜잭션으로 원자적 처리
      *
-     * **처리 플로우**:
-     * 1. Payload 파싱
-     * 2. tid 검증
-     * 3. orderNumber 기반 내부/외부 거래 판단
-     * 4. 내부: UNKNOWN → SUCCESS/FAILED CAS 업데이트
-     * 5. 외부: PaymentProcess + Payment 신규 생성
+     * ## 3단계 파이프라인
+     *
+     * **Step 1: 파싱** - PG 응답에서 필수 필드 추출 (tid, pgMid)
+     *
+     * **Step 2: PG MID → CashGatewayMid 특정**
+     * - PG MID로 CashGatewayMid 후보 목록 역추적 (N:1이므로 복수 가능)
+     * - 후보 1개 → 확정
+     * - 후보 복수 → userId로 필터링하여 정확히 1개 확정
+     * - 후보 0개 → 에러
+     *
+     * **Step 3: CashGatewayMid + PENDING → PaymentProcess 특정**
+     * - 확정된 cashGatewayMid + provider + PENDING 상태로 PaymentProcess 조회
+     * - 찾으면 → 내부 거래 (tid 업데이트 + 상태 마킹)
+     * - 못 찾으면 → 외부 거래 (새 PaymentProcess 생성)
      */
     @Transactional(propagation = Propagation.MANDATORY)
     override fun handleWebhook(rawPayload: String) {
-        log.info("[{}] Webhook 수신", provider.getProvider().name)
+        val providerName = provider.getProvider().name
+        log.info("[{}] Webhook 수신", providerName)
         log.debug("Webhook Payload = {}", rawPayload)
 
-        // 1. Payload 파싱
+        // ── Step 1: 파싱 ──
         val response: PaymentResponse = try {
             provider.parsePaymentResponse(rawPayload)
         } catch (e: Exception) {
-            log.error("[{}] Webhook 파싱 실패: {}", provider.getProvider().name, e.message)
+            log.error("[{}] Webhook 파싱 실패: {}", providerName, e.message)
             throw CustomRuntimeException("Webhook 파싱 실패", e)
         }
 
-        // 2. tid 검증 (필수)
         val tid = response.getPgTransaction()
             ?: throw CustomRuntimeException("Webhook에 tid 없음")
+        val pgMid = response.getMid()
+            ?: throw CustomRuntimeException("Webhook에 PG MID 없음")
+        val userId = response.getUserId()
 
-        // 3. MID 추출
-        val mid = provider.extractMid(response) ?: provider.getMid()
+        log.info("[{}] Step 1 완료 | tid={}, pgMid={}, userId={}, success={}",
+            providerName, tid, pgMid, userId, response.isSuccess())
 
-        log.info("[{}] Webhook 처리 시작 | tid={}, mid={}, success={}",
-            provider.getProvider().name, tid, mid, response.isSuccess())
+        // ── Step 2: PG MID → CashGatewayMid 특정 ──
+        val cashGatewayMid = resolveCashGatewayMid(pgMid, userId)
 
-        // PENDING 상태의 PaymentProcess 조회 (Webhook은 PENDING 상태에서만 처리)
-        val existingProcess = paymentGatewayCoreService.findAttemptByTid(tid)
+        log.info("[{}] Step 2 완료 | cashGatewayMid={}, userKeycloakId={}",
+            providerName, cashGatewayMid.mid, cashGatewayMid.userKeycloakId)
 
-        if (existingProcess == null) {
-            log.error("[{}] 해당 거래를 찾을 수 없음 | tid={}", provider.getProvider().name, tid)
-            throw CustomRuntimeException("해당 거래를 찾을 수 없음: tid=$tid")
+        // ── Step 3: CashGatewayMid + PENDING → PaymentProcess 특정 ──
+        val existingProcess = paymentGatewayCoreService.findPendingByCashGatewayMidAndProvider(
+            cashGatewayMid.mid, provider.getProvider()
+        )
+
+        if (existingProcess != null) {
+            // 내부 거래: PENDING PaymentProcess 존재 → tid 업데이트 + 상태 마킹
+            log.info("[{}] Step 3 완료 (내부 거래) | processId={}, cashGatewayMid={}",
+                providerName, existingProcess.id, cashGatewayMid.mid)
+
+            handleInternalWebhook(existingProcess, response, rawPayload)
+        } else {
+            // 외부 거래: PENDING PaymentProcess 없음 → 새 PaymentProcess 생성
+            log.info("[{}] Step 3 완료 (외부 거래) | cashGatewayMid={}, tid={}",
+                providerName, cashGatewayMid.mid, tid)
+
+            handleExternalWebhook(response, rawPayload, tid, cashGatewayMid.mid)
+        }
+    }
+
+    /**
+     * PG MID → CashGatewayMid 특정 (Webhook Step 2)
+     *
+     * 1. PG MID로 후보 목록 조회 (N:1 관계이므로 복수 가능)
+     * 2. 후보 1개 → 확정
+     * 3. 후보 복수 + userId 있음 → userId로 필터링
+     * 4. 후보 0개 → 에러
+     *
+     * @param pgMid PG 응답의 MID (PG사에 등록된 가맹점 ID)
+     * @param userId PG 응답의 유저 식별자 (후보 필터링용, nullable)
+     * @return 확정된 CashGatewayMid 엔티티
+     */
+    private fun resolveCashGatewayMid(
+        pgMid: String,
+        userId: String?
+    ): CashGatewayMid {
+        val providerEnum = provider.getProvider()
+
+        // userId가 있으면 직접 1개 특정 시도
+        if (userId != null) {
+            val exact = cashGatewayMidRepository.findByProviderAndPgMidAndUserKeycloakId(
+                providerEnum, pgMid, userId
+            )
+            if (exact != null) return exact
         }
 
-        log.info("[{}] 거래 PaymentProcess 조회 성공 | processId={}, status={}",
-            provider.getProvider().name, existingProcess.id, existingProcess.status)
+        // userId 없거나 직접 매칭 실패 → 후보 목록 조회
+        val candidates = cashGatewayMidRepository.findAllByProviderAndPgMid(providerEnum, pgMid)
 
-        // PENDING 상태 검증
-        if (existingProcess.status != PaymentProcessStatus.PENDING) {
-            log.warn("[{}] PENDING 상태가 아닌 거래에 Webhook 수신 | processId={}, status={}",
-                provider.getProvider().name, existingProcess.id, existingProcess.status)
-            return  // 이미 처리됨 or 잘못된 상태
+        return when (candidates.size) {
+            0 -> throw CustomRuntimeException(
+                "CashGatewayMid를 찾을 수 없습니다. provider=$providerEnum, pgMid=$pgMid, userId=$userId"
+            )
+            1 -> candidates.first()
+            else -> throw CustomRuntimeException(
+                "CashGatewayMid 후보가 복수입니다. 특정할 수 없습니다. " +
+                    "provider=$providerEnum, pgMid=$pgMid, userId=$userId, candidates=${candidates.map { it.mid }}"
+            )
         }
-
-        // PENDING → SUCCESS/FAILED로 CAS 업데이트 (이벤트 발행)
-        handleInternalWebhook(existingProcess, response, rawPayload)
-
-        /*
-            // [외부 거래] gatewayReferenceId 없음 + tid 있음 = 외부에서 발생한 거래
-            log.info("[{}] 외부 거래 판단 | tid={}, mid={}", provider.getProvider().name, tid, mid)
-
-            // tid 중복 체크 (멱등성 보장)
-            val duplicateCheck = paymentGatewayCoreService.findAttemptByTid(tid)
-            if (duplicateCheck != null) {
-                log.warn("[{}] 중복 tid 감지 | tid={}, 기존 processId={}",
-                    provider.getProvider().name, tid, duplicateCheck.id)
-                return null  // 이미 처리됨
-            }
-
-            // PaymentProcess + Payment 신규 생성
-            return handleExternalWebhook(response, rawPayload, tid, mid)
-        */
     }
 
     /**
@@ -334,6 +335,13 @@ abstract class PaymentGatewayClientProtocolCore(
     ) {
         log.info("[{}] 내부 요청 Webhook 처리 시작 | processId={}, 기존 status={}",
             provider.getProvider().name, existingProcess.id, existingProcess.status)
+
+        // PENDING 상태 검증
+        if (existingProcess.status != PaymentProcessStatus.PENDING) {
+            log.warn("[{}] PENDING 상태가 아닌 거래에 Webhook 수신 | processId={}, status={}",
+                provider.getProvider().name, existingProcess.id, existingProcess.status)
+            return  // 이미 처리됨 (중복 Webhook 무시)
+        }
 
         // [2026-02-09] Claude Opus 4: Webhook 경계에서 원본 trace 복원
         //
@@ -390,15 +398,24 @@ abstract class PaymentGatewayClientProtocolCore(
         response: PaymentResponse,
         rawPayload: String,
         tid: String,
-        mid: String
+        cashGatewayMid: String?
     ) {
-        log.info("[{}] 외부 거래 Webhook | tid={}, mid={}",
-            provider.getProvider().name, tid, mid)
+        log.info("[{}] 외부 거래 Webhook | tid={}, cashGatewayMid={}",
+            provider.getProvider().name, tid, cashGatewayMid)
 
-        // TODO: PgMerchantMapping으로 originSource 조회
-        // val mapping = pgMerchantMappingRepository.findByProviderAndMid(provider.getProvider(), mid)
-        // val originSource = mapping?.originSource ?: "${provider.getProvider().name}_WEBHOOK"
-        val originSource = "${provider.getProvider().name}_WEBHOOK"
+        // CashGatewayMid로 originSource + userKeycloakId 조회
+        val mapping = if (cashGatewayMid != null) {
+            cashGatewayMidRepository.findByProviderAndMid(provider.getProvider(), cashGatewayMid)
+        } else null
+        val originSource = mapping?.originSource ?: "${provider.getProvider().name}_WEBHOOK"
+        val resolvedCashGatewayMid = cashGatewayMid ?: "UNKNOWN"
+        val resolvedUserKeycloakId = mapping?.userKeycloakId
+            ?: throw CustomRuntimeException("외부 거래의 userKeycloakId를 확인할 수 없습니다. cashGatewayMid=$cashGatewayMid")
+
+        if (mapping != null) {
+            log.info("[{}] CashGatewayMid 조회 성공 | cashGatewayMid={}, userKeycloakId={}, originSource={}",
+                provider.getProvider().name, cashGatewayMid, resolvedUserKeycloakId, originSource)
+        }
 
         // Amount 추출
         val amount = response.getAmount()
@@ -412,15 +429,15 @@ abstract class PaymentGatewayClientProtocolCore(
         val providerEnum = provider.getProvider()
         val externalAttempt = PaymentProcess(
             orderPublicId = null,  // 외부 거래는 orderPublicId 없음
-            userPublicId = null,
+            userKeycloakId = resolvedUserKeycloakId,
             provider = providerEnum,
-            mid = mid,
+            cashGatewayMid = resolvedCashGatewayMid,
             amount = amount,
             status = if (response.isSuccess())
                 PaymentProcessStatus.SUCCESS
             else
                 PaymentProcessStatus.FAILED,
-            gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, mid),
+            gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, resolvedCashGatewayMid),
             orderNumber = null,
             code = response.getCode(),
             message = response.getMessage(),

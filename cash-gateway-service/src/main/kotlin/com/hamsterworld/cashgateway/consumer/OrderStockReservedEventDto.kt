@@ -18,14 +18,15 @@ import java.math.BigDecimal
  */
 data class OrderStockReservedEventDto(
     val orderPublicId: String,  // E-commerce Service의 Order Public ID (Snowflake Base62)
-    val userPublicId: String,   // E-commerce Service의 User Public ID (Snowflake Base62)
+    val userKeycloakId: String,  // User의 Keycloak Subject ID (외부 시스템 UUID)
     val orderNumber: String,
     val cashAmount: BigDecimal, // 실제 PG 결제 금액
     val items: List<OrderItemDto>
 )
 
 data class OrderItemDto(
-    val productId: String,      // Product의 Public ID (Snowflake Base62)
+    val productId: String,            // Product의 Public ID (Snowflake Base62)
+    val merchantPublicId: String,     // Merchant의 Public ID (Snowflake Base62)
     val quantity: Int,
     val price: BigDecimal
 )

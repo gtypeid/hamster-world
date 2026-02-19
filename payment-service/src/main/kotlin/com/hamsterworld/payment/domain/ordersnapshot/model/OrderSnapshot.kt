@@ -44,7 +44,10 @@ class OrderSnapshot(
     var orderNumber: String,
 
     @Column(name = "user_public_id", nullable = false, length = 20)
-    var userPublicId: String,  // E-commerce Service User의 Public ID (Snowflake Base62)
+    var userPublicId: String,  // User의 Public ID (Snowflake Base62, 내부 서비스용)
+
+    @Column(name = "user_keycloak_id", nullable = false, length = 100)
+    var userKeycloakId: String,  // User의 Keycloak Subject ID (외부 시스템 UUID)
 
     @Column(name = "total_price", nullable = false, precision = 15, scale = 3)
     var totalPrice: BigDecimal,
@@ -72,7 +75,8 @@ class OrderSnapshot(
          *
          * @param orderPublicId E-commerce Service의 Order Public ID (Snowflake Base62)
          * @param orderNumber 주문 번호
-         * @param userPublicId User의 Public ID (Snowflake Base62)
+         * @param userPublicId User의 Public ID (Snowflake Base62, 내부 서비스용)
+         * @param userKeycloakId User의 Keycloak Subject ID (외부 시스템 UUID)
          * @param totalPrice 총 주문 금액
          * @param items 주문 항목 리스트
          * @return OrderSnapshot (이벤트 등록됨)
@@ -81,6 +85,7 @@ class OrderSnapshot(
             orderPublicId: String,
             orderNumber: String,
             userPublicId: String,
+            userKeycloakId: String,
             totalPrice: BigDecimal,
             couponDiscount: BigDecimal,
             pointsUsed: BigDecimal,
@@ -91,6 +96,7 @@ class OrderSnapshot(
                 orderPublicId = orderPublicId,
                 orderNumber = orderNumber,
                 userPublicId = userPublicId,
+                userKeycloakId = userKeycloakId,
                 totalPrice = totalPrice,
                 couponDiscount = couponDiscount,
                 pointsUsed = pointsUsed,
@@ -102,6 +108,7 @@ class OrderSnapshot(
                 OrderStockReservedEvent(
                     orderPublicId = orderPublicId,
                     userPublicId = userPublicId,
+                    userKeycloakId = userKeycloakId,
                     orderNumber = orderNumber,
                     totalPrice = totalPrice,
                     couponDiscount = couponDiscount,
@@ -110,6 +117,7 @@ class OrderSnapshot(
                     items = items.map { item ->
                         ProductEventOrderItemDto(
                             productId = item.productPublicId,
+                            merchantPublicId = item.merchantPublicId,
                             quantity = item.quantity,
                             price = item.price
                         )

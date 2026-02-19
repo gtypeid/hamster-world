@@ -1,6 +1,6 @@
 package com.hamsterworld.cashgateway.domain.paymentprocess.model
 
-import com.hamsterworld.cashgateway.domain.payment.event.PaymentProcessCreatedEvent
+import com.hamsterworld.cashgateway.domain.payment.event.InternalPaymentProcessCreatedEvent
 import com.hamsterworld.cashgateway.domain.paymentprocess.constant.PaymentProcessStatus
 import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
 import com.hamsterworld.common.domain.abs.AbsDomain
@@ -20,22 +20,23 @@ import java.time.LocalDateTime
         Index(name = "idx_payment_processes_public_id", columnList = "public_id", unique = true),
         Index(name = "idx_pg_transaction", columnList = "pgTransaction", unique = true),
         Index(name = "idx_payment_processes_order_public_id", columnList = "order_public_id"),
-        Index(name = "idx_provider_mid_status", columnList = "provider,mid,status")
+        Index(name = "idx_provider_cgw_mid_status", columnList = "provider,cash_gateway_mid,status")
     ]
 )
 class PaymentProcess(
     @Column(name = "order_public_id", length = 20)
     var orderPublicId: String?,  // nullable (외부 거래는 NULL) - Order의 Public ID (Snowflake Base62)
 
-    @Column(name = "user_public_id", length = 20)
-    var userPublicId: String?,  // nullable (외부 거래는 NULL) - User의 Public ID (Snowflake Base62)
+    @Column(name = "user_keycloak_id", nullable = false, length = 100)
+    var userKeycloakId: String,  // User의 Keycloak Subject ID (외부 시스템 UUID)
 
     var orderNumber: String? = null,  // nullable (주문 번호)
 
     @Enumerated(EnumType.STRING)
     var provider: Provider?,  // nullable
 
-    var mid: String,  // MID (Merchant ID)
+    @Column(name = "cash_gateway_mid")
+    var cashGatewayMid: String,  // Cash Gateway MID (Cash Gateway가 발급한 가맹점 식별자, ≠ PG MID)
 
     var amount: BigDecimal,
 
@@ -78,8 +79,8 @@ class PaymentProcess(
     @Column(name = "request_attempt_count")
     var requestAttemptCount: Int = 0,  // 총 요청 시도 횟수
 
-    @Column(name = "last_pg_response_code", length = 10)
-    var lastPgResponseCode: String? = null,  // 마지막 PG 응답 코드 (202, 200 등)
+    @Column(name = "last_http_status_code", length = 10)
+    var lastHttpStatusCode: String? = null,  // 마지막 PG HTTP 상태 코드 (202, 200, 400 등)
 
     // Trace context (for webhook callback)
     @Column(name = "trace_id", length = 32)
@@ -91,13 +92,13 @@ class PaymentProcess(
     /**
      * PaymentProcess 생성 시 이벤트 등록
      *
-     * PG 요청 기록 완료 후 호출되어 PaymentProcessCreatedEvent를 등록합니다.
+     * PG 요청 기록 완료 후 호출되어 InternalPaymentProcessCreatedEvent를 등록합니다.
      * repository.save() 시 자동으로 이벤트가 발행됩니다.
      *
      * @return this
      */
     fun onCreate(): PaymentProcess {
-        registerEvent(PaymentProcessCreatedEvent(this))
+        registerEvent(InternalPaymentProcessCreatedEvent(this))
         return this
     }
 
@@ -121,13 +122,13 @@ class PaymentProcess(
          */
         fun generateGatewayReferenceId(
             provider: Provider?,
-            mid: String
+            cashGatewayMid: String
         ): String {
             val providerName = provider?.name ?: "EXTERNAL"
             val timestamp = java.time.LocalDateTime.now()
             val dateTime = timestamp.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
             val random = java.util.UUID.randomUUID().toString().substring(0, 8).uppercase()
-            return "CGW_${providerName}_${mid}_${dateTime}_${random}"
+            return "CGW_${providerName}_${cashGatewayMid}_${dateTime}_${random}"
         }
     }
 }

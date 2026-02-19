@@ -14,17 +14,8 @@ class PgMidService(
 ) {
 
     @Transactional
-    fun createMid(merchantName: String): PgMid {
-        // Generate unique midId and apiKey
-        val midId = "MID_${System.currentTimeMillis()}_${(1000..9999).random()}"
-        val apiKey = java.util.UUID.randomUUID().toString()
-
-        val pgMid = PgMid(
-            midId = midId,
-            merchantName = merchantName,
-            apiKey = apiKey,
-            isActive = true
-        )
+    fun createMid(merchantName: String, webhookUrl: String): PgMid {
+        val pgMid = PgMid.create(merchantName, webhookUrl)
         return repository.save(pgMid)
     }
 
@@ -60,8 +51,8 @@ class PgMidService(
 
     // DTO conversion methods (used by controllers)
     @Transactional
-    fun createMidResponse(merchantName: String): MidResponse {
-        val pgMid = createMid(merchantName)
+    fun createMidResponse(merchantName: String, webhookUrl: String): MidResponse {
+        val pgMid = createMid(merchantName, webhookUrl)
         return MidResponse.from(pgMid)
     }
 

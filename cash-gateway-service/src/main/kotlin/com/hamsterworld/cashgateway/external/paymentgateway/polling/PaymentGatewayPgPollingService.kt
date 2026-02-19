@@ -49,7 +49,7 @@ import java.time.LocalDateTime
     prefix = "payment.gateway.polling",
     name = ["enabled"],
     havingValue = "true",
-    matchIfMissing = false  // 기본값: 비활성화
+    matchIfMissing = true  // 기본값
 )
 class PaymentGatewayPgPollingService(
     private val paymentProcessRepository: PaymentProcessRepository,
@@ -66,10 +66,10 @@ class PaymentGatewayPgPollingService(
     /**
      * UNKNOWN 상태의 PaymentProcess를 PG에 요청
      *
-     * fixedDelay: 이전 실행 완료 후 5초 대기 (overlapping 방지)
-     * initialDelay: 서버 시작 후 10초 대기 (초기화 시간 확보)
+     * fixedDelay: 이전 실행 완료 후 2초 대기 (overlapping 방지)
+     * initialDelay: 서버 시작 후 5초 대기 (초기화 시간 확보)
      */
-    @Scheduled(fixedDelay = 5000, initialDelay = 10000)
+    @Scheduled(fixedDelay = 2000, initialDelay = 5000)
     @Transactional
     fun pollAndRequest() {
         try {
@@ -111,8 +111,8 @@ class PaymentGatewayPgPollingService(
         val processId = process.id!!
 
         logger.info(
-            "Processing payment request - processId: {}, gatewayReferenceId: {}, provider: {}, mid: {}",
-            process.id, process.gatewayReferenceId, process.provider, process.mid
+            "Processing payment request - processId: {}, gatewayReferenceId: {}, provider: {}, cashGatewayMid: {}",
+            process.id, process.gatewayReferenceId, process.provider, process.cashGatewayMid
         )
 
         // Provider 찾기
@@ -122,11 +122,11 @@ class PaymentGatewayPgPollingService(
         try {
             // PaymentCtx 생성
             val paymentCtx = ApprovePaymentCtx(
-                userPublicId = process.userPublicId ?: "",
+                userKeycloakId = process.userKeycloakId,
                 orderPublicId = process.orderPublicId ?: "",
                 orderNumber = process.orderNumber ?: "Payment",
                 amount = process.amount,
-                mid = process.mid
+                cashGatewayMid = process.cashGatewayMid
             )
 
             // PG 요청 준비

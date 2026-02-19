@@ -14,9 +14,9 @@ import java.math.BigDecimal
 data class PaymentFailedEventDto(
     val processPublicId: String,    // PaymentProcess Public ID
     val orderPublicId: String?,     // nullable (외부 거래)
-    val userPublicId: String?,      // nullable (외부 거래)
+    val userKeycloakId: String?,     // nullable (외부 거래) - User의 Keycloak Subject ID
     val provider: String?,          // Provider.name
-    val mid: String,                // Cash Gateway MID
+    val cashGatewayMid: String,     // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val orderNumber: String?,
     val code: String?,

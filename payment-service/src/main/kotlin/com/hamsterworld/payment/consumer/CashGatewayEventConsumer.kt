@@ -114,7 +114,7 @@ class CashGatewayEventConsumer(
         val payment = Payment.createApproved(
             processPublicId = event.paymentPublicId,
             gatewayPaymentPublicId = event.gatewayPaymentPublicId,
-            gatewayMid = event.mid,
+            gatewayMid = event.cashGatewayMid,
             orderPublicId = event.orderPublicId,
             orderSnapshotId = snapshot.id!!,
             amount = event.amount,
@@ -126,8 +126,8 @@ class CashGatewayEventConsumer(
         paymentRepository.save(payment)
 
         logger.info(
-            "[Payment 생성 완료] orderPublicId={} | paymentPublicId={} | gatewayPaymentPublicId={} | gatewayMid={} | amount={} | traceId={}",
-            event.orderPublicId, payment.publicId, event.gatewayPaymentPublicId, event.mid, event.amount,
+            "[Payment 생성 완료] orderPublicId={} | paymentPublicId={} | gatewayPaymentPublicId={} | cashGatewayMid={} | amount={} | traceId={}",
+            event.orderPublicId, payment.publicId, event.gatewayPaymentPublicId, event.cashGatewayMid, event.amount,
             parsedEvent.traceId ?: "N/A"
         )
     }
@@ -275,7 +275,7 @@ class CashGatewayEventConsumer(
         val cancelledPayment = Payment.createCancelled(
             processPublicId = event.paymentPublicId,
             gatewayPaymentPublicId = event.gatewayPaymentPublicId,
-            gatewayMid = event.mid,
+            gatewayMid = event.cashGatewayMid,
             orderPublicId = event.orderPublicId,
             orderSnapshotId = snapshot.id!!,
             amount = event.amount,

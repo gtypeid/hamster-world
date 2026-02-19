@@ -44,19 +44,19 @@ class PaymentCancelledRequestToProcessConverter(
 
             return PaymentProcess(
                 orderPublicId = ctx.orderPublicId,
-                userPublicId = ctx.userPublicId,
+                userKeycloakId = ctx.userKeycloakId,
                 provider = providerEnum,
-                mid = ctx.mid,
+                cashGatewayMid = ctx.cashGatewayMid,
                 // 취소는 음수 금액
                 amount = ctx.amount.negate(),
                 orderNumber = ctx.orderNumber,
                 // 원본 PaymentProcess 참조
                 originProcessId = originProcess.id,
-                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.mid),
+                gatewayReferenceId = PaymentProcess.generateGatewayReferenceId(providerEnum, ctx.cashGatewayMid),
                 pgTransaction = null,  // 취소 요청 시점엔 아직 없음 (응답에서 받음)
                 pgApprovalNo = null,    // 취소 요청 시점엔 아직 없음
                 status = PaymentProcessStatus.UNKNOWN,
-                activeRequestKey = "${ctx.userPublicId}-${ctx.orderPublicId}-${providerEnum}",
+                activeRequestKey = "${ctx.userKeycloakId}-${ctx.orderPublicId}-${providerEnum}",
                 requestPayload = objectMapper.writeValueAsString(paymentRequest)
             )
         } catch (e: Exception) {

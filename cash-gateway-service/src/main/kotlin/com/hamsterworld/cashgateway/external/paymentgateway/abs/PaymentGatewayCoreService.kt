@@ -31,14 +31,33 @@ class PaymentGatewayCoreService(
     }
 
     /**
+     * orderNumber + provider로 PENDING 상태의 PaymentProcess 조회
+     *
+     * Webhook에서 PaymentProcess를 찾기 위해 사용.
+     * ACK에 tid가 없으므로 pgTransaction 기반 조회 대신 사용한다.
+     */
+    fun findPendingByOrderNumberAndProvider(orderNumber: String, provider: Provider): PaymentProcess? {
+        return paymentProcessRepository.findPendingByOrderNumberAndProvider(orderNumber, provider)
+    }
+
+    /**
+     * CashGatewayMid + provider로 PENDING PaymentProcess 조회
+     *
+     * Webhook Step 3에서 사용: 확정된 CashGatewayMid로 PENDING 상태의 PaymentProcess를 찾는다.
+     */
+    fun findPendingByCashGatewayMidAndProvider(cashGatewayMid: String, provider: Provider): PaymentProcess? {
+        return paymentProcessRepository.findPendingByCashGatewayMidAndProvider(cashGatewayMid, provider)
+    }
+
+    /**
      * Provider + MID로 PaymentAttempt 조회
      */
-    fun findByProviderAndMid(
+    fun findByProviderAndCashGatewayMid(
         provider: Provider,
-        mid: String
+        cashGatewayMid: String
     ): PaymentProcess {
-        return paymentProcessRepository.findByProviderAndMid(
-            provider, mid
+        return paymentProcessRepository.findByProviderAndCashGatewayMid(
+            provider, cashGatewayMid
         )
     }
 
@@ -77,28 +96,28 @@ class PaymentGatewayCoreService(
         if (process.isExternal()) {
             paymentProcessRepository.save(process.onCreate())
             log.info("[외부 거래 기록 완료] provider={}, originSource={}, mid={}, tid={}, gatewayReferenceId={}",
-               process.provider,process.originSource,process.mid,process.pgTransaction,process.gatewayReferenceId)
+               process.provider,process.originSource,process.cashGatewayMid,process.pgTransaction,process.gatewayReferenceId)
 
             // 이벤트는 PaymentProcess.onCreate()에서 등록, save() 시 자동 발행
             return
         }
 
-        val casExisting = paymentProcessRepository.findUnknownAttempt(
+        val existingProcess = paymentProcessRepository.findUnknownAttempt(
            process.orderPublicId!!,  // 내부 요청은 orderPublicId 필수
-           process.userPublicId!!,
+           process.userKeycloakId,
            process.provider!!
         )
 
-        if (casExisting.isEmpty) {
+        if (existingProcess.isEmpty) {
             try {
                 paymentProcessRepository.save(process.onCreate())
                 log.info("[PG 프로세스 시작] provider={}, gatewayReferenceId={}",
                    process.provider,process.gatewayReferenceId)
 
                 // Order 상태 변경은 이벤트 발행으로 처리
-                // ecommerce-service가 PaymentProcessCreatedEvent 구독하여 Order 상태 변경
+                // ecommerce-service가 InternalPaymentProcessCreatedEvent 구독하여 Order 상태 변경
                 // 이벤트는 PaymentProcess.onCreate()에서 등록, save() 시 자동 발행
-                log.debug("[이벤트 등록] PaymentProcessCreatedEvent (save 시 자동 발행), orderPublicId={}",process.orderPublicId)
+                log.debug("[이벤트 등록] InternalPaymentProcessCreatedEvent (save 시 자동 발행), orderPublicId={}",process.orderPublicId)
 
             } catch (e: DataIntegrityViolationException) {
                 // 레이스 컨디션으로 애플리케이션 체크는 통과했지만, DB unique constraint에서 막힌 경우
@@ -160,7 +179,7 @@ class PaymentGatewayCoreService(
 
                 // 실패는 Payment 엔티티 없이 CoreService에서 직접 이벤트 발행
                 val reason = event.message ?: event.code ?: "Unknown error"
-                eventPublisher.publishEvent(PaymentFailedEvent.from(event, reason, event.userPublicId))
+                eventPublisher.publishEvent(PaymentFailedEvent.from(event, reason, event.userKeycloakId))
                 log.debug("[이벤트 발행] PaymentFailedEvent, orderPublicId={}, reason={}", event.orderPublicId, reason)
             } else {
                 log.warn("[CAS 업데이트 실패] processId={}, orderPublicId={}, expected=PENDING",
@@ -173,7 +192,7 @@ class PaymentGatewayCoreService(
                 log.info("[PG 응답 실패 기록 완료] orderPublicId={}, status={}", event.orderPublicId, event.status)
 
                 val reason = event.message ?: event.code ?: "Unknown error"
-                eventPublisher.publishEvent(PaymentFailedEvent.from(event, reason, event.userPublicId))
+                eventPublisher.publishEvent(PaymentFailedEvent.from(event, reason, event.userKeycloakId))
                 log.debug("[이벤트 발행] PaymentFailedEvent, orderPublicId={}, reason={}", event.orderPublicId, reason)
             } else {
                 log.warn("[PG 응답 실패 마킹 실패] orderPublicId={}, status={}", event.orderPublicId, event.status)

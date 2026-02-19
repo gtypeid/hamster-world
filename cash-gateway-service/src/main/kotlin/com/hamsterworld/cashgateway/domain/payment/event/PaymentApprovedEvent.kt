@@ -17,16 +17,16 @@ import java.time.LocalDateTime
  *
  * **필드 정책**:
  * - orderPublicId: nullable (외부 거래는 NULL) - Order의 Public ID (Snowflake Base62)
- * - userPublicId: nullable (외부 거래는 NULL) - User의 Public ID (Snowflake Base62)
+ * - userKeycloakId: NOT NULL - User의 Keycloak Subject ID (Cash Gateway 필수)
  * - provider: String으로 전달 (외부 거래는 null → "EXTERNAL")
  * - pgTransaction, pgApprovalNo, orderNumber: NOT NULL (Payment 생성 = PG 응답 받음)
  */
 data class PaymentApprovedEvent(
     val paymentPublicId: String,  // Payment의 Public ID (Snowflake Base62)
     val orderPublicId: String?,   // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,    // nullable (외부 거래) - User의 Public ID (Snowflake Base62)
+    val userKeycloakId: String,   // User의 Keycloak Subject ID (Cash Gateway 필수)
     val provider: String,         // Provider.name
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val pgTransaction: String,       // NOT NULL (Payment 생성 = PG 응답 받음)
     val pgApprovalNo: String,        // NOT NULL
@@ -62,12 +62,12 @@ data class PaymentApprovedEvent(
             return PaymentApprovedEvent(
                 paymentPublicId = process.publicId,  // PaymentProcess의 Public ID 사용
                 orderPublicId = process.orderPublicId,
-                userPublicId = process.userPublicId,
+                userKeycloakId = process.userKeycloakId,
                 provider = process.provider?.name ?: "UNKNOWN",
-                mid = process.mid,
+                cashGatewayMid = process.cashGatewayMid,
                 amount = process.amount,
                 pgTransaction = process.pgTransaction!!,  // NOT NULL (SUCCESS 시점엔 항상 있음)
-                pgApprovalNo = process.pgApprovalNo!!,    // NOT NULL
+                pgApprovalNo = process.pgApprovalNo!!,    // NOT NULL (SUCCESS 시점엔 항상 있음)
                 gatewayPaymentPublicId = process.publicId,  // PaymentProcess의 Public ID 사용
                 originSource = process.originSource ?: "INTERNAL"
             )

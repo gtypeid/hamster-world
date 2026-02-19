@@ -20,9 +20,9 @@ import java.time.LocalDateTime
 data class PaymentFailedEvent(
     val processPublicId: String,    // PaymentProcess의 Public ID (Snowflake Base62)
     val orderPublicId: String?,     // Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,      // User의 Public ID (Snowflake Base62)
+    val userKeycloakId: String,      // User의 Keycloak Subject ID (Cash Gateway 필수)
     val provider: Provider?,
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val orderNumber: String?,
     val code: String?,
@@ -44,13 +44,13 @@ data class PaymentFailedEvent(
     occurredAt = occurredAt
 ) {
     companion object {
-        fun from(process: PaymentProcess, reason: String?, userPublicId: String?): PaymentFailedEvent {
+        fun from(process: PaymentProcess, reason: String?, userKeycloakId: String): PaymentFailedEvent {
             return PaymentFailedEvent(
                 processPublicId = process.publicId,
                 orderPublicId = process.orderPublicId,
-                userPublicId = userPublicId,
+                userKeycloakId = userKeycloakId,
                 provider = process.provider,
-                mid = process.mid,
+                cashGatewayMid = process.cashGatewayMid,
                 amount = process.amount,
                 orderNumber = process.orderNumber,
                 code = process.code,

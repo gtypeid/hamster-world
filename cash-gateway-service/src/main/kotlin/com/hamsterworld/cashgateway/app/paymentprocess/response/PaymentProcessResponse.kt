@@ -16,10 +16,10 @@ import java.time.LocalDateTime
 data class PaymentProcessResponse(
     val publicId: String,
     val orderPublicId: String?,
-    val userPublicId: String?,
+    val userKeycloakId: String,
     val orderNumber: String?,
     val provider: Provider?,
-    val mid: String,
+    val cashGatewayMid: String,
     val amount: BigDecimal,
     val status: PaymentProcessStatus,
     val gatewayReferenceId: String,
@@ -35,7 +35,7 @@ data class PaymentProcessResponse(
     val ackReceivedAt: LocalDateTime?,
     val lastRequestAttemptAt: LocalDateTime?,
     val requestAttemptCount: Int,
-    val lastPgResponseCode: String?,
+    val lastHttpStatusCode: String?,
     val createdAt: LocalDateTime,
     val modifiedAt: LocalDateTime?
 ) {
@@ -44,10 +44,10 @@ data class PaymentProcessResponse(
             return PaymentProcessResponse(
                 publicId = process.publicId,
                 orderPublicId = process.orderPublicId,
-                userPublicId = process.userPublicId,
+                userKeycloakId = process.userKeycloakId,
                 orderNumber = process.orderNumber,
                 provider = process.provider,
-                mid = process.mid,
+                cashGatewayMid = process.cashGatewayMid,
                 amount = process.amount,
                 status = process.status,
                 gatewayReferenceId = process.gatewayReferenceId,
@@ -63,7 +63,7 @@ data class PaymentProcessResponse(
                 ackReceivedAt = process.ackReceivedAt,
                 lastRequestAttemptAt = process.lastRequestAttemptAt,
                 requestAttemptCount = process.requestAttemptCount,
-                lastPgResponseCode = process.lastPgResponseCode,
+                lastHttpStatusCode = process.lastHttpStatusCode,
                 createdAt = process.createdAt,
                 modifiedAt = process.modifiedAt
             )

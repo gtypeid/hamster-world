@@ -29,7 +29,8 @@ import java.time.LocalDateTime
  */
 data class OrderStockReservedEvent(
     val orderPublicId: String,        // E-commerce Service의 Order Public ID (Snowflake Base62)
-    val userPublicId: String,         // User의 Public ID (Snowflake Base62)
+    val userPublicId: String,          // User의 Public ID (Snowflake Base62, 내부 서비스용)
+    val userKeycloakId: String,        // User의 Keycloak Subject ID (외부 시스템 UUID)
     val orderNumber: String,          // 주문 번호
     val totalPrice: BigDecimal,       // 총 주문 금액 (원가)
     val couponDiscount: BigDecimal,   // 쿠폰 할인 금액
@@ -54,7 +55,8 @@ data class OrderStockReservedEvent(
  * 주문 항목 DTO
  */
 data class OrderItemDto(
-    val productId: String,  // E-commerce Product의 Public ID (Snowflake Base62)
+    val productId: String,            // E-commerce Product의 Public ID (Snowflake Base62)
+    val merchantPublicId: String,     // E-commerce Merchant의 Public ID (Snowflake Base62)
     val quantity: Int,
     val price: BigDecimal
 )

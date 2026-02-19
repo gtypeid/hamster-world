@@ -11,7 +11,8 @@ import java.math.BigDecimal
 @Table(
     name = "order_items",
     indexes = [
-        Index(name = "idx_order_items_public_id", columnList = "public_id", unique = true)
+        Index(name = "idx_order_items_public_id", columnList = "public_id", unique = true),
+        Index(name = "idx_order_items_merchant_id", columnList = "merchant_id")
     ]
 )
 class OrderItem(
@@ -19,10 +20,10 @@ class OrderItem(
     var orderId: Long? = null,
 
     @Column(nullable = false, name = "product_id")
-    var productId: Long? = null,  // Internal ID (FK to products table)
+    var productId: Long? = null,
 
-    @Column(nullable = false, name = "product_public_id", length = 20)
-    var productPublicId: String? = null,  // Product의 Public ID (Kafka 이벤트용)
+    @Column(nullable = false, name = "merchant_id")
+    var merchantId: Long? = null,
 
     var quantity: Int? = null,
 
@@ -35,14 +36,14 @@ class OrderItem(
     fun copy(
         orderId: Long? = this.orderId,
         productId: Long? = this.productId,
-        productPublicId: String? = this.productPublicId,
+        merchantId: Long? = this.merchantId,
         quantity: Int? = this.quantity,
         price: BigDecimal? = this.price
     ): OrderItem {
         val copied = OrderItem(
             orderId = orderId,
             productId = productId,
-            productPublicId = productPublicId,
+            merchantId = merchantId,
             quantity = quantity,
             price = price
         )
@@ -57,11 +58,9 @@ class OrderItem(
         /**
          * OrderItem 생성 팩토리 메서드
          *
-         * DDD 패턴: 도메인 생성 로직을 Domain 레이어에 위치
-         *
          * @param orderId 주문 ID (nullable, 나중에 설정됨)
          * @param productId 상품 ID
-         * @param productPublicId 상품 Public ID
+         * @param merchantId 판매자 ID (Product에서 비정규화)
          * @param quantity 수량
          * @param price 가격
          * @return 생성된 OrderItem
@@ -69,14 +68,14 @@ class OrderItem(
         fun create(
             orderId: Long?,
             productId: Long,
-            productPublicId: String,
+            merchantId: Long,
             quantity: Int,
             price: BigDecimal
         ): OrderItem {
             return OrderItem(
                 orderId = orderId,
                 productId = productId,
-                productPublicId = productPublicId,
+                merchantId = merchantId,
                 quantity = quantity,
                 price = price
             )

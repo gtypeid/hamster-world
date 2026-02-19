@@ -24,9 +24,9 @@ data class PaymentProcessSearchRequest(
 
     // PaymentProcess specific
     val orderPublicId: String? = null,
-    val userPublicId: String? = null,
+    val userKeycloakId: String? = null,
     val provider: Provider? = null,
-    val mid: String? = null,
+    val cashGatewayMid: String? = null,
     val minAmount: BigDecimal? = null,
     val maxAmount: BigDecimal? = null,
     val statuses: Set<PaymentProcessStatus>? = null,

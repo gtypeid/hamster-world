@@ -8,17 +8,17 @@ import java.util.Optional
 
 interface PaymentProcessJpaRepository : JpaRepository<PaymentProcess, Long> {
 
-    fun findTopByOrderPublicIdAndUserPublicIdAndProviderAndStatus(
+    fun findTopByOrderPublicIdAndUserKeycloakIdAndProviderAndStatus(
         orderPublicId: String,  // E-commerce Service의 Order Public ID (Snowflake Base62)
-        userPublicId: String,   // E-commerce Service의 User Public ID (Snowflake Base62)
+        userKeycloakId: String, // User의 Keycloak Subject ID (외부 시스템 UUID)
         provider: Provider,
         status: PaymentProcessStatus
     ): Optional<PaymentProcess>
 
     fun findByPgTransaction(tid: String): PaymentProcess?
 
-    fun findByProviderAndMid(
+    fun findByProviderAndCashGatewayMid(
         provider: Provider?,
-        mid: String
+        cashGatewayMid: String
     ): Optional<PaymentProcess>
 }

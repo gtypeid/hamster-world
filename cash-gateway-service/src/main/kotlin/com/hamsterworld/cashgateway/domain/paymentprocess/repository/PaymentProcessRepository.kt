@@ -36,11 +36,11 @@ class PaymentProcessRepository(
             .orElseThrow { throw RuntimeException("PaymentProcess를 찾을 수 없습니다. ID: $id") }
     }
 
-    fun findUnknownAttempt(orderPublicId: String, userPublicId: String, provider: Provider): Optional<PaymentProcess> {
+    fun findUnknownAttempt(orderPublicId: String, userKeycloakId: String, provider: Provider): Optional<PaymentProcess> {
         return paymentProcessJpaRepository
-            .findTopByOrderPublicIdAndUserPublicIdAndProviderAndStatus(
+            .findTopByOrderPublicIdAndUserKeycloakIdAndProviderAndStatus(
                 orderPublicId,
-                userPublicId,
+                userKeycloakId,
                 provider,
                 PaymentProcessStatus.UNKNOWN
             )
@@ -52,7 +52,7 @@ class PaymentProcessRepository(
 
         val updatedBuilder = BooleanBuilder()
             .and(paymentProcess.orderPublicId.eq(process.orderPublicId))
-            .and(paymentProcess.userPublicId.eq(process.userPublicId))
+            .and(paymentProcess.userKeycloakId.eq(process.userKeycloakId))
             .and(paymentProcess.provider.eq(process.provider))
             .and(paymentProcess.status.eq(PaymentProcessStatus.PENDING))
 
@@ -79,7 +79,7 @@ class PaymentProcessRepository(
 
         val targetBuilder = BooleanBuilder()
             .and(paymentProcess.orderPublicId.eq(process.orderPublicId))
-            .and(paymentProcess.userPublicId.eq(process.userPublicId))
+            .and(paymentProcess.userKeycloakId.eq(process.userKeycloakId))
             .and(paymentProcess.provider.eq(process.provider))
 
         if (process.originProcessId != null) {
@@ -123,21 +123,62 @@ class PaymentProcessRepository(
     }
 
     /**
+     * Webhook에서 PaymentProcess를 조회
+     *
+     * PG 응답의 echo에서 추출한 orderNumber + provider로 PENDING 상태의 PaymentProcess를 찾는다.
+     * ACK에는 tid가 없으므로 pgTransaction으로 조회할 수 없다.
+     * tid는 이 조회로 찾은 후 업데이트한다.
+     */
+    fun findPendingByOrderNumberAndProvider(orderNumber: String, provider: Provider): PaymentProcess? {
+        return jpaQueryFactory
+            .selectFrom(paymentProcess)
+            .where(
+                paymentProcess.orderNumber.eq(orderNumber),
+                paymentProcess.provider.eq(provider),
+                paymentProcess.status.eq(PaymentProcessStatus.PENDING)
+            )
+            .orderBy(paymentProcess.createdAt.desc())
+            .fetchFirst()
+    }
+
+    /**
+     * CashGatewayMid + provider로 PENDING 상태의 PaymentProcess 조회
+     *
+     * Webhook에서 내부 거래의 PaymentProcess를 특정하기 위한 핵심 메서드.
+     * CashGatewayMid는 Webhook Step 2에서 이미 확정된 상태.
+     *
+     * @param cashGatewayMid 확정된 Cash Gateway MID
+     * @param provider PG사
+     * @return PENDING 상태의 PaymentProcess (가장 최근 것), 없으면 null
+     */
+    fun findPendingByCashGatewayMidAndProvider(cashGatewayMid: String, provider: Provider): PaymentProcess? {
+        return jpaQueryFactory
+            .selectFrom(paymentProcess)
+            .where(
+                paymentProcess.cashGatewayMid.eq(cashGatewayMid),
+                paymentProcess.provider.eq(provider),
+                paymentProcess.status.eq(PaymentProcessStatus.PENDING)
+            )
+            .orderBy(paymentProcess.createdAt.desc())
+            .fetchFirst()
+    }
+
+    /**
      * Provider + MID로 PaymentProcess 조회
      *
      * Webhook에서 내부 거래 조회 (정확한 매칭)
      * - Provider: PG사
      * - mid: Cash Gateway MID
      */
-    fun findByProviderAndMid(
+    fun findByProviderAndCashGatewayMid(
         provider: Provider,
-        mid: String
+        cashGatewayMid: String
     ): PaymentProcess {
-        return paymentProcessJpaRepository.findByProviderAndMid(
-            provider, mid
+        return paymentProcessJpaRepository.findByProviderAndCashGatewayMid(
+            provider, cashGatewayMid
         ).orElseThrow{ CustomRuntimeException(
             "[${provider.name}] PaymentProcess 조회 실패 | " +
-                    "provider=${provider.name}, mid=$mid") }
+                    "provider=${provider.name}, cashGatewayMid=$cashGatewayMid") }
     }
 
     /**
@@ -177,7 +218,7 @@ class PaymentProcessRepository(
             .set(paymentProcess.lastRequestAttemptAt, requestedAt)
             .set(paymentProcess.requestAttemptCount, paymentProcess.requestAttemptCount.add(1))
             .set(paymentProcess.ackReceivedAt, ackReceivedAt)
-            .set(paymentProcess.lastPgResponseCode, responseCode)
+            .set(paymentProcess.lastHttpStatusCode, responseCode)
             .set(paymentProcess.responsePayload, responsePayload)
             .set(paymentProcess.modifiedAt, LocalDateTime.now())
 
@@ -324,9 +365,9 @@ class PaymentProcessRepository(
             QuerydslExtension.between(paymentProcess.createdAt, search.from, search.to),
             QuerydslExtension.inOrNullSafe(paymentProcess.publicId, search.publicIds),
             QuerydslExtension.eqOrNull(paymentProcess.orderPublicId, search.orderPublicId),
-            QuerydslExtension.eqOrNull(paymentProcess.userPublicId, search.userPublicId),
+            QuerydslExtension.eqOrNull(paymentProcess.userKeycloakId, search.userKeycloakId),
             QuerydslExtension.eqOrNull(paymentProcess.provider, search.provider),
-            QuerydslExtension.eqOrNull(paymentProcess.mid, search.mid),
+            QuerydslExtension.eqOrNull(paymentProcess.cashGatewayMid, search.cashGatewayMid),
             QuerydslExtension.between(paymentProcess.amount, search.minAmount, search.maxAmount),
             QuerydslExtension.inOrNullSafe(paymentProcess.status, search.statuses),
             QuerydslExtension.eqOrNull(paymentProcess.pgTransaction, search.pgTransaction)

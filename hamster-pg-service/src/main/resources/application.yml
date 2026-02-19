@@ -17,14 +17,13 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.MySQLDialect
 
-# Webhook 설정 - 로컬에서는 localhost의 cash-gateway(8082)로 전송
 payment:
   webhook:
     base-url: http://localhost:8082
@@ -34,4 +33,7 @@ server:
 
 logging:
   level:
-    com.hamsterworld.hamsterpg: DEBUG
+    root: WARN
+    com.hamsterworld.hamsterpg: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql: OFF

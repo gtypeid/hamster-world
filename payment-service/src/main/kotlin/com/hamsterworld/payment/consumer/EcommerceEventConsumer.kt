@@ -128,8 +128,8 @@ class EcommerceEventConsumer(
         val event = objectMapper.convertValue<OrderCreatedEventDto>(parsedEvent.payload)
 
         logger.info(
-            "주문 생성 이벤트 수신 | orderPublicId={} | userPublicId={} | orderNumber={} | items={}개 | eventId={}",
-            event.orderPublicId, event.userPublicId, event.orderNumber, event.items.size, parsedEvent.eventId
+            "주문 생성 이벤트 수신 | orderPublicId={} | userPublicId={} | userKeycloakId={} | orderNumber={} | items={}개 | eventId={}",
+            event.orderPublicId, event.userPublicId, event.userKeycloakId, event.orderNumber, event.items.size, parsedEvent.eventId
         )
 
         // 재고 검증 + 포인트 차감 + 선차감
@@ -139,6 +139,7 @@ class EcommerceEventConsumer(
             orderPublicId = event.orderPublicId,
             orderNumber = event.orderNumber,
             userPublicId = event.userPublicId,
+            userKeycloakId = event.userKeycloakId,
             totalPrice = event.totalPrice,
             couponDiscount = event.couponDiscount ?: BigDecimal.ZERO,
             pointsToUse = event.pointsToUse ?: BigDecimal.ZERO,

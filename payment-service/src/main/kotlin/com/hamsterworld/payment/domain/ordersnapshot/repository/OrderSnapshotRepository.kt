@@ -45,8 +45,9 @@ class OrderSnapshotRepository(
             val product = productRepository.findByEcommerceProductId(item.productPublicId)
             OrderSnapshotItem(
                 snapshotId = savedSnapshot.id!!,
-                productId = product.id!!,  // Payment Service Product Internal PK (서비스 내부 FK)
-                ecommerceProductPublicId = item.productPublicId,  // E-commerce Product Public ID (Kafka 이벤트용)
+                productId = product.id!!,
+                ecommerceProductPublicId = item.productPublicId,
+                merchantPublicId = item.merchantPublicId,
                 quantity = item.quantity,
                 price = item.price
             )
@@ -83,7 +84,8 @@ class OrderSnapshotRepository(
         val items = itemEntities.map { item ->
             val product = productRepository.findById(item.productId)
             OrderItemDto(
-                productPublicId = product.ecommerceProductId!!,  // Internal PK → Public ID
+                productPublicId = product.ecommerceProductId!!,
+                merchantPublicId = item.merchantPublicId,
                 quantity = item.quantity,
                 price = item.price
             )
@@ -128,7 +130,8 @@ class OrderSnapshotRepository(
         val items = itemEntities.map { item ->
             val product = productRepository.findById(item.productId)
             OrderItemDto(
-                productPublicId = product.ecommerceProductId!!,  // Internal PK → Public ID
+                productPublicId = product.ecommerceProductId!!,
+                merchantPublicId = item.merchantPublicId,
                 quantity = item.quantity,
                 price = item.price
             )

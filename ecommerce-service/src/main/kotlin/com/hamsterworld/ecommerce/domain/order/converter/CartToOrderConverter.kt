@@ -72,7 +72,7 @@ class CartToOrderConverter(
             OrderItem.create(
                 orderId = null,
                 productId = item.cartItem.productId,
-                productPublicId = item.product.publicId,
+                merchantId = item.product.merchantId,
                 quantity = item.cartItem.quantity,
                 price = item.product.price
             )

@@ -22,9 +22,9 @@ class PgMidController(
     fun createMid(
         @Valid @RequestBody request: CreateMidRequest
     ): ResponseEntity<MidResponse> {
-        log.info("Creating MID: merchantName=${request.merchantName}")
+        log.info("Creating MID: merchantName={}, webhookUrl={}", request.merchantName, request.webhookUrl)
 
-        val response = pgMidService.createMidResponse(request.merchantName)
+        val response = pgMidService.createMidResponse(request.merchantName, request.webhookUrl)
 
         log.info("MID created successfully: midId=${response.midId}, apiKey=${response.apiKey}")
 

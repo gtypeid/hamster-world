@@ -8,18 +8,15 @@ import java.time.LocalDateTime
 
 data class TransactionResponse(
     val tid: String,
-    val midId: String,
     val orderId: String,
     val amount: BigDecimal,
-    val callbackUrl: String,
-    val echo: String?,
     val status: PaymentStatus,
     val approvalNo: String?,
+    val failureReason: String?,
     val notificationStatus: NotificationStatus,
     val notificationAttemptCount: Int,
     val lastNotificationAt: LocalDateTime?,
-    val failureReason: String?,
-    val processedAt: LocalDateTime?,
+    val processedAt: LocalDateTime,
     val createdAt: LocalDateTime?,
     val modifiedAt: LocalDateTime?
 ) {
@@ -27,17 +24,14 @@ data class TransactionResponse(
         fun from(payment: Payment): TransactionResponse {
             return TransactionResponse(
                 tid = payment.tid,
-                midId = payment.midId,
-                orderId = payment.orderPublicId,
+                orderId = payment.orderId,
                 amount = payment.amount,
-                callbackUrl = payment.callbackUrl,
-                echo = payment.echo,
                 status = payment.status,
                 approvalNo = payment.approvalNo,
+                failureReason = payment.failureReason,
                 notificationStatus = payment.notificationStatus,
                 notificationAttemptCount = payment.notificationAttemptCount,
                 lastNotificationAt = payment.lastNotificationAt,
-                failureReason = payment.failureReason,
                 processedAt = payment.processedAt,
                 createdAt = payment.createdAt,
                 modifiedAt = payment.modifiedAt

@@ -7,27 +7,29 @@ import java.time.LocalDateTime
 
 data class PaymentProcessDetailsResponse(
     val tid: String,
+    val midId: String,
     val orderId: String,
     val amount: BigDecimal,
     val status: PaymentProcessStatus,
     val approvalNo: String?,
     val failReason: String?,
     val requestedAt: LocalDateTime,
-    val processedAt: LocalDateTime?,
-    val webhookSentAt: LocalDateTime?
+    val processingStartedAt: LocalDateTime?,
+    val processedAt: LocalDateTime?
 ) {
     companion object {
         fun from(process: PaymentProcess): PaymentProcessDetailsResponse {
             return PaymentProcessDetailsResponse(
                 tid = process.tid,
+                midId = process.midId,
                 orderId = process.orderId,
                 amount = process.amount,
                 status = process.status,
                 approvalNo = process.approvalNo,
                 failReason = process.failReason,
                 requestedAt = process.requestedAt,
-                processedAt = process.processedAt,
-                webhookSentAt = process.webhookSentAt
+                processingStartedAt = process.processingStartedAt,
+                processedAt = process.processedAt
             )
         }
     }

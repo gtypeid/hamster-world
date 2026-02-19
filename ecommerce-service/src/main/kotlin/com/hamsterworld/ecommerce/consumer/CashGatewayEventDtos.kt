@@ -10,9 +10,9 @@ import java.math.BigDecimal
 data class PaymentApprovedEventDto(
     val paymentPublicId: String,  // Cash Gateway Payment Public ID (Snowflake Base62)
     val orderPublicId: String?,  // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,  // User Public ID (Snowflake Base62)
+    val userKeycloakId: String?,  // User의 Keycloak Subject ID
     val provider: String,
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val pgTransaction: String,
     val pgApprovalNo: String,
@@ -28,9 +28,9 @@ data class PaymentApprovedEventDto(
 data class PaymentFailedEventDto(
     val attemptPublicId: String,  // PaymentAttempt Public ID (Snowflake Base62)
     val orderPublicId: String?,  // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,  // User Public ID (Snowflake Base62)
+    val userKeycloakId: String?,  // User의 Keycloak Subject ID
     val provider: String?,
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val code: String?,
     val message: String?,
@@ -47,9 +47,9 @@ data class PaymentCancelledEventDto(
     val paymentPublicId: String,  // 취소 Payment Public ID (Snowflake Base62)
     val originPaymentPublicId: String,  // 원본 Payment Public ID (Snowflake Base62)
     val orderPublicId: String?,  // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,  // User Public ID (Snowflake Base62)
+    val userKeycloakId: String?,  // User의 Keycloak Subject ID
     val provider: String,
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val pgTransaction: String,
     val pgApprovalNo: String,

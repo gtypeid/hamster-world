@@ -17,7 +17,7 @@ import java.time.LocalDateTime
  *
  * **필드 정책**:
  * - orderPublicId: nullable (외부 거래는 NULL) - Order의 Public ID (Snowflake Base62)
- * - userPublicId: nullable (외부 거래는 NULL) - User의 Public ID (Snowflake Base62)
+ * - userKeycloakId: NOT NULL - User의 Keycloak Subject ID (Cash Gateway 필수)
  * - provider: String으로 전달 (외부 거래는 null → "EXTERNAL")
  * - pgTransaction, pgApprovalNo, orderNumber: NOT NULL (Payment 생성 = PG 응답 받음)
  */
@@ -25,9 +25,9 @@ data class PaymentCancelledEvent(
     val paymentPublicId: String,       // 취소 Payment의 Public ID (Snowflake Base62)
     val originPaymentPublicId: String, // 원본 Payment의 Public ID (Snowflake Base62)
     val orderPublicId: String?,        // nullable (외부 거래) - Order의 Public ID (Snowflake Base62)
-    val userPublicId: String?,         // nullable (외부 거래) - User의 Public ID (Snowflake Base62)
+    val userKeycloakId: String,         // User의 Keycloak Subject ID (Cash Gateway 필수)
     val provider: String,       // Provider.name
-    val mid: String,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
     val amount: BigDecimal,
     val pgTransaction: String,       // NOT NULL (취소도 PG 응답 받음)
     val pgApprovalNo: String,        // NOT NULL (원본 승인번호)
@@ -69,9 +69,9 @@ data class PaymentCancelledEvent(
                 paymentPublicId = cancelProcess.publicId,  // 취소 PaymentProcess의 Public ID
                 originPaymentPublicId = originProcess.publicId,  // 원본 PaymentProcess의 Public ID
                 orderPublicId = cancelProcess.orderPublicId,
-                userPublicId = cancelProcess.userPublicId,
+                userKeycloakId = cancelProcess.userKeycloakId,
                 provider = cancelProcess.provider?.name ?: "UNKNOWN",
-                mid = cancelProcess.mid,
+                cashGatewayMid = cancelProcess.cashGatewayMid,
                 amount = cancelProcess.amount,
                 pgTransaction = cancelProcess.pgTransaction!!,  // NOT NULL
                 pgApprovalNo = originProcess.pgApprovalNo!!,  // 원본 승인번호 사용

@@ -1,124 +1,46 @@
 package com.hamsterworld.hamsterpg.domain.payment.service
 
 import com.hamsterworld.hamsterpg.app.payment.request.PaymentSearchRequest
-import com.hamsterworld.hamsterpg.app.payment.response.PaymentResponse
 import com.hamsterworld.hamsterpg.app.payment.response.TransactionResponse
-import com.hamsterworld.hamsterpg.domain.payment.constant.PaymentStatus
-import com.hamsterworld.hamsterpg.domain.payment.model.Payment
+import com.hamsterworld.hamsterpg.domain.notification.service.NotificationService
 import com.hamsterworld.hamsterpg.domain.payment.repository.PaymentRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 
+/**
+ * Payment 조회 및 노티 재발송 서비스
+ *
+ * Payment는 PaymentProcessEventHandler를 통해서만 생성된다.
+ * 이 서비스는 조회와 노티 재발송만 담당한다.
+ */
 @Service
 class PaymentService(
-    private val repository: PaymentRepository
+    private val paymentRepository: PaymentRepository,
+    private val notificationService: NotificationService
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
+    /**
+     * tid 기반 노티 재발송
+     */
     @Transactional
-    fun createPayment(
-        midId: String,
-        orderPublicId: String,
-        amount: BigDecimal,
-        callbackUrl: String,
-        echo: String?
-    ): Payment {
-        val payment = Payment(
-            midId = midId,
-            orderPublicId = orderPublicId,
-            amount = amount,
-            callbackUrl = callbackUrl,
-            echo = echo,
-            status = PaymentStatus.PENDING
-        )
-        return repository.save(payment)
-    }
-
-    @Transactional
-    fun resendNotification(id: Long): Payment {
-        val payment = repository.findById(id)
-
-        if (payment.status !in listOf(PaymentStatus.COMPLETED, PaymentStatus.FAILED)) {
-            throw IllegalStateException("Payment not completed: $id")
-        }
-
-        return payment
-    }
-
-    @Transactional
-    fun requestCancelPayment(tid: String): Payment {
-        val payment = repository.findByTid(tid)
-
-        if (payment.status == PaymentStatus.CANCELLED) {
-            throw IllegalStateException("Payment already cancelled: $tid")
-        }
-
-        if (payment.status == PaymentStatus.CANCEL_PENDING) {
-            return payment // Already in cancel pending state
-        }
-
-        if (payment.status !in listOf(PaymentStatus.PENDING, PaymentStatus.COMPLETED)) {
-            throw IllegalStateException("Payment cannot be cancelled: $tid (status=${payment.status})")
-        }
-
-        val cancelRequested = payment.requestCancel()
-        return repository.save(cancelRequested)
-    }
-
-    fun getTransaction(tid: String): Payment {
-        return repository.findByTid(tid)
-    }
-
-    fun searchTransactions(request: PaymentSearchRequest): List<Payment> {
-        return repository.searchList(request)
-    }
-
-    fun searchTransactionsPage(request: PaymentSearchRequest): Page<Payment> {
-        return repository.searchPage(request)
-    }
-
-    // DTO conversion methods (used by controllers)
-    @Transactional
-    fun createPaymentResponse(
-        midId: String,
-        orderPublicId: String,
-        amount: BigDecimal,
-        callbackUrl: String,
-        echo: String?
-    ): PaymentResponse {
-        val payment = createPayment(midId, orderPublicId, amount, callbackUrl, echo)
-        return PaymentResponse(
-            tid = payment.tid,
-            orderPublicId = payment.orderPublicId,
-            amount = payment.amount,
-            status = payment.status.name
-        )
-    }
-
-    @Transactional
-    fun requestCancelPaymentResponse(tid: String): PaymentResponse {
-        val payment = requestCancelPayment(tid)
-        return PaymentResponse(
-            tid = payment.tid,
-            orderPublicId = payment.orderPublicId,
-            amount = payment.amount,
-            status = payment.status.name
-        )
+    fun resendNotification(tid: String) {
+        val payment = paymentRepository.findByTid(tid)
+        log.info("[노티 재발송 요청] tid={}, status={}", tid, payment.status)
+        notificationService.resendNotification(payment)
     }
 
     fun getTransactionResponse(tid: String): TransactionResponse {
-        val transaction = getTransaction(tid)
-        return TransactionResponse.from(transaction)
+        return TransactionResponse.from(paymentRepository.findByTid(tid))
     }
 
     fun searchTransactionsResponseList(request: PaymentSearchRequest): List<TransactionResponse> {
-        val transactions = searchTransactions(request)
-        return transactions.map { TransactionResponse.from(it) }
+        return paymentRepository.searchList(request).map { TransactionResponse.from(it) }
     }
 
     fun searchTransactionsResponsePage(request: PaymentSearchRequest): Page<TransactionResponse> {
-        val page = searchTransactionsPage(request)
-        return page.map { TransactionResponse.from(it) }
+        return paymentRepository.searchPage(request).map { TransactionResponse.from(it) }
     }
 }

@@ -78,8 +78,8 @@ class PaymentEventConsumer(
         val request = domainConverterAdapter.convert(eventDto, PaymentApproveRequest::class.java)
 
         logger.info(
-            "[재고 확보 완료] PG 요청 시작 | orderPublicId={} | userPublicId={} | orderNumber={} | cashAmount={} | provider={} | traceId={}",
-            eventDto.orderPublicId, eventDto.userPublicId, eventDto.orderNumber, eventDto.cashAmount,
+            "[재고 확보 완료] PG 요청 시작 | orderPublicId={} | userKeycloakId={} | orderNumber={} | cashAmount={} | provider={} | traceId={}",
+            eventDto.orderPublicId, eventDto.userKeycloakId, eventDto.orderNumber, eventDto.cashAmount,
             request.provider, parsedEvent.traceId ?: "N/A"
         )
 

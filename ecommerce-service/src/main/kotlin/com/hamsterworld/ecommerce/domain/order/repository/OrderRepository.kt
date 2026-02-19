@@ -25,8 +25,10 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import com.hamsterworld.ecommerce.domain.user.repository.UserRepository
+import com.hamsterworld.ecommerce.domain.merchant.repository.MerchantRepository
 import com.hamsterworld.ecommerce.domain.orderitem.model.QOrderItem
 import com.hamsterworld.ecommerce.domain.product.model.QProduct
+import com.hamsterworld.ecommerce.domain.product.repository.ProductRepository
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -36,6 +38,8 @@ class OrderRepository(
     private val orderItemJpaRepository: OrderItemJpaRepository,
     private val jpaQueryFactory: JPAQueryFactory,
     private val userRepository: UserRepository,
+    private val productRepository: ProductRepository,
+    private val merchantRepository: MerchantRepository,
     private val couponUsageRepository: CouponUsageRepository,
     private val userCouponRepository: UserCouponRepository
 ) {
@@ -94,17 +98,28 @@ class OrderRepository(
         }
 
         // 3. OrderCreatedEvent 등록
-        // userId(Long) → userPublicId(String) 변환
+        // 내부 PK → Public ID 변환을 위한 배치 조회
         val user = userRepository.findById(savedOrder.userId!!)
+        val productIds = savedItems.map { it.productId!! }.distinct()
+        val productMap = productRepository.findByIds(productIds).associateBy { it.id!! }
+        val merchantIds = savedItems.map { it.merchantId!! }.distinct()
+        val merchantMap = merchantRepository.findByIds(merchantIds).associateBy { it.id!! }
+
         savedOrder = savedOrder.publishCreatedEvent(
             OrderCreatedEvent(
-                orderPublicId = savedOrder.publicId,  // Order의 Public ID 사용
-                userPublicId = user.publicId,         // User의 Public ID 사용
+                orderPublicId = savedOrder.publicId,
+                userPublicId = user.publicId,
+                userKeycloakId = user.keycloakUserId,
                 orderNumber = savedOrder.orderNumber!!,
                 totalPrice = savedOrder.price!!,
                 items = savedItems.map { item ->
+                    val product = productMap[item.productId!!]
+                        ?: throw CustomRuntimeException("Product를 찾을 수 없습니다. ID: ${item.productId}")
+                    val merchant = merchantMap[item.merchantId!!]
+                        ?: throw CustomRuntimeException("Merchant를 찾을 수 없습니다. ID: ${item.merchantId}")
                     OrderItemDto(
-                        productPublicId = item.productPublicId!!,  // Product의 Public ID 사용
+                        productPublicId = product.publicId,
+                        merchantPublicId = merchant.publicId,
                         quantity = item.quantity!!,
                         price = item.price!!
                     )

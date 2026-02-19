@@ -35,6 +35,11 @@ class MerchantRepository(
             ?: throw CustomRuntimeException("Merchant를 찾을 수 없습니다. User ID: $userId")
     }
 
+    fun findByIds(ids: List<Long>): List<Merchant> {
+        if (ids.isEmpty()) return emptyList()
+        return merchantJpaRepository.findAllById(ids)
+    }
+
     fun findByCashGatewayMid(cashGatewayMid: String): Merchant? {
         return merchantJpaRepository.findByCashGatewayMid(cashGatewayMid)
     }

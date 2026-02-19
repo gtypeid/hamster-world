@@ -12,10 +12,10 @@ import java.math.BigDecimal
  * - 이유: originProcess는 orderPublicId로 조회 가능하지만, PG 취소 요청에는 originTid 필요
  */
 class CancelPaymentCtx(
-    userPublicId: String,     // E-commerce Service의 User Public ID (Snowflake Base62)
+    userKeycloakId: String,    // User의 Keycloak Subject ID (외부 시스템 UUID)
     orderPublicId: String,    // E-commerce Service의 Order Public ID (Snowflake Base62)
     orderNumber: String,
     amount: BigDecimal,
-    mid: String,
+    cashGatewayMid: String,   // Cash Gateway MID (Cash Gateway가 발급한 가맹점 식별자)
     val originTid: String     // 원본 PG 거래번호 (취소 대상)
-) : PaymentCtx(PaymentStatus.CANCELLED, userPublicId, orderPublicId, orderNumber, amount, mid)
+) : PaymentCtx(PaymentStatus.CANCELLED, userKeycloakId, orderPublicId, orderNumber, amount, cashGatewayMid)
