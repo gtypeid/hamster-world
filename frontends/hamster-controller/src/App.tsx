@@ -15,7 +15,7 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename="/hamster-controller">
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
         <AppLayout>
           <Infrastructure />
         </AppLayout>

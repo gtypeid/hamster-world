@@ -1,0 +1,44 @@
+name: Deploy Hamster-Controller to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # common 심볼릭 링크 (hamster-controller가 ../common 참조)
+      - name: Install common dependencies
+        run: |
+          cd frontends/common
+          ln -s ../hamster-controller/node_modules node_modules
+
+      - name: Install & Build
+        working-directory: frontends/hamster-controller
+        env:
+          VITE_BASE: /
+          VITE_LAMBDA_URL: ${{ vars.VITE_LAMBDA_URL }}
+          VITE_GITHUB_OWNER: ${{ vars.VITE_GITHUB_OWNER }}
+          VITE_GITHUB_REPO: ${{ vars.VITE_GITHUB_REPO }}
+          VITE_WORKFLOW_DURATION_MIN: ${{ vars.VITE_WORKFLOW_DURATION_MIN }}
+          VITE_COOLDOWN_MIN: ${{ vars.VITE_COOLDOWN_MIN }}
+          VITE_MAX_SESSIONS_PER_DAY: ${{ vars.VITE_MAX_SESSIONS_PER_DAY }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy to gtypeid.github.io
+        run: |
+          cd frontends/hamster-controller/dist
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "deploy hamster-controller"
+          git push --force https://x-access-token:${{ secrets.GH_IO_TOKEN }}@github.com/gtypeid/gtypeid.github.io.git HEAD:main

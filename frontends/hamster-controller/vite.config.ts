@@ -5,7 +5,7 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/hamster-controller/', // GitHub Pages 배포 시 레포 이름으로 변경 필요
+  base: process.env.VITE_BASE || '/hamster-controller/',
   resolve: {
     alias: {
       '@common': path.resolve(__dirname, '../common'),

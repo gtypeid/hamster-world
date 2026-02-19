@@ -396,9 +396,11 @@ export const selectCanInit = (state: InfraState) =>
 export const selectCanStartSession = (state: InfraState) =>
   state.sessionPhase === 'planned';
 
+// TODO: 실제 인프라 연동 시 Stop 기능 활성화
+//  현재 GitHub Pages 데모 배포 중 워크플로우 꼬임 방지를 위해 비활성화
 /** 가동중이거나 applying일 때 Stop 가능 */
-export const selectCanStop = (state: InfraState) =>
-  state.sessionPhase === 'running' || state.sessionPhase === 'applying' || state.sessionPhase === 'triggering';
+export const selectCanStop = (_state: InfraState) => false;
+  // state.sessionPhase === 'running' || state.sessionPhase === 'applying' || state.sessionPhase === 'triggering';
 
 export const INSTANCE_IDS: InstanceId[] = [
   'hamster-db',
