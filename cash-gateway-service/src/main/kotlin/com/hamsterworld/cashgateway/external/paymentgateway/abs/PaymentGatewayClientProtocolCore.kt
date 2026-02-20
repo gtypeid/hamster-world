@@ -56,27 +56,32 @@ abstract class PaymentGatewayClientProtocolCore(
     }
 
     /**
-     * PG 결제 요청
+     * PG 결제 요청 등록 (UNKNOWN 상태로 기록)
      *
      * **트랜잭션 전파 정책**:
      * - `MANDATORY`: 반드시 부모 트랜잭션 내에서 호출되어야 함
      * - 호출 경로: PaymentService.approve(MANDATORY) → payment(MANDATORY) → handleRequest(MANDATORY)
-     * - 목적: PG 요청 실패 시 전체 롤백 (PaymentAttempt 포함)
+     * - 목적: PaymentProcess 기록 실패 시 전체 롤백 (Kafka 재시도)
      *
-     * **Webhook 전용 정책**:
-     * - 모든 PG를 비동기로 간주, Payment 생성은 Webhook에서만 처리
-     * - 응답 성공 = 요청 접수 완료 (승인 완료 아님)
-     * - PaymentAttempt는 UNKNOWN 상태 유지, Webhook에서 SUCCESS/FAILED로 CAS 업데이트
+     * **이 메서드의 책임**:
+     * 1. prepareRequest: PG 요청 객체 생성 (Provider별 포맷)
+     * 2. JSON 직렬화 검증: 유효하지 않은 요청은 여기서 실패 (UNKNOWN으로 영원히 남는 것 방지)
+     * 3. PaymentProcess UNKNOWN 저장 (requestPayload 포함)
+     *
+     * **단일 경로 원칙** (PG 통신은 여기서 하지 않음):
+     * - 실제 HTTP 요청은 PaymentGatewayPgPollingService가 전담
+     *   1. 폴링 스케줄러(2초)가 UNKNOWN 조회
+     *   2. CAS: UNKNOWN → PENDING
+     *   3. HTTP 요청 전송
+     *   4. Webhook 수신 대기
+     * - PG 통신 경로가 하나뿐이므로 중복 요청 방지
      */
     @Transactional(propagation = Propagation.MANDATORY)
     override fun payment(paymentCtx: ApprovePaymentCtx) {
-        // Webhook 전용 정책:
-        // - 모든 PG를 비동기로 간주, 승인/거절은 Webhook에서만 처리
-        // - 응답 성공 = 요청 접수 완료 (승인 완료 아님)
-        // - PaymentProcess는 UNKNOWN 상태 유지, Webhook에서 SUCCESS/FAILED로 CAS 업데이트
-
         val request: PaymentRequest = provider.prepareRequest(paymentCtx)
 
+        // 직렬화 검증: 여기서 실패하면 트랜잭션 롤백 → Kafka 재시도
+        // 폴링 스케줄러에서 반복 실패하는 것보다 여기서 빠르게 실패하는 것이 안전
         val jsonBody: String
         try {
             jsonBody = objectMapper.writeValueAsString(request)
@@ -88,46 +93,15 @@ abstract class PaymentGatewayClientProtocolCore(
             PaymentApprovedRequestWithCtx(provider, paymentCtx, request),
             PaymentProcess::class.java
         )
+
+        // 직렬화된 요청 본문을 PaymentProcess에 저장 (폴링 시 재활용 가능)
+        requestPaymentProcess.requestPayload = jsonBody
+
+        // UNKNOWN 상태로 기록. 실제 PG HTTP 통신은 폴링 스케줄러가 담당.
         paymentGatewayCoreService.handleRequest(requestPaymentProcess)
 
-        val headers = HttpHeaders()
-        headers.contentType = MediaType.APPLICATION_JSON
-        val entity = HttpEntity(jsonBody, headers)
-
-        log.info("[{}] 결제 요청 -> {}", provider.getProvider().name, provider.getEndpoint())
-        log.info("Request Body = {}", jsonBody)
-
-        val responseEntity: ResponseEntity<String>
-        try {
-            responseEntity = pgRestTemplate.exchange(
-                provider.getEndpoint(),
-                HttpMethod.POST,
-                entity,
-                String::class.java
-            )
-        } catch (e: Exception) {
-            log.error("[{}] PG 서버 통신 실패 (서버 다운 또는 네트워크 오류): {}", provider.getProvider().name, e.message, e)
-
-            // PG 서버 다운 시 PaymentProcess를 FAILED로 기록
-            // 예외를 던지지 않아 트랜잭션 커밋되며, Kafka 재시도 방지
-            requestPaymentProcess.status = PaymentProcessStatus.FAILED
-            requestPaymentProcess.code = "PG_SERVER_DOWN"
-            requestPaymentProcess.message = "PG 서버 통신 실패: ${e.message}"
-
-            log.warn("[{}] PaymentProcess를 FAILED로 기록 | processId={}",
-                provider.getProvider().name, requestPaymentProcess.id)
-
-            return
-        }
-
-        val rawResponse = responseEntity.body
-        log.info("[{}] 결제 응답 <- {}", provider.getProvider().name, rawResponse)
-
-        // Webhook 전용 정책: 응답은 "접수 완료" 의미만. 승인/거절은 Webhook에서 처리.
-        log.info(
-            "[{}] PG 요청 접수 완료 - Webhook으로 최종 결과 수신 예정",
-            provider.getProvider().name
-        )
+        log.info("[{}] PaymentProcess 등록 완료 (UNKNOWN) | orderPublicId={}, gatewayReferenceId={} | PG 요청은 폴링 스케줄러가 전담",
+            provider.getProvider().name, paymentCtx.orderPublicId, requestPaymentProcess.gatewayReferenceId)
     }
 
     override fun cancel(paymentCtx: CancelPaymentCtx) {

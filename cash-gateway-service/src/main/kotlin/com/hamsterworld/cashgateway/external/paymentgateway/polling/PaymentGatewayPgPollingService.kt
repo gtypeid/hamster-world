@@ -209,6 +209,20 @@ class PaymentGatewayPgPollingService(
 
             // 실패 시 상태 변경하지 않음 (UNKNOWN 유지)
             // 이곳에서의 실패란 대체적으로 통신조차 가지 않았을 경우, 다만 아닐 수도 있다
+
+            // TODO 1: 재시도 횟수 제한
+            //   현재 PG 장시간 다운 시 2초마다 무한 재시도하며 로그가 폭발한다.
+            //   retryCount 컬럼을 추가하고, maxRetry 초과 시 FAILED로 전이하여 수동 재처리 대상으로 분리할 것.
+
+            // TODO 2: 백오프 전략
+            //   현재 고정 2초 간격으로 동일 요청을 반복한다.
+            //   exponential backoff 또는 nextRetryAt 컬럼 기반으로 아직 재시도 시점이 안 된 건은 스킵하도록 개선할 것.
+
+            // TODO 3: 예외 구분 - 통신 실패 vs HTTP 200 후 파싱 실패
+            //   현재 ConnectException(통신 자체 실패)과 HTTP 200 수신 후 parseAcknowledgementResponse 파싱 실패가
+            //   동일한 catch에서 UNKNOWN 유지로 처리된다.
+            //   후자의 경우 PG에서는 이미 결제를 처리했을 수 있으므로, UNKNOWN 유지 → 다음 폴링에서 PG에 중복 요청 발생 가능.
+            //   통신 성공(응답 수신) 후 파싱 실패는 별도 상태(예: PARSE_ERROR)로 분리하거나, PENDING으로 전이 후 수동 확인 필요.
         }
     }
 

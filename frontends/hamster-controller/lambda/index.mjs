@@ -3,17 +3,15 @@
 //
 // 역할: GitHub PAT를 서버측에 보관하고 API 요청을 중계.
 // 비즈니스 로직(상태 판단, 세션 관리)은 프론트엔드가 담당.
-// 이 Lambda는 순수 프록시 + CORS 처리만 수행.
+// 이 Lambda는 순수 프록시만 수행. CORS는 Lambda Function URL 설정에서 관리.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const GITHUB_API     = 'https://api.github.com';
 const PAT            = process.env.GITHUB_PAT;
 const OWNER          = process.env.GITHUB_OWNER;
 const REPO           = process.env.GITHUB_REPO || 'hamster-world';
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
-
 // ── 세션 제한 (과금 방어) ──
-const MAX_SESSIONS_PER_DAY = 5;
+const MAX_SESSIONS_PER_DAY = 10;
 const WORKFLOW_APPLY = 'terraform-apply.yml';
 
 // ── 허용된 GitHub API 경로 패턴 (화이트리스트) ──
@@ -33,11 +31,6 @@ const ALLOWED_PATTERNS = [
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function handler(event) {
-  // CORS preflight
-  if (event.requestContext?.http?.method === 'OPTIONS') {
-    return respond(204);
-  }
-
   const method = event.requestContext?.http?.method || 'GET';
 
   // 프론트엔드가 보내는 요청 형태:
@@ -158,9 +151,6 @@ function respond(statusCode, body = null) {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
     },
     body: body ? JSON.stringify(body) : undefined,
   };
