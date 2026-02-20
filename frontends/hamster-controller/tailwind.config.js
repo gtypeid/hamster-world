@@ -31,8 +31,13 @@ export default {
         'wiggle': 'wiggle 0.5s ease-in-out infinite',
         'spin-slow': 'spin 3s linear infinite',
         'shimmer': 'shimmer 2s infinite',
+        'pulse-fast': 'pulse-fast 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       keyframes: {
+        'pulse-fast': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.3' },
+        },
         wiggle: {
           '0%, 100%': { transform: 'rotate(-3deg)' },
           '50%': { transform: 'rotate(3deg)' },

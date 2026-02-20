@@ -4,7 +4,7 @@
  *  2. Architecture   (ReactFlow 시스템 다이어그램)
  *  3. Event Flow     (Kafka 토폴로지 뷰어)
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Position } from 'reactflow';
 import type { Node, Edge } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -13,17 +13,44 @@ import type { TopologyResponse } from '@common/topology';
 import { useInfraStore } from '../../stores/useInfraStore';
 import { parsePlanOutput } from '../../utils/parsePlan';
 
-type ViewerTab = 'report' | 'architecture' | 'topology';
+type LegacyViewerTab = 'report' | 'architecture' | 'topology';
 
-export function PlanReportModal({ initialTab, onClose }: { initialTab?: ViewerTab; onClose: () => void }) {
+/** @deprecated Use ViewerModal instead. Kept for backward compatibility. */
+export function PlanReportModal({ initialTab, onClose, embedded }: { initialTab?: LegacyViewerTab; onClose?: () => void; embedded?: boolean }) {
   const planResult = useInfraStore((s) => s.planResult);
   const hasPlan = !!planResult;
-  const [activeTab, setActiveTab] = useState<ViewerTab>(initialTab ?? 'architecture');
+  const [activeTab, setActiveTab] = useState<LegacyViewerTab>(initialTab ?? 'architecture');
   const topology = useMemo(() => STATIC_TOPOLOGY, []);
 
-  const tabs: { key: ViewerTab; label: string; badge?: string; color: string; activeColor: string }[] = [
-    { key: 'architecture', label: 'System Architecture', color: 'text-purple-400', activeColor: 'border-purple-500 bg-purple-500/10' },
-    { key: 'topology', label: 'Event Flow Topology', color: 'text-amber-400', activeColor: 'border-amber-500 bg-amber-500/10' },
+  // When tab changes via parent (ViewerModal), sync internal state
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Embedded mode: just render body content, no modal wrapper
+  if (embedded) {
+    return (
+      <div className="h-full overflow-hidden">
+        {activeTab === 'report' && (hasPlan ? <PlanReportTab /> : <PlanPendingPlaceholder />)}
+        {activeTab === 'architecture' && <ArchitectureTab />}
+        {activeTab === 'topology' && <TopologyTab topology={topology} />}
+      </div>
+    );
+  }
+
+  const body = (
+    <div className="flex-1 min-h-0 overflow-hidden">
+      {activeTab === 'report' && (hasPlan ? <PlanReportTab /> : <PlanPendingPlaceholder />)}
+      {activeTab === 'architecture' && <ArchitectureTab />}
+      {activeTab === 'topology' && <TopologyTab topology={topology} />}
+    </div>
+  );
+
+  const tabs: { key: LegacyViewerTab; label: string; badge?: string; color: string; activeColor: string }[] = [
+    { key: 'architecture', label: 'System Architecture', color: 'text-blue-400', activeColor: 'border-blue-500 bg-blue-500/10' },
+    { key: 'topology', label: 'Event Flow Topology', color: 'text-blue-400', activeColor: 'border-blue-500 bg-blue-500/10' },
     { key: 'report', label: 'Plan Report', badge: 'terraform plan', color: 'text-blue-400', activeColor: 'border-blue-500 bg-blue-500/10' },
   ];
 
@@ -46,10 +73,7 @@ export function PlanReportModal({ initialTab, onClose }: { initialTab?: ViewerTa
                       : 'text-gray-500 border-transparent hover:text-gray-300 hover:bg-white/[0.02]'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${isActive ? 'opacity-100' : 'opacity-30'} ${
-                    tab.key === 'architecture' ? 'bg-purple-400' :
-                    tab.key === 'topology' ? 'bg-amber-400' : 'bg-blue-400'
-                  }`} />
+                  <span className={`w-2 h-2 rounded-full ${isActive ? 'opacity-100' : 'opacity-30'} bg-blue-400`} />
                   {tab.label}
                   {tab.badge && isActive && (
                     <span className="text-[10px] font-mono text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/50">
@@ -74,11 +98,7 @@ export function PlanReportModal({ initialTab, onClose }: { initialTab?: ViewerTa
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {activeTab === 'report' && (hasPlan ? <PlanReportTab /> : <PlanPendingPlaceholder />)}
-          {activeTab === 'architecture' && <ArchitectureTab />}
-          {activeTab === 'topology' && <TopologyTab topology={topology} />}
-        </div>
+        {body}
       </div>
     </div>
   );

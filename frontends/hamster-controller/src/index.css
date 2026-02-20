@@ -7,3 +7,8 @@
     @apply bg-gray-900 text-gray-100 min-h-screen;
   }
 }
+
+@keyframes click-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}

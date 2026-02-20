@@ -14,7 +14,12 @@ import { startWorkflowPolling, resumeWorkflowPolling, stopWorkflowPolling } from
 
 // ─── Component ───
 
-export function SessionBar() {
+interface SessionBarProps {
+  /** When true, renders without outer wrapper (accent line, padding, height) for embedding in Header */
+  inline?: boolean;
+}
+
+export function SessionBar({ inline }: SessionBarProps = {}) {
   const sessionPhase = useInfraStore((s) => s.sessionPhase);
   const infraStatus = useInfraStore((s) => s.infraStatus);
   const sessionStartedAt = useInfraStore((s) => s.sessionStartedAt);
@@ -155,6 +160,184 @@ export function SessionBar() {
   const destroyElapsed = isDestroying ? Math.max(elapsed - activeSeconds, 0) : 0;
   const destroyPercent = cooldownSeconds > 0 ? Math.min((destroyElapsed / cooldownSeconds) * 100, 100) : 0;
 
+  const content = (
+    <div className={`flex items-center gap-4 ${inline ? '' : 'px-5 py-2.5 h-14'}`}>
+      {/* Phase indicator + label */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className={`w-2 h-2 rounded-full ${getPhaseColor(sessionPhase)}`} />
+        <span className={`text-xs font-semibold truncate ${
+          isActive ? 'text-white' : 'text-gray-400'
+        }`}>
+          {getPhaseLabel(sessionPhase, infraStatus)}
+        </span>
+      </div>
+
+      {/* Buttons: Connect / Init / Start / Stop */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={handleConnect}
+          disabled={!canConnect}
+          className="px-3 py-1 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-[11px] shadow-lg shadow-purple-900/20"
+        >
+          {sessionPhase === 'connecting' ? 'Syncing...' : 'Connect'}
+        </button>
+        <button
+          onClick={handleInit}
+          disabled={!canInit}
+          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-[11px] shadow-lg shadow-indigo-900/20"
+        >
+          {sessionPhase === 'planning' ? 'Planning...' : 'Init'}
+        </button>
+        <button
+          onClick={handleStart}
+          disabled={!canStart}
+          className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-[11px] shadow-lg shadow-green-900/20"
+        >
+          Start
+        </button>
+        <button
+          onClick={handleStop}
+          disabled={!canStop}
+          className="px-3 py-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-[11px] shadow-lg shadow-red-900/20"
+        >
+          Stop
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-6 bg-gray-700 shrink-0" />
+
+      {/* Status message (Connect 결과) */}
+      {sessionPhase === 'connected' && (
+        <>
+          <div className="shrink-0">
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${getStatusBadge(infraStatus)}`}>
+              {getStatusLabel(infraStatus)}
+            </span>
+          </div>
+          {infraStatus === 'cooldown' && initResult?.cooldownRemainingSeconds != null && (
+            <span className="text-[11px] text-gray-400">
+              {Math.ceil(initResult.cooldownRemainingSeconds / 60)}min
+            </span>
+          )}
+          <div className="w-px h-6 bg-gray-700 shrink-0" />
+        </>
+      )}
+
+      {/* Plan result badge */}
+      {sessionPhase === 'planned' && (
+        <>
+          <div className="shrink-0">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-900/50 text-blue-400 border border-blue-700/50">
+              PLAN READY
+            </span>
+          </div>
+          <div className="w-px h-6 bg-gray-700 shrink-0" />
+        </>
+      )}
+
+      {/* Timer - remaining / destroying */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={`text-[9px] font-semibold uppercase tracking-widest ${isDestroying ? 'text-orange-500' : 'text-gray-500'}`}>
+          {isDestroying ? 'Destroy' : 'Time'}
+        </span>
+        <span className="font-mono text-sm tabular-nums">
+          {isDestroying ? (
+            <>
+              <span className="text-orange-400">{formatTime(destroyElapsed)}</span>
+              <span className="text-gray-700 mx-0.5">/</span>
+              <span className="text-gray-500">~{formatTime(cooldownSeconds)}</span>
+            </>
+          ) : (
+            <>
+              <span className={remaining <= 120 && isActive ? 'text-red-400' : isActive ? 'text-accent-orange' : 'text-gray-600'}>
+                {formatTime(remaining)}
+              </span>
+              <span className="text-gray-700 mx-0.5">/</span>
+              <span className="text-gray-500">{formatTime(activeSeconds)}</span>
+            </>
+          )}
+        </span>
+      </div>
+
+      {/* Time progress bar */}
+      <div className="flex-1 min-w-0 max-w-[120px]">
+        <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+          {isDestroying ? (
+            <div
+              className="h-1.5 rounded-full transition-all duration-1000 relative"
+              style={{
+                width: `${destroyPercent}%`,
+                background: 'linear-gradient(90deg, #f97316, #ef4444)',
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+            </div>
+          ) : (
+            <div
+              className="h-1.5 rounded-full transition-all duration-1000 relative"
+              style={{
+                width: `${remainPercent}%`,
+                background: remainPercent < 10 ? '#ef4444' : remainPercent < 30 ? '#eab308' : '#6366f1',
+              }}
+            >
+              {isActive && (
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-6 bg-gray-700 shrink-0" />
+
+      {/* Instances */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest">EC2</span>
+        <span className="font-mono text-sm tabular-nums">
+          <span className={runningCount > 0 ? 'text-green-400 font-bold' : 'text-gray-600'}>{runningCount}</span>
+          <span className="text-gray-700 mx-0.5">/</span>
+          <span className="text-gray-500">{ec2Total ?? '?'}</span>
+        </span>
+        <div className="w-14 bg-gray-800 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-1.5 rounded-full transition-all duration-500 relative"
+            style={{
+              width: ec2Total ? `${(runningCount / ec2Total) * 100}%` : '0%',
+              background: 'linear-gradient(90deg, #16a34a, #4ade80)',
+            }}
+          >
+            {runningCount > 0 && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-6 bg-gray-700 shrink-0" />
+
+      {/* Session budget */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest">Budget</span>
+        <div className="flex items-center gap-0.5">
+          {Array.from({ length: maxSessionsPerDay }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-3 h-1.5 rounded-sm transition-colors ${
+                i < sessionsUsedToday ? 'bg-accent-orange shadow-sm shadow-amber-900/50' : 'bg-gray-800'
+              }`}
+            />
+          ))}
+        </div>
+        <span className="text-[11px] text-gray-500 font-mono tabular-nums">{sessionsUsedToday}/{maxSessionsPerDay}</span>
+      </div>
+    </div>
+  );
+
+  if (inline) return content;
+
   return (
     <div className="relative">
       {/* Accent top line */}
@@ -168,180 +351,7 @@ export function SessionBar() {
               : 'linear-gradient(90deg, #334155, #334155)',
         }}
       />
-
-      <div className="flex items-center gap-5 px-5 py-2.5 h-14">
-        {/* Phase indicator + label */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className={`w-2.5 h-2.5 rounded-full ${getPhaseColor(sessionPhase)}`} />
-          <span className={`text-sm font-semibold w-36 truncate ${
-            isActive ? 'text-white' : 'text-gray-400'
-          }`}>
-            {getPhaseLabel(sessionPhase, infraStatus)}
-          </span>
-        </div>
-
-        {/* Buttons: Connect / Init / Start / Stop */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleConnect}
-            disabled={!canConnect}
-            className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-purple-900/20"
-          >
-            {sessionPhase === 'connecting' ? 'Syncing...' : 'Connect'}
-          </button>
-          <button
-            onClick={handleInit}
-            disabled={!canInit}
-            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-indigo-900/20"
-          >
-            {sessionPhase === 'planning' ? 'Planning...' : 'Init'}
-          </button>
-          <button
-            onClick={handleStart}
-            disabled={!canStart}
-            className="px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-green-900/20"
-          >
-            Start
-          </button>
-          <button
-            onClick={handleStop}
-            disabled={!canStop}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700/50 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-md transition-all text-xs shadow-lg shadow-red-900/20"
-          >
-            Stop
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div className="w-px h-7 bg-gray-700 shrink-0" />
-
-        {/* Status message (Connect 결과) */}
-        {sessionPhase === 'connected' && (
-          <>
-            <div className="shrink-0">
-              <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusBadge(infraStatus)}`}>
-                {getStatusLabel(infraStatus)}
-              </span>
-            </div>
-            {infraStatus === 'cooldown' && initResult?.cooldownRemainingSeconds != null && (
-              <span className="text-xs text-gray-400">
-                {Math.ceil(initResult.cooldownRemainingSeconds / 60)}min cooldown
-              </span>
-            )}
-            <div className="w-px h-7 bg-gray-700 shrink-0" />
-          </>
-        )}
-
-        {/* Plan result badge */}
-        {sessionPhase === 'planned' && (
-          <>
-            <div className="shrink-0">
-              <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-900/50 text-blue-400 border border-blue-700/50">
-                PLAN READY
-              </span>
-            </div>
-            <div className="w-px h-7 bg-gray-700 shrink-0" />
-          </>
-        )}
-
-        {/* Timer - remaining / destroying */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <span className={`text-[10px] font-semibold uppercase tracking-widest ${isDestroying ? 'text-orange-500' : 'text-gray-500'}`}>
-            {isDestroying ? 'Destroying' : 'Remaining'}
-          </span>
-          <span className="font-mono text-base tabular-nums">
-            {isDestroying ? (
-              <>
-                <span className="text-orange-400">{formatTime(destroyElapsed)}</span>
-                <span className="text-gray-700 mx-0.5">/</span>
-                <span className="text-gray-500">~{formatTime(cooldownSeconds)}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-gray-500">{formatTime(activeSeconds)}</span>
-                <span className="text-gray-700 mx-0.5">/</span>
-                <span className={remaining <= 120 && isActive ? 'text-red-400' : isActive ? 'text-accent-orange' : 'text-gray-600'}>
-                  {formatTime(remaining)}
-                </span>
-              </>
-            )}
-          </span>
-        </div>
-
-        {/* Time progress bar - remaining life / destroy progress */}
-        <div className="flex-1 min-w-0 max-w-xs">
-          <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-            {isDestroying ? (
-              <div
-                className="h-1.5 rounded-full transition-all duration-1000 relative"
-                style={{
-                  width: `${destroyPercent}%`,
-                  background: 'linear-gradient(90deg, #f97316, #ef4444)',
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-              </div>
-            ) : (
-              <div
-                className="h-1.5 rounded-full transition-all duration-1000 relative"
-                style={{
-                  width: `${remainPercent}%`,
-                  background: remainPercent < 10 ? '#ef4444' : remainPercent < 30 ? '#eab308' : '#6366f1',
-                }}
-              >
-                {isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="w-px h-7 bg-gray-700 shrink-0" />
-
-        {/* Instances */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">EC2</span>
-          <span className="font-mono text-base tabular-nums">
-            <span className={runningCount > 0 ? 'text-green-400 font-bold' : 'text-gray-600'}>{runningCount}</span>
-            <span className="text-gray-700 mx-0.5">/</span>
-            <span className="text-gray-500">{ec2Total ?? '?'}</span>
-          </span>
-          <div className="w-20 bg-gray-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-1.5 rounded-full transition-all duration-500 relative"
-              style={{
-                width: ec2Total ? `${(runningCount / ec2Total) * 100}%` : '0%',
-                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
-              }}
-            >
-              {runningCount > 0 && (
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="w-px h-7 bg-gray-700 shrink-0" />
-
-        {/* Session budget */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Budget</span>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: maxSessionsPerDay }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-4 h-2 rounded-sm transition-colors ${
-                  i < sessionsUsedToday ? 'bg-accent-orange shadow-sm shadow-amber-900/50' : 'bg-gray-800'
-                }`}
-              />
-            ))}
-          </div>
-          <span className="text-xs text-gray-500 font-mono tabular-nums">{sessionsUsedToday}/{maxSessionsPerDay}</span>
-        </div>
-      </div>
+      {content}
     </div>
   );
 }
