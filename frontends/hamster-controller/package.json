@@ -12,8 +12,10 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
     "@types/dagre": "^0.7.53",
+    "@types/prismjs": "^1.26.6",
     "axios": "^1.13.5",
     "dagre": "^0.8.5",
+    "prismjs": "^1.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",

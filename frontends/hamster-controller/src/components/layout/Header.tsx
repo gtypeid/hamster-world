@@ -26,7 +26,7 @@ export function Header({ onHelpClick }: HeaderProps) {
             </div>
             <button
               onClick={onHelpClick}
-              className="w-7 h-7 rounded-full border-2 border-white/40 text-white hover:bg-white/10 hover:border-white/60 transition-all flex items-center justify-center text-xs font-extrabold"
+              className="help-btn-reflect w-7 h-7 rounded-full border-2 border-white/40 text-white hover:bg-white/10 hover:border-white/60 transition-all flex items-center justify-center text-xs font-extrabold"
               title="Help & Guide"
             >
               ?

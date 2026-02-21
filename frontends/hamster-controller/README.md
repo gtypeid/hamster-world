@@ -1,181 +1,273 @@
-# 🐹 Hamster Controller
+# Hamster Controller
 
-> Portfolio Hub + Infrastructure Control Dashboard
+> Portfolio Hub + Infrastructure Control + Service Documentation
 
-Hamster World 프로젝트의 **엔트리 포인트**이자 **인프라 제어 센터**입니다.
-GitHub Pages에 정적으로 배포되어 프로젝트 문서, 아키텍처, 서비스 링크를 제공하고,
-GitHub Actions를 통해 AWS 인프라를 온디맨드로 제어합니다.
+Hamster World 프로젝트의 엔트리 포인트이자 인프라 제어 센터.
+GitHub Pages에 정적 배포되어 서비스 문서, 인프라 제어, 아키텍처 시각화를 제공한다.
 
-## 🎯 주요 기능
+## 주요 기능
 
-### 🏠 Entry Point (Home)
-- 프로젝트 전체 소개 및 기술 스택
-- 이벤트 드리븐 아키텍처 설명
-- 빠른 네비게이션 (서비스, 인프라, 문서)
+### Home
+- 프로젝트 소개, 기술 스택, 이벤트 드리븐 아키텍처 설명
+- 서비스/인프라/문서 네비게이션
 
-### 🎯 Services Navigator
-- 모든 서비스 목록 및 상태 표시
-  - Frontend: 이커머스, 어드민, Hamster PG
-  - Backend: E-Commerce API, Payment, Cash Gateway 등
-  - Infrastructure: Keycloak, Grafana
+### Services
+- 전체 서비스 목록 및 상태 표시 (Frontend, Backend, Infrastructure)
 - 인스턴스 상태에 따른 서비스 접근 제어
 
-### 🏗️ Architecture Visualization
-- **ReactFlow**로 시스템 구조 다이어그램
-- Frontend → Gateway → Backend → Kafka → Database 흐름
-- 인프라 인스턴스 구성 설명
+### Infrastructure Control
+- GitHub Actions 워크플로우 트리거 (EC2 생성, Docker 배포, 리소스 삭제)
+- ReactFlow 기반 인프라 플로우 시각화
+- 사용 시간 모니터링, 실시간 워크플로우 이력, 세션 관리
 
-### 🎮 Infrastructure Control
-- GitHub Actions 워크플로우 트리거
-  - 🚀 AWS EC2 인스턴스 생성
-  - 🐳 Docker 애플리케이션 배포
-  - 🗑️ 리소스 삭제
-- 사용 시간 모니터링 (프리티어 한도 체크)
-- 실시간 워크플로우 실행 이력
-- 햄스터 챗바퀴 애니메이션 (상태 시각화)
+### Service Documentation (Viewer Modal)
+- 서비스별 탭 전환 방식의 문서 뷰어 (ViewerModal + viewerTabs)
+- 각 서비스 탭은 왼쪽 사이드바 카테고리로 섹션 전환
 
-### 📚 Documentation Viewer
-- 프로젝트 문서 모음
-- Google Slides 임베드 지원
-- API 명세, ERD 등
+## 서비스 문서 시스템
 
-## 🛠️ 기술 스택
+`src/components/docs/` 아래에 서비스별 문서 탭이 존재한다.
+공통 컴포넌트로 데이터와 렌더러를 분리하는 패턴을 사용한다.
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Routing**: React Router DOM
-- **State Management**:
-  - TanStack Query (서버 상태)
-  - Zustand (클라이언트 상태)
-- **Styling**: Tailwind CSS 3.x
-- **Visualization**: ReactFlow (시스템 다이어그램)
-- **HTTP Client**: Axios
-- **API**: GitHub REST API (Actions, Workflows)
+### 공통 컴포넌트
 
-## 🚀 로컬 개발
+| 파일 | 역할 |
+|------|------|
+| `ServiceDocLayout.tsx` | 왼쪽 사이드바 + 본문 레이아웃. DocHeading, DocBlock, DocParagraph, DocCard, DocCode(Prism.js 신택스 하이라이팅), DocCallout, DocLink, DocKeyValueList, DocBulletList, DocImage 등 공통 UI 제공. 키워드 하이라이트 시스템 내장 |
+| `ServiceFlowSection.tsx` | 카프카 토폴로지 렌더러. `ServiceFlowData` (publishes, consumes) 데이터를 받아 시각화 |
+| `BoundedContextSection.tsx` | 바운드 컨텍스트 렌더러. `BoundedContextData` (contexts, externals, children) 데이터를 받아 시각화 |
 
-### 1. 환경변수 설정
+### 서비스 탭
 
-`.env.example`을 복사해서 `.env` 파일 생성:
+| 파일 | 서비스 | 섹션 구성 |
+|------|--------|-----------|
+| `EcommerceTab.tsx` | 이커머스 | 개요, 카프카 토폴로지, 바운드 컨텍스트, 설계 의도, 핵심 코드, 결과, 화면 |
+| `PaymentTab.tsx` | 페이먼트 | 개요, 카프카 토폴로지, 바운드 컨텍스트, 설계 의도, 핵심 코드, 결과 |
+| `CashGatewayTab.tsx` | 캐시 게이트웨이 | 개요(서비스 의도, 서비스 설명, 핵심 설계 및 코드, 여담), 카프카 토폴로지, 바운드 컨텍스트 |
+| `ProgressionTab.tsx` | 프로그레션 | 개요, 카프카 토폴로지, 바운드 컨텍스트, 설계 의도, 핵심 코드, 결과 |
+| `InternalAdminTab.tsx` | 내부 어드민 | 프론트엔드 앱 (Kafka 없음) |
+| `ContentCreatorTab.tsx` | 콘텐츠 크리에이터 | 프론트엔드 앱 (Kafka 없음) |
+| `HamsterPgTab.tsx` | 햄스터 PG | PG 시뮬레이터 |
+| `OverviewTab.tsx` | 전체 개요 | 프로젝트 전체 아키텍처 |
+| `PlatformTab.tsx` | 플랫폼 | 공통 인프라 |
+| `InfrastructureTab.tsx` | 인프라 | AWS/Terraform |
 
-```bash
-cp .env.example .env
+### 바운드 컨텍스트 데이터 구조
+
+```typescript
+interface ExternalRef {
+  service: ViewerTab;         // viewerTabs.ts의 탭 키
+  desc: string;
+  isSourceOfTruth?: boolean;  // 이 외부 서비스가 진실의 원천인 경우
+}
+
+interface ContextItem {
+  name: string;
+  service: ViewerTab;
+  detail: string;
+  externals?: ExternalRef[];
+  children?: ContextItem[];   // 하위 도메인 (ㄴ 커넥터로 연결)
+}
 ```
 
-`.env` 파일에 GitHub 정보 입력:
+- `isSourceOfTruth: true`인 external이 있으면 → 자기 서비스 태그/텍스트 비활성, 해당 external 태그/텍스트 활성
+- 활성/비활성은 색상 차이만 (폰트 크기 동일)
+- 서비스 태그는 `viewerTabs.ts`의 `ALL_TABS`에서 label/color를 조회
 
-```env
-VITE_GITHUB_TOKEN=ghp_your_token_here
-VITE_GITHUB_OWNER=your-username
-VITE_GITHUB_REPO=your-repo
-VITE_WORKFLOW_ID=infrastructure.yml
+### 서비스 간 이벤트 의존 관계 (바운드 컨텍스트 기준)
+
+```
+Ecommerce
+  Order        ← payment(SoT), progression(반응하여 소비)
+  Product      ← payment(SoT, 재고)
+  Account      ← payment(SoT, 잔액)
+  Merchant     → cashgw(MID 발급)
+  CouponPolicy (자체 소유)
+  Cart         (자체 소유)
+
+Payment
+  Payment      ← cashgw(SoT) → ecommerce(반응하여 소비)
+  Product      → ecommerce(캐시 동기화)
+    └ ProductRecord
+  Account      → ecommerce(캐시 동기화), progression(보상 이벤트)
+    └ AccountRecord
+  OrderSnapshot ← ecommerce(SoT, 주문 원본)
+
+CashGateway
+  PaymentProcess ← payment(트리거)
+    └ Payment    → payment(반응하여 소비), ecommerce(반응하여 소비)
+  CashGatewayMid → ecommerce(식별자 저장)
+
+Progression
+  Archive      ← ecommerce(트리거) → payment(반응하여 소비)
+    └ UserArchiveProgress
+  Quota        ← ecommerce(트리거) → payment(반응하여 소비)
+  SeasonPromotion ← ecommerce(트리거), payment(SoT, VIP 상태)
 ```
 
-### 2. 의존성 설치
+`←` 이 서비스에 영향을 주는 쪽, `→` 이 서비스의 이벤트를 소비하는 쪽, `SoT` = Source of Truth
 
-```bash
-npm install
-```
+## 기술 스택
 
-### 3. 개발 서버 실행
+- React 19 + TypeScript + Vite
+- React Router DOM
+- TanStack Query (서버 상태) + Zustand (클라이언트 상태)
+- Tailwind CSS 4.x
+- Prism.js (코드 신택스 하이라이팅)
+- ReactFlow (인프라 플로우 시각화)
+- Axios + GitHub REST API + Lambda Proxy
 
-```bash
-npm run dev
-```
-
-http://localhost:3000 에서 확인 가능
-
-## 📦 빌드 및 배포
-
-### 로컬 빌드
-
-```bash
-npm run build
-```
-
-`dist/` 폴더에 정적 파일 생성됨
-
-### GitHub Pages 배포
-
-1. `vite.config.ts`의 `base` 경로를 레포 이름으로 수정
-2. GitHub Actions 또는 수동으로 `dist/` 폴더를 `gh-pages` 브랜치에 푸시
-
-## 🔑 GitHub Personal Access Token 발급
-
-1. GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate new token (classic)
-3. 필수 권한:
-   - `repo` (전체)
-   - `workflow` (GitHub Actions 트리거용)
-
-## 📊 프로젝트 구조
+## 프로젝트 구조
 
 ```
 src/
-├── components/           # 재사용 컴포넌트
-│   ├── HamsterWheel.tsx # 챗바퀴 애니메이션
-│   └── Layout.tsx       # 공통 레이아웃 (헤더, 네비게이션, 푸터)
-├── pages/               # 페이지 컴포넌트
-│   ├── Home.tsx         # 홈 (프로젝트 소개)
-│   ├── Services.tsx     # 서비스 네비게이터
-│   ├── Architecture.tsx # 시스템 아키텍처 (ReactFlow)
-│   ├── Infrastructure.tsx # 인프라 제어
-│   └── Documentation.tsx  # 문서 뷰어
-├── services/            # API 서비스
-│   └── github.ts        # GitHub API 클라이언트
-├── stores/              # Zustand 스토어
-│   └── useInfraStore.ts # 인프라 상태 관리
-├── types/               # TypeScript 타입
+├── components/
+│   ├── docs/                    # 서비스 문서 탭 + 공통 렌더러
+│   │   ├── ServiceDocLayout.tsx # 공통 레이아웃 (사이드바 + 본문)
+│   │   ├── ServiceFlowSection.tsx # 카프카 토폴로지 렌더러
+│   │   ├── BoundedContextSection.tsx # 바운드 컨텍스트 렌더러
+│   │   ├── EcommerceTab.tsx
+│   │   ├── PaymentTab.tsx
+│   │   ├── CashGatewayTab.tsx
+│   │   ├── ProgressionTab.tsx
+│   │   └── ...Tab.tsx           # 기타 서비스 탭
+│   ├── infra/                   # 인프라 제어 UI
+│   │   ├── InfraFlowView.tsx    # ReactFlow 인프라 다이어그램
+│   │   ├── SessionControl.tsx   # 세션 관리
+│   │   ├── ViewerModal.tsx      # 서비스 문서 뷰어 모달
+│   │   └── viewerTabs.ts        # 탭 정의 (ViewerTab 타입, ALL_TABS)
+│   ├── layout/
+│   │   ├── AppLayout.tsx
+│   │   └── Header.tsx
+│   ├── HamsterWheel.tsx
+│   └── WelcomeModal.tsx
+├── pages/
+│   ├── Home.tsx
+│   ├── Services.tsx
+│   └── Infrastructure.tsx
+├── services/
+│   ├── github.ts               # GitHub API 클라이언트
+│   ├── lambdaProxy.ts           # Lambda 프록시 (CORS 우회)
+│   ├── infraSession.ts
+│   ├── mockGithub.ts
+│   └── workflowPoller.ts
+├── stores/
+│   └── useInfraStore.ts
+├── config/
+│   └── infraConfig.ts
+├── types/
 │   └── github.ts
-└── utils/               # 유틸리티
-    └── timeCalculator.ts # 시간 계산 로직
+└── utils/
+    ├── parsePlan.ts
+    ├── parseWorkflowLog.ts
+    └── timeCalculator.ts
 ```
 
-## 🗺️ 페이지 라우팅
+## 다음 세션 가이드
 
-| 경로 | 페이지 | 설명 |
-|------|--------|------|
-| `/` | Home | 프로젝트 소개 및 엔트리 포인트 |
-| `/services` | Services | 모든 서비스 목록 및 링크 |
-| `/architecture` | Architecture | 시스템 구조 다이어그램 |
-| `/infrastructure` | Infrastructure | AWS 인프라 제어 대시보드 |
-| `/docs` | Documentation | 프로젝트 문서 뷰어 |
+이 프로젝트를 이어서 작업할 때 알아야 할 핵심 사항:
 
-## ⚙️ 설정
+### 서비스 문서 패턴
 
-### 일일 시간 제한 변경
+새 서비스 탭을 추가하거나 기존 탭을 수정할 때:
 
-`src/stores/useInfraStore.ts`:
+1. 데이터 객체 (`ServiceFlowData`, `BoundedContextData`)를 정의하고
+2. 공통 렌더러 (`ServiceFlowSection`, `BoundedContextSection`)에 전달하는 패턴
+3. `viewerTabs.ts`의 `ALL_TABS`가 탭 정의의 단일 진실의 원천
+
+### 바운드 컨텍스트 활성/비활성 규칙
+
+- `ExternalRef.isSourceOfTruth: true` → 해당 external 태그/텍스트 활성, 자기 서비스 태그/텍스트 비활성
+- children은 부모의 활성/비활성을 상속
+- children도 자체 externals를 가질 수 있음 (렌더러 지원됨)
+- 활성/비활성은 색상만 다름 (`text-gray-300` vs `text-gray-500`), 폰트 크기는 동일 (`text-[15px]`)
+
+### 섹션 순서 규칙
+
+CashGatewayTab (최신 패턴):
+- 개요 섹션 안에 DocBlock 서브섹션으로 구성: 서비스 의도 → 서비스 설명 → 핵심 설계 및 코드 → 여담
+- `DocSection.children`으로 사이드바 앵커 네비게이션 제공, children은 항상 펼침 상태
+- 개요 → 카프카 토폴로지 → 바운드 컨텍스트
+
+기존 탭 (Ecommerce, Payment, Progression):
+- 개요 → 카프카 토폴로지 → 바운드 컨텍스트 → 설계 의도 → 핵심 코드 → 결과
+
+### DocBlock 서브섹션 패턴 (CashGatewayTab 기준)
 
 ```typescript
-dailyLimit: 1440, // 분 단위 (1440 = 24시간)
+const sections: DocSection[] = [
+  {
+    key: 'overview',
+    label: '개요',
+    children: [                              // 사이드바 앵커 네비게이션
+      { key: 'svc-intent', label: '서비스 의도' },
+      { key: 'svc-desc', label: '서비스 설명' },
+      { key: 'svc-design', label: '핵심 설계 및 코드' },
+      { key: 'svc-aside', label: '여담' },
+    ],
+    content: (
+      <div className="space-y-8">
+        <DocBlock id="svc-intent" title="서비스 의도">...</DocBlock>
+        <DocBlock id="svc-desc" title="서비스 설명">...</DocBlock>
+        <DocBlock id="svc-design" title="핵심 설계 및 코드">...</DocBlock>
+        <DocBlock id="svc-aside" title="여담">...</DocBlock>
+      </div>
+    ),
+  },
+  // ...카프카 토폴로지, 바운드 컨텍스트
+];
 ```
 
-### 최소 실행 시간 변경
+- `DocSection.children[].key`와 `DocBlock id`가 일치해야 앵커 스크롤 동작
+- children이 있는 섹션은 다른 탭 클릭 시에도 항상 펼침 상태 유지
 
-`src/pages/Dashboard.tsx`:
+### 키워드 하이라이트 시스템
 
-```typescript
-const canTrigger = remainingMinutes > 10; // 최소 10분 이상
+`ServiceDocLayout.tsx`의 `HIGHLIGHT_RULES` 배열에 키워드-색상 매핑 정의.
+`DocParagraph`, `DocCallout` 내부 텍스트에 자동 적용.
+
+| 키워드 | 색상 |
+|--------|------|
+| 햄스터 월드, Cash Gateway | amber |
+| Payment Service | red |
+| Ecommerce | blue |
+| Progression | purple |
+| Source of Truth, 진실의 원천 | emerald |
+| Kafka | sky |
+| Webhook | orange |
+
+### 코드 하이라이팅
+
+- `DocCode`에 `language="kotlin"` 전달 시 Prism.js로 신택스 하이라이팅 적용
+- `language` 미지정 시 단색 텍스트 출력 (상태 전이 다이어그램 등)
+- 테마: prism-tomorrow (다크), 배경색은 `#080e1a`로 오버라이드
+
+### DocCallout 컴포넌트
+
+설계 결정의 이유(Why)를 강조하는 콜아웃 블록.
+amber 좌측 보더 + 반투명 배경 + "WHY" 라벨. 키워드 하이라이트 적용됨.
+
+```tsx
+<DocCallout>
+  Cash Gateway는 "누가 요청했는지"만 식별하고, "얼마를 누구에게"는 Payment Service의 도메인으로 남겨 두었습니다.
+</DocCallout>
 ```
 
-## 🎨 디자인 컨셉
+### 텍스트 스타일 규칙
 
-- **Hamster 컬러 팔레트** (기존 프로젝트 통일)
-  - Primary: Hamster Orange (#F59E0B)
-  - Text: Hamster Brown (#92400E)
-  - Background: Hamster Ivory/Beige
-- **레이아웃**: 왼쪽 사이드바 네비게이션 (햄스터월드 표준)
-- **애니메이션**: 햄스터 로고 wiggle 효과
-- **통일성**: ecommerce, internal-admin, hamster-pg와 동일한 UI 패턴
+- 한글 위주, 영어 최소화 (Source of Truth → 진실의 원천, INSERT-only → 불변, delta → 변화량)
+- 반응하는 소비자는 "~에 반응하여 소비" 패턴으로 통일
+- CashGatewayTab: "~합니다/~했습니다" 정중체 (텔링 스타일)
 
-## 📝 TODO
+## 로컬 개발
 
-- [ ] 워크플로우별 개별 시간 추적
-- [ ] 실행 이력 상세 로그 표시
-- [ ] 인스턴스 상태 실시간 모니터링
-- [ ] 알림 기능 (시간 초과 시)
-- [ ] Chart.js로 사용량 시각화
+```bash
+cp .env.example .env   # 환경변수 설정
+npm install
+npm run dev            # http://localhost:3000
+npm run build          # dist/ 정적 빌드
+```
 
-## 📄 라이선스
+## 라이선스
 
 MIT

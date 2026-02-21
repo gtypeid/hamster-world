@@ -5,13 +5,13 @@
  *  3. Event Flow     (Kafka 토폴로지 뷰어)
  */
 import { useState, useMemo, useEffect } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, Position } from 'reactflow';
-import type { Node, Edge } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { TopologyViewer } from '@common/topology';
 import type { TopologyResponse } from '@common/topology';
 import { useInfraStore } from '../../stores/useInfraStore';
 import { parsePlanOutput } from '../../utils/parsePlan';
+import { DocMiniFlow } from '../docs/DocMiniFlow';
+import { UNIFIED_NODES, UNIFIED_EDGES } from '../docs/InfrastructureTab';
 
 type LegacyViewerTab = 'report' | 'architecture' | 'topology';
 
@@ -111,12 +111,12 @@ export function PlanReportModal({ initialTab, onClose, embedded }: { initialTab?
 function PlanPendingPlaceholder() {
   return (
     <div className="h-full flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <div className="text-gray-600 text-lg font-mono">terraform plan</div>
-        <div className="text-gray-500 text-sm">
+      <div className="text-center space-y-5">
+        <div className="text-gray-600 text-3xl font-mono">terraform plan</div>
+        <div className="text-gray-500 text-lg">
           Init 단계를 실행하면 Plan Report가 표시됩니다
         </div>
-        <div className="text-gray-700 text-xs">
+        <div className="text-gray-700 text-base">
           Connect &rarr; <span className="text-blue-400">Init</span> &rarr; Plan Report 자동 표시
         </div>
       </div>
@@ -319,50 +319,16 @@ function PlanReportTab() {
 
 function ArchitectureTab() {
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 min-h-0">
-        <ReactFlow
-          nodes={ARCH_NODES}
-          edges={ARCH_EDGES}
-          fitView
-          nodesDraggable={true}
-          nodesConnectable={false}
-          elementsSelectable={true}
-          panOnDrag={true}
-          zoomOnScroll={true}
-          minZoom={0.1}
-          maxZoom={4}
-          attributionPosition="bottom-left"
-        >
-          <Background />
-          <Controls position="top-right" />
-          <MiniMap
-            nodeColor={(node) => {
-              if (node.type === 'input') return '#FF9900';
-              const bg = node.style?.background;
-              return typeof bg === 'string' ? bg : '#3B82F6';
-            }}
-          />
-        </ReactFlow>
-      </div>
-
-      {/* Legend bar */}
-      <div className="shrink-0 flex items-center gap-6 px-6 py-3 border-t border-gray-800 bg-[#080e1a]">
-        {[
-          { color: 'bg-purple-600', label: 'Frontend', desc: 'React 19' },
-          { color: 'bg-green-600', label: 'Gateway', desc: 'Nginx' },
-          { color: 'bg-blue-600', label: 'Backend', desc: 'Spring Boot 3.x' },
-          { color: 'bg-red-600', label: 'Message Broker', desc: 'Apache Kafka' },
-          { color: 'bg-yellow-600', label: 'Database', desc: 'MySQL / MongoDB' },
-          { color: 'bg-indigo-600', label: 'Auth', desc: 'Keycloak' },
-        ].map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded ${item.color}`} />
-            <span className="text-xs text-gray-400">{item.label}</span>
-            <span className="text-[11px] text-gray-600">{item.desc}</span>
-          </div>
-        ))}
-      </div>
+    <div className="h-full">
+      <DocMiniFlow
+        nodes={UNIFIED_NODES}
+        edges={UNIFIED_EDGES}
+        direction="TB"
+        height="100%"
+        miniMap
+        draggable
+        zoomable
+      />
     </div>
   );
 }
@@ -629,140 +595,6 @@ const API_ROUTES = [
   { path: '/api/progression/*', backend: 'support:8084', desc: 'Progress' },
   { path: '/api/notification/*', backend: 'support:8085', desc: 'Notify' },
   { path: '/keycloak/*', backend: 'auth:8090', desc: 'Auth' },
-];
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Data: Architecture diagram
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const ARCH_NODES: Node[] = [
-  {
-    id: 'user',
-    type: 'input',
-    data: { label: '사용자' },
-    position: { x: 250, y: 0 },
-    style: { background: '#FF9900', color: 'white', fontWeight: 'bold' },
-  },
-  {
-    id: 'ecommerce-fe',
-    data: { label: 'ecommerce FE' },
-    position: { x: 50, y: 100 },
-    style: { background: '#8B5CF6', color: 'white' },
-  },
-  {
-    id: 'admin-fe',
-    data: { label: 'internal-admin FE' },
-    position: { x: 250, y: 100 },
-    style: { background: '#8B5CF6', color: 'white' },
-  },
-  {
-    id: 'pg-fe',
-    data: { label: 'hamster-pg FE' },
-    position: { x: 450, y: 100 },
-    style: { background: '#8B5CF6', color: 'white' },
-  },
-  {
-    id: 'nginx',
-    data: { label: 'Nginx (Reverse Proxy)' },
-    position: { x: 250, y: 200 },
-    style: { background: '#10B981', color: 'white', fontWeight: 'bold' },
-  },
-  {
-    id: 'ecommerce-api',
-    data: { label: 'ecommerce-service' },
-    position: { x: 0, y: 320 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'payment',
-    data: { label: 'payment-service' },
-    position: { x: 180, y: 320 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'cash-gateway',
-    data: { label: 'cash-gateway-service' },
-    position: { x: 360, y: 320 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'hamster-pg',
-    data: { label: 'hamster-pg-service' },
-    position: { x: 540, y: 320 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'notification',
-    data: { label: 'notification-service' },
-    position: { x: 720, y: 320 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'progression',
-    data: { label: 'progression-service' },
-    position: { x: 720, y: 420 },
-    style: { background: '#3B82F6', color: 'white' },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-  },
-  {
-    id: 'kafka',
-    data: { label: 'Apache Kafka (KRaft)' },
-    position: { x: 250, y: 480 },
-    style: { background: '#EF4444', color: 'white', fontWeight: 'bold', width: 200 },
-  },
-  {
-    id: 'mysql',
-    data: { label: 'MySQL 8.0' },
-    position: { x: 100, y: 620 },
-    style: { background: '#F59E0B', color: 'white' },
-  },
-  {
-    id: 'mongodb',
-    data: { label: 'MongoDB 7.0' },
-    position: { x: 300, y: 620 },
-    style: { background: '#10B981', color: 'white' },
-  },
-  {
-    id: 'keycloak',
-    data: { label: 'Keycloak 23.0' },
-    position: { x: 500, y: 620 },
-    style: { background: '#6366F1', color: 'white' },
-  },
-];
-
-const ARCH_EDGES: Edge[] = [
-  { id: 'e-user-ecommerce', source: 'user', target: 'ecommerce-fe', animated: true },
-  { id: 'e-user-admin', source: 'user', target: 'admin-fe', animated: true },
-  { id: 'e-user-pg', source: 'user', target: 'pg-fe', animated: true },
-  { id: 'e-ecommerce-nginx', source: 'ecommerce-fe', target: 'nginx' },
-  { id: 'e-admin-nginx', source: 'admin-fe', target: 'nginx' },
-  { id: 'e-pg-nginx', source: 'pg-fe', target: 'nginx' },
-  { id: 'e-nginx-ecommerce-api', source: 'nginx', target: 'ecommerce-api' },
-  { id: 'e-nginx-payment', source: 'nginx', target: 'payment' },
-  { id: 'e-nginx-cash', source: 'nginx', target: 'cash-gateway' },
-  { id: 'e-nginx-pg', source: 'nginx', target: 'hamster-pg' },
-  { id: 'e-ecommerce-kafka', source: 'ecommerce-api', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
-  { id: 'e-payment-kafka', source: 'payment', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
-  { id: 'e-cash-kafka', source: 'cash-gateway', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
-  { id: 'e-noti-kafka', source: 'notification', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
-  { id: 'e-prog-kafka', source: 'progression', target: 'kafka', animated: true, style: { stroke: '#EF4444' } },
-  { id: 'e-ecommerce-mysql', source: 'ecommerce-api', target: 'mysql' },
-  { id: 'e-payment-mysql', source: 'payment', target: 'mysql' },
-  { id: 'e-cash-mysql', source: 'cash-gateway', target: 'mysql' },
-  { id: 'e-pg-mysql', source: 'hamster-pg', target: 'mysql' },
-  { id: 'e-ecommerce-mongo', source: 'ecommerce-api', target: 'mongodb' },
-  { id: 'e-nginx-keycloak', source: 'nginx', target: 'keycloak', style: { strokeDasharray: '5,5' } },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
