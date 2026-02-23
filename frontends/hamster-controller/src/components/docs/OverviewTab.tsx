@@ -15,7 +15,7 @@ const sections: DocSection[] = [
       <div className="space-y-8">
         {/* 프로젝트 의도 */}
         <DocBlock id="svc-intent" title="프로젝트 의도">
-          {/* TODO: 내용 작성 예정
+          <>{/* TODO: 내용 작성 예정
           <DocParagraph>
             햄스터 월드는 결제 중개 플랫폼(PG Aggregator) 아키텍처의 이벤트 드리븐 이커머스 시스템입니다.
             토스페이먼츠, 이니시스와 같은 결제 대행 서비스를 모델링합니다.
@@ -30,12 +30,12 @@ const sections: DocSection[] = [
             Terraform + GitHub Actions로 8개 EC2 인스턴스를 자동 프로비저닝하며,
             이 대시보드(Hamster Controller)가 인프라 제어의 엔트리 포인트 역할을 합니다.
           </DocCallout>
-          */}
+          */}</>
         </DocBlock>
 
         {/* 프로젝트 설명 */}
         <DocBlock id="svc-desc" title="프로젝트 설명">
-          {/* TODO: 내용 작성 예정
+          <>{/* TODO: 내용 작성 예정
           <DocCard title="비즈니스 모델 — PG Aggregator">
             <DocParagraph>
               가맹점(Vendor)은 두 가지 결제 경로를 선택할 수 있습니다.
@@ -72,12 +72,12 @@ progression-events    Progression → Payment
               이것이 이벤트 드리븐 아키텍처에서 "반응형 서비스"의 극단적 형태입니다.
             </DocCallout>
           </DocCard>
-          */}
+          */}</>
         </DocBlock>
 
         {/* 핵심 설계 */}
         <DocBlock id="svc-design" title="핵심 설계">
-          {/* TODO: 내용 작성 예정
+          <>{/* TODO: 내용 작성 예정
           <DocCard title="아키텍처 원칙">
             <DocKeyValueList labelWidth="w-20" items={[
               { label: 'DDD', value: 'Aggregate Root + Domain Events 기반 바운디드 컨텍스트 분리', color: 'text-emerald-400' },
@@ -138,12 +138,12 @@ Progression — 아카이브, 반복 보상, 시즌 프로모션 진행 상태
    성공: Order → PAID, 정산 기록 생성, 잔액 차감
    실패: Order → CANCELLED, 재고 복원 (보상 트랜잭션)`}</DocCode>
           </DocCard>
-          */}
+          */}</>
         </DocBlock>
 
         {/* 여담 */}
         <DocBlock id="svc-aside" title="여담">
-          {/* TODO: 내용 작성 예정
+          <>{/* TODO: 내용 작성 예정
           <DocParagraph>
             이 프로젝트의 핵심은 "실제로 동작하는 결제 시스템"을 만드는 것이었습니다.
             단순히 아키텍처 다이어그램을 그리는 것이 아니라,
@@ -155,7 +155,7 @@ Progression — 아카이브, 반복 보상, 시즌 프로모션 진행 상태
             GitHub Pages에 정적 배포되어 별도 서버 없이 동작하며,
             Lambda Proxy를 통해 GitHub PAT을 노출하지 않고 인프라를 제어합니다.
           </DocParagraph>
-          */}
+          */}</>
         </DocBlock>
       </div>
     ),
