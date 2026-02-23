@@ -307,9 +307,14 @@ function applyInfraVariable(infraVar: InfraVariableStatus): number {
             level: 'info',
           });
         } else if (update.status === 'running') {
+          const ipDisplay = info.ip
+            ? info.publicIp
+              ? ` (🔒 ${info.ip}  🌐 ${info.publicIp})`
+              : ` (${info.ip})`
+            : '';
           addLog({
             instanceId,
-            message: `인스턴스 온라인${info.ip ? ` (${info.ip})` : ''}`,
+            message: `인스턴스 온라인${ipDisplay}`,
             level: 'success',
           });
         } else if (update.status === 'failed') {

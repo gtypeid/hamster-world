@@ -144,6 +144,13 @@ jobs:
       - name: Terraform Destroy
         if: always()
         run: |
+          # null_resource는 실제 인프라가 아님 (cloud-init SSH 체크용)
+          # apply 실패 시 connection block의 host 참조가 깨져 destroy plan이 실패할 수 있음
+          # state에서 제거하면 평가 자체를 건너뛰고 실제 AWS 리소스만 destroy
+          for nr in $(terraform state list 2>/dev/null | grep '^null_resource\.' || true); do
+            terraform state rm "$nr" 2>/dev/null || true
+          done
+
           # always: 정상 완료, 실패, cancel 모든 경우에 실행
           # state에 기록된 리소스만 파괴 (13개 중 4개만 생성됐으면 4개만 destroy)
           # -lock=false: cancel 후 OS flock이 남아있을 경우를 대비한 안전장치
