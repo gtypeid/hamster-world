@@ -73,7 +73,7 @@ const ecommerceContext: BoundedContextData = {
       detail: '주문 전표. 사용자가 보는 주문 내역이며, 상태 변경은 페이먼트 이벤트로만 수행된다. 거래의 진실의 원천이 아닌 UI용 전표.',
       externals: [
         { service: 'payment', desc: '주문 상태 변경의 원천. 결제 확정·실패·취소 이벤트를 발행하면 Order 상태가 전이된다', isSourceOfTruth: true },
-        { service: 'progression', desc: 'OrderCreatedEvent에 반응하여 소비. 아카이브·쿼타 진행도를 업데이트한다' },
+        { service: 'progression', desc: 'OrderCreatedEvent에 반응하여 소비. 아카이브·반복 보상 진행도를 업데이트한다' },
       ],
       children: [
         {

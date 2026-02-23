@@ -39,7 +39,7 @@ const paymentFlow: ServiceFlowData = {
       topic: 'progression-events',
       events: [
         { name: 'ArchiveClaimedEvent', action: '아카이브 보상 포인트 지급' },
-        { name: 'QuotaClaimedEvent', action: '쿼타 보상 포인트 지급' },
+        { name: 'QuotaClaimedEvent', action: '반복 보상 포인트 지급' },
         { name: 'SeasonPromotionRewardClaimedEvent', action: '시즌 프로모션 보상 포인트 지급' },
       ],
     },
@@ -51,10 +51,10 @@ const paymentContext: BoundedContextData = {
     {
       name: 'Payment',
       service: 'payment',
-      detail: '결제 확정 기록. 불변으로 이력을 쌓으며, 승인 또는 취소만 존재한다. 실패 시에는 기록을 생성하지 않는다. Cash Gateway 이벤트에 반응하여 생성된다.',
+      detail: '결제 확정 기록의 진실의 원천. 불변이며 승인·취소만 존재한다. 실패는 기록하지 않는다.',
       externals: [
-        { service: 'cashgw', desc: 'PaymentProcess가 결제 상태의 진실의 원천. 확정 이벤트를 발행하면 Payment가 생성된다', isSourceOfTruth: true },
-        { service: 'ecommerce', desc: 'Payment 이벤트에 반응하여 소비. Order 상태를 전이시킨다' },
+        { service: 'cashgw', desc: 'PaymentProcess 이벤트 발행. Payment 생성 트리거' },
+        { service: 'ecommerce', desc: 'Payment 이벤트 소비. Order 상태 전이' },
       ],
     },
     {
@@ -113,6 +113,82 @@ const ROLE_NODES: MiniFlowNode[] = [
 const ROLE_EDGES: MiniFlowEdge[] = [
   { source: 'role-cgw', target: 'role-payment', label: '리액티브', animated: true },
   { source: 'role-payment', target: 'role-ecommerce', label: '리액티브', animated: true },
+];
+
+/* ── 여담: @TransactionalEventListener → @EventListener 토폴로지 ── */
+
+const elPhaseStyle = { bg: '#1e293b', color: '#e2e8f0', border: '1px solid #475569', width: 160 };
+const elLockDanger = { bg: '#450a0a', color: '#fca5a5', border: '2px solid #dc2626', width: 180 };
+const elLockOk = { bg: '#14532d', color: '#86efac', border: '2px solid #22c55e', width: 180 };
+const elCommitBox = { bg: '#1e1b4b', color: '#a5b4fc', border: '2px dashed #6366f1', width: 80 };
+const elLabelBox = { bg: '#111827', color: '#9ca3af', border: '1px solid #374151', width: 200, fontWeight: 'bold' };
+
+// 토폴로지 A: BEFORE_COMMIT — flush 후 교차 락 → 데드락
+const BC_R1 = 0;
+const BC_R2 = 90;
+
+const BEFORE_COMMIT_NODES: MiniFlowNode[] = [
+  { id: 'bc-la', label: 'TX-A', x: 0, y: BC_R1, style: elLabelBox },
+  { id: 'bc-a-domain', label: '도메인 변경', x: 220, y: BC_R1,
+    style: elPhaseStyle, sourcePosition: 'right' },
+  { id: 'bc-a-flush', label: 'flush 완료\n(row X 점유)', x: 410, y: BC_R1,
+    style: elPhaseStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'bc-a-lock', label: 'BEFORE_COMMIT\nrow Y 락 대기', x: 620, y: BC_R1,
+    style: elLockDanger, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'bc-dead', label: 'DEADLOCK', x: 850, y: BC_R1 + 45,
+    style: { bg: '#450a0a', color: '#fca5a5', border: '2px solid #dc2626', width: 110, fontWeight: 'bold' }, targetPosition: 'left' },
+
+  { id: 'bc-lb', label: 'TX-B', x: 0, y: BC_R2, style: elLabelBox },
+  { id: 'bc-b-domain', label: '도메인 변경', x: 220, y: BC_R2,
+    style: elPhaseStyle, sourcePosition: 'right' },
+  { id: 'bc-b-flush', label: 'flush 완료\n(row Y 점유)', x: 410, y: BC_R2,
+    style: elPhaseStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'bc-b-lock', label: 'BEFORE_COMMIT\nrow X 락 대기', x: 620, y: BC_R2,
+    style: elLockDanger, targetPosition: 'left', sourcePosition: 'right' },
+];
+
+const BEFORE_COMMIT_EDGES: MiniFlowEdge[] = [
+  { source: 'bc-a-domain', target: 'bc-a-flush', color: '#475569' },
+  { source: 'bc-a-flush', target: 'bc-a-lock', color: '#dc2626', dashed: true },
+  { source: 'bc-a-lock', target: 'bc-dead', color: '#dc2626' },
+  { source: 'bc-b-domain', target: 'bc-b-flush', color: '#475569' },
+  { source: 'bc-b-flush', target: 'bc-b-lock', color: '#dc2626', dashed: true },
+  { source: 'bc-b-lock', target: 'bc-dead', color: '#dc2626' },
+];
+
+// 토폴로지 B: @EventListener — 즉시 락 선점 → 순차 처리
+const EV_R1 = 0;
+const EV_R2 = 90;
+
+const EVENT_LISTENER_NODES: MiniFlowNode[] = [
+  { id: 'ev-la', label: 'TX-A', x: 0, y: EV_R1, style: elLabelBox },
+  { id: 'ev-a-domain', label: '도메인 변경', x: 220, y: EV_R1,
+    style: elPhaseStyle, sourcePosition: 'right' },
+  { id: 'ev-a-lock', label: '@EventListener\n락 획득 (선점)', x: 410, y: EV_R1,
+    style: elLockOk, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ev-a-flush', label: 'flush', x: 620, y: EV_R1,
+    style: elPhaseStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ev-a-commit', label: 'COMMIT', x: 770, y: EV_R1,
+    style: elCommitBox, targetPosition: 'left' },
+
+  { id: 'ev-lb', label: 'TX-B', x: 0, y: EV_R2, style: elLabelBox },
+  { id: 'ev-b-domain', label: '도메인 변경', x: 220, y: EV_R2,
+    style: elPhaseStyle, sourcePosition: 'right' },
+  { id: 'ev-b-wait', label: '락 대기\n(TX-A 완료 후 획득)', x: 410, y: EV_R2,
+    style: { bg: '#1e293b', color: '#fbbf24', border: '1px solid #d97706', width: 180 }, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ev-b-flush', label: 'flush', x: 620, y: EV_R2,
+    style: elPhaseStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ev-b-commit', label: 'COMMIT', x: 770, y: EV_R2,
+    style: elCommitBox, targetPosition: 'left' },
+];
+
+const EVENT_LISTENER_EDGES: MiniFlowEdge[] = [
+  { source: 'ev-a-domain', target: 'ev-a-lock', label: '즉시', color: '#22c55e' },
+  { source: 'ev-a-lock', target: 'ev-a-flush', color: '#475569' },
+  { source: 'ev-a-flush', target: 'ev-a-commit', color: '#6366f1', dashed: true },
+  { source: 'ev-b-domain', target: 'ev-b-wait', label: '대기', color: '#d97706' },
+  { source: 'ev-b-wait', target: 'ev-b-flush', color: '#475569' },
+  { source: 'ev-b-flush', target: 'ev-b-commit', color: '#6366f1', dashed: true },
 ];
 
 /* ── 선차감 흐름 플로우 데이터 ── */
@@ -358,7 +434,35 @@ class AccountRepository : RecordRepository<Account> {
             label="payment-system"
             desc="이 프로젝트의 시작점이 되는 결제 시스템 레포지토리"
           />
+
+          <DocCard title="@TransactionalEventListener → @EventListener">
+            <DocParagraph>
+              Record 생성을 @TransactionalEventListener(BEFORE_COMMIT)로 처리했던 시기가 있었습니다.
+              트랜잭션 라이프사이클에 엮어 커밋 직전에 이력을 쌓는 구조였으나,
+              BEFORE_COMMIT 시점은 이미 flush가 완료된 뒤이므로 비관 락(findByIdForUpdate) 획득이 트랜잭션 후반부로 밀립니다.
+              동시 트랜잭션이 각자 flush를 마치고 BEFORE_COMMIT에서 서로의 락을 기다리는 교착 상태(데드락)에 더 취약해졌고,
+              이에 따라 @EventListener로 전환하여 락 획득을 트랜잭션 초기로 앞당겼습니다.
+            </DocParagraph>
+            <DocMiniFlow
+              nodes={BEFORE_COMMIT_NODES}
+              edges={BEFORE_COMMIT_EDGES}
+              direction="LR"
+              height={180}
+            />
+            <DocMiniFlow
+              nodes={EVENT_LISTENER_NODES}
+              edges={EVENT_LISTENER_EDGES}
+              direction="LR"
+              height={180}
+            />
+            <DocCallout>
+              BEFORE_COMMIT은 flush 이후에 실행되므로, 동시 트랜잭션이 각자 flush를 마친 뒤
+              서로의 비관 락을 기다리는 교착 상태에 빠질 수 있습니다.
+              @EventListener는 flush 이전에 락을 선점하므로 경합 구간이 짧아집니다.
+            </DocCallout>
+          </DocCard>
         </DocBlock>
+
       </div>
     ),
   },

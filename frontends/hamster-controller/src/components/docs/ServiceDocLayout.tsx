@@ -17,10 +17,13 @@ const HIGHLIGHT_RULES: HighlightRule[] = [
   { keyword: 'Cash Gateway', className: 'text-amber-400 font-semibold' },
   { keyword: 'Payment Service', className: 'text-red-400 font-semibold' },
   { keyword: 'Ecommerce', className: 'text-blue-400 font-semibold' },
+  { keyword: 'Progression Service', className: 'text-purple-400 font-semibold' },
   { keyword: 'Progression', className: 'text-purple-400 font-semibold' },
   { keyword: 'Notification', className: 'text-teal-400 font-semibold' },
   { keyword: 'Source of Truth', className: 'text-emerald-400 font-semibold' },
   { keyword: '진실의 원천', className: 'text-emerald-400 font-semibold' },
+  { keyword: '소유권', className: 'text-violet-300 font-semibold' },
+  { keyword: 'Ownership', className: 'text-violet-300 font-semibold' },
   { keyword: 'Product', className: 'text-cyan-400 font-semibold' },
   { keyword: '이벤트 소싱', className: 'text-rose-400 font-semibold' },
   { keyword: 'Outbox', className: 'text-orange-400 font-semibold' },
@@ -28,7 +31,9 @@ const HIGHLIGHT_RULES: HighlightRule[] = [
   { keyword: 'Webhook', className: 'text-orange-400 font-semibold' },
   { keyword: 'PG', className: 'text-pink-400 font-semibold' },
   { keyword: '사가 오케스트레이션', className: 'text-yellow-400 font-semibold' },
+  { keyword: '사가 코레오그래피', className: 'text-green-400 font-semibold' },
   { keyword: '최종 일관성', className: 'text-lime-400 font-semibold' },
+  { keyword: '아웃박스', className: 'text-orange-400 font-semibold' },
   { keyword: 'Keycloak', className: 'text-indigo-400 font-semibold' },
   { keyword: 'Bounded Context', className: 'text-violet-400 font-semibold' },
   { keyword: '자원', className: 'text-emerald-300 font-semibold' },
@@ -326,9 +331,9 @@ export function DocLink({ href, label, desc }: { href: string; label: string; de
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 px-4 py-3 rounded-lg border border-gray-800/60 bg-[#0d1628] hover:border-gray-700 hover:bg-[#111d35] transition-colors mb-3 group"
+      className="flex items-start gap-3 px-4 py-3 rounded-lg border border-blue-900/40 bg-blue-950/[0.15] hover:border-blue-700/50 hover:bg-blue-950/[0.25] transition-colors mb-3 group"
     >
-      <span className="shrink-0 mt-0.5 text-gray-500 group-hover:text-gray-400">
+      <span className="shrink-0 mt-0.5 text-blue-400/70 group-hover:text-blue-400">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
           <path d="M10 2h4v4" />
@@ -336,7 +341,7 @@ export function DocLink({ href, label, desc }: { href: string; label: string; de
         </svg>
       </span>
       <div className="min-w-0">
-        <div className="text-sm font-medium text-gray-300 group-hover:text-gray-200 truncate">{label}</div>
+        <div className="text-sm font-medium text-blue-300/80 group-hover:text-blue-300 truncate underline underline-offset-2 decoration-blue-500/30 group-hover:decoration-blue-400/50">{label}</div>
         {desc && <div className="text-xs text-gray-500 mt-0.5">{desc}</div>}
       </div>
     </a>

@@ -1,4 +1,4 @@
-import { ServiceDocLayout, DocBlock, DocParagraph, DocCard, DocCode, DocCallout, DocKeyValueList } from './ServiceDocLayout';
+import { ServiceDocLayout, DocBlock, DocParagraph, DocCard, DocCode, DocCallout } from './ServiceDocLayout';
 import type { DocSection } from './ServiceDocLayout';
 import { DocMiniFlow } from './DocMiniFlow';
 import type { MiniFlowNode, MiniFlowEdge } from './DocMiniFlow';
@@ -87,68 +87,6 @@ const RESTORE_EDGES: MiniFlowEdge[] = [
 ];
 
 /* ── 세션 라이프사이클 ── */
-
-const phaseStyle = { bg: '#312e81', color: '#c4b5fd', border: '2px solid #6366f1', width: 200 };
-const stepStyle = { bg: '#1e293b', color: '#e2e8f0', border: '1px solid #475569', width: 200 };
-const stepActiveStyle = { bg: '#14532d', color: '#86efac', border: '1px solid #22c55e', width: 220 };
-const stepDestroyStyle = { bg: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', width: 200 };
-
-const LIFECYCLE_NODES: MiniFlowNode[] = [
-  // Phase 1: Terraform Apply
-  { id: 'lc-p1', label: 'Phase 1\nTerraform Apply (5~8분)', x: 220, y: 0,
-    style: phaseStyle, sourcePosition: 'bottom' },
-  { id: 'lc-dispatch', label: 'workflow_dispatch\n트리거', x: 0, y: 100,
-    style: stepStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-apply', label: 'terraform init + apply', x: 220, y: 100,
-    style: stepStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-ec2', label: '8개 EC2 생성\ncloud-init Docker 배포', x: 440, y: 100,
-    style: stepStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-
-  // Phase 2: Active Runtime
-  { id: 'lc-p2', label: 'Phase 2\nActive Runtime (15분)', x: 220, y: 220,
-    style: { ...phaseStyle, bg: '#14532d', color: '#86efac', border: '2px solid #22c55e' }, sourcePosition: 'bottom' },
-  { id: 'lc-running', label: '서비스 정상 동작', x: 0, y: 320,
-    style: stepActiveStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-status', label: 'INFRA_STATUS\n실시간 업데이트', x: 220, y: 320,
-    style: stepActiveStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-polling', label: 'Controller\n5초 간격 폴링', x: 440, y: 320,
-    style: stepActiveStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-
-  // Phase 3: Terraform Destroy
-  { id: 'lc-p3', label: 'Phase 3\nTerraform Destroy (2~3분)', x: 220, y: 440,
-    style: { ...phaseStyle, bg: '#7f1d1d', color: '#fca5a5', border: '2px solid #dc2626' }, sourcePosition: 'bottom' },
-  { id: 'lc-timer', label: '타이머 만료', x: 0, y: 540,
-    style: stepDestroyStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-destroy', label: 'terraform destroy\n모든 EC2 삭제', x: 220, y: 540,
-    style: stepDestroyStyle, targetPosition: 'top', sourcePosition: 'bottom' },
-  { id: 'lc-reset', label: 'INFRA_STATUS\n초기화', x: 440, y: 540,
-    style: stepDestroyStyle, targetPosition: 'top' },
-];
-
-const LIFECYCLE_EDGES: MiniFlowEdge[] = [
-  // Phase 1 → steps
-  { source: 'lc-p1', target: 'lc-dispatch', color: '#6366f1' },
-  { source: 'lc-p1', target: 'lc-apply', color: '#6366f1' },
-  { source: 'lc-p1', target: 'lc-ec2', color: '#6366f1' },
-  // steps flow
-  { source: 'lc-dispatch', target: 'lc-apply', color: '#475569', dashed: true },
-  { source: 'lc-apply', target: 'lc-ec2', color: '#475569', dashed: true },
-  // Phase 1 → Phase 2
-  { source: 'lc-ec2', target: 'lc-p2', color: '#22c55e', animated: true, label: 'SSH 완료 확인' },
-  // Phase 2 → steps
-  { source: 'lc-p2', target: 'lc-running', color: '#22c55e' },
-  { source: 'lc-p2', target: 'lc-status', color: '#22c55e' },
-  { source: 'lc-p2', target: 'lc-polling', color: '#22c55e' },
-  // Phase 2 → Phase 3
-  { source: 'lc-running', target: 'lc-p3', color: '#dc2626', animated: true, label: '15분 경과' },
-  // Phase 3 → steps
-  { source: 'lc-p3', target: 'lc-timer', color: '#dc2626' },
-  { source: 'lc-p3', target: 'lc-destroy', color: '#dc2626' },
-  { source: 'lc-p3', target: 'lc-reset', color: '#dc2626' },
-  // steps flow
-  { source: 'lc-timer', target: 'lc-destroy', color: '#475569', dashed: true },
-  { source: 'lc-destroy', target: 'lc-reset', color: '#475569', dashed: true },
-];
 
 /* ── 인프라 토폴로지 ── */
 

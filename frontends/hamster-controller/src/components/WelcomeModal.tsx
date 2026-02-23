@@ -53,6 +53,7 @@ const SLIDES = [
     content: (idx: number) => (
       <div className="space-y-4">
         <SlideImage slideIndex={idx} />
+        {/* TODO: 내용 작성 예정
         <p className="text-gray-300 leading-relaxed text-base">
           Hamster World는{' '}
           <span className="text-amber-400 font-semibold">결제를 대행하는 PG Aggregator</span>를
@@ -69,6 +70,7 @@ const SLIDES = [
             AWS 프리티어
           </div>
         </div>
+        */}
         <p className="text-gray-500 text-sm leading-relaxed">
           이 페이지는 프로젝트 소개와 문서, 인프라 제어를 하나로 모은{' '}
           <span className="text-gray-300">포트폴리오 대시보드</span>입니다.

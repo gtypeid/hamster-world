@@ -1,5 +1,47 @@
-import { ServiceDocLayout, DocBlock, DocParagraph, DocCard, DocCode, DocCallout } from './ServiceDocLayout';
+import { ServiceDocLayout, DocBlock, DocParagraph, DocCallout } from './ServiceDocLayout';
+import { DocMiniFlow } from './DocMiniFlow';
+import type { MiniFlowNode, MiniFlowEdge } from './DocMiniFlow';
 import type { DocSection } from './ServiceDocLayout';
+
+/* ── 결제 흐름 토폴로지 데이터 ── */
+
+const cgwStyle = { bg: '#92400e', color: '#fef3c7', border: '1px solid #d97706' };
+const hpgStyle = { bg: '#831843', color: '#fbbf24', border: '1px solid #be185d' };
+const webhookStyle = { bg: '#4a044e', color: '#f0abfc', border: '1px solid #a855f7' };
+const entityStyle = { bg: '#1e293b', color: '#e2e8f0', border: '1px solid #475569', width: 180 };
+const schedulerStyle = { bg: '#0c4a6e', color: '#7dd3fc', border: '1px solid #0284c7' };
+
+// Line 1: Cash Gateway → REST → 햄스터 PG (ACK)
+// Line 2: 햄스터 PG 내부 — PaymentProcess → Scheduler → Payment
+// Line 3: Payment → Webhook → Cash Gateway
+const PG_FLOW_NODES: MiniFlowNode[] = [
+  // Line 1
+  { id: 'cgw', label: 'Cash Gateway', x: 0, y: 0, style: cgwStyle, sourcePosition: 'right' },
+  { id: 'hpg-api', label: '햄스터 PG\nREST API (ACK)', x: 250, y: 0, style: hpgStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'pp', label: 'PaymentProcess\n(PENDING)', x: 500, y: 0, style: entityStyle, targetPosition: 'left', sourcePosition: 'right' },
+  // Line 2
+  { id: 'scheduler', label: '폴링 스케줄러\n(2초 간격)', x: 500, y: 110, style: schedulerStyle, targetPosition: 'top', sourcePosition: 'right' },
+  { id: 'pp-final', label: 'PaymentProcess\n(SUCCESS / FAILED)', x: 750, y: 110, style: entityStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'payment', label: 'Payment\n(확정 결과)', x: 1000, y: 110, style: entityStyle, targetPosition: 'left', sourcePosition: 'bottom' },
+  // Line 3
+  { id: 'webhook', label: 'Webhook\n전송', x: 1000, y: 220, style: webhookStyle, targetPosition: 'top', sourcePosition: 'left' },
+  { id: 'cgw2', label: 'Cash Gateway', x: 750, y: 220, style: cgwStyle, targetPosition: 'right' },
+];
+
+const PG_FLOW_EDGES: MiniFlowEdge[] = [
+  // Line 1
+  { source: 'cgw', target: 'hpg-api', animated: true, label: 'HTTP' },
+  { source: 'hpg-api', target: 'pp', animated: true, label: '202 ACK' },
+  // Line 1 → Line 2
+  { source: 'pp', target: 'scheduler', dashed: true, color: '#334155' },
+  // Line 2
+  { source: 'scheduler', target: 'pp-final', animated: true, label: 'CAS 상태 전이' },
+  { source: 'pp-final', target: 'payment', animated: true, label: '이벤트' },
+  // Line 2 → Line 3
+  { source: 'payment', target: 'webhook', dashed: true, color: '#334155' },
+  // Line 3
+  { source: 'webhook', target: 'cgw2', animated: true, label: 'HTTP POST' },
+];
 
 const sections: DocSection[] = [
   {
@@ -8,8 +50,6 @@ const sections: DocSection[] = [
     children: [
       { key: 'svc-intent', label: '서비스 의도' },
       { key: 'svc-desc', label: '서비스 설명' },
-      { key: 'svc-design', label: '핵심 설계 및 코드' },
-      { key: 'svc-aside', label: '여담' },
     ],
     content: (
       <div className="space-y-8">
@@ -30,177 +70,16 @@ const sections: DocSection[] = [
         {/* 서비스 설명 */}
         <DocBlock id="svc-desc" title="서비스 설명">
           <DocParagraph>
-            Cash Gateway로부터 결제 요청을 REST API로 접수하고,
-            2초 간격 폴링 스케줄러로 비동기 처리한 뒤,
-            결과를 Webhook으로 Cash Gateway에 전달합니다.
+            Cash Gateway로부터 결제 요청을 REST API로 ACK 접수하고,
+            Cash Gateway와 동일하게 PaymentProcess, Payment로서 트랜잭션 라이프사이클을 분리하여
+            스케줄러로 비동기 처리한 뒤, 결과를 Webhook으로 Cash Gateway에 전달합니다.
             80% 확률로 성공, 20% 확률로 실패를 시뮬레이션합니다.
           </DocParagraph>
-          <DocCard title="엔티티 분리 — PaymentProcess vs Payment">
-            <DocParagraph>
-              거래 시도 이력(PaymentProcess)과 확정된 결과(Payment)를 분리합니다.
-              PaymentProcess는 PENDING → PROCESSING → SUCCESS/FAILED 전체 라이프사이클을 기록하고,
-              Payment는 CAS로 확정된 유의미한 결과만 기록합니다.
-            </DocParagraph>
-            <DocCode>{`PaymentProcess (거래 시도 이력)
-  PENDING → PROCESSING → SUCCESS or FAILED
-  모든 시도를 기록 (디버깅, 감사 목적)
-
-Payment (확정 결과)
-  COMPLETED or FAILED (중간 상태 없음)
-  PaymentProcessEventHandler를 통해서만 생성
-  Webhook은 Payment 기준으로 전송`}</DocCode>
-            <DocCallout>
-              PaymentProcess가 PROCESSING 상태에서 타임아웃되면 SUCCESS도 FAILED도 아닙니다.
-              이 경우 Payment는 생성되지 않으며, Webhook도 발송되지 않습니다.
-              PaymentProcess만 남아서 "시도했으나 결과 없음" 상태를 기록합니다.
-            </DocCallout>
-          </DocCard>
-          <DocCard title="MID — 가맹점 식별자 관리">
-            <DocParagraph>
-              PgMid는 가맹점에게 발급하는 식별 정보입니다.
-              midId(고유 식별자), apiKey(HMAC 서명 검증용), webhookUrl(결과 콜백 URL)을 관리합니다.
-              앱 시작 시 DataInitializer가 Cash Gateway용 더미 MID를 자동 생성합니다.
-            </DocParagraph>
-            <DocCode language="kotlin">{`// PgMid — 가맹점 식별 정보
-class PgMid(
-    val midId: String,          // "MID_1643961234_5678"
-    val merchantName: String,
-    val apiKey: String,         // UUID 기반 (HMAC 서명용)
-    val webhookUrl: String,     // 결과 콜백 URL
-    var isActive: Boolean = true
-)
-
-// 앱 시작 시 자동 생성
-companion object {
-    const val DUMMY_MID_ID = "hamster_dummy_mid_001"
-    const val WEBHOOK_PATH = "/api/webhook/pg/DUMMY"
-}`}</DocCode>
-          </DocCard>
-        </DocBlock>
-
-        {/* 핵심 설계 및 코드 */}
-        <DocBlock id="svc-design" title="핵심 설계 및 코드">
-          <DocCard title="결제 요청 접수 → 폴링 → Webhook 전체 흐름">
-            <DocCode>{`1. 결제 요청 접수
-   POST /api/payment-process → 202 Accepted (ACK만 반환)
-   PaymentProcess 생성 (status=PENDING)
-
-2. 폴링 스케줄러 (2초 간격)
-   SELECT WHERE status=PENDING LIMIT 10 (FIFO)
-   ├─ CAS Phase 1: PENDING → PROCESSING (선점)
-   ├─ 결과 생성: 80% 성공 / 20% 실패
-   └─ CAS Phase 2: PROCESSING → SUCCESS or FAILED
-
-3. 이벤트 발행 → Payment 생성
-   InternalPaymentProcessSucceededEvent → Payment(COMPLETED)
-   InternalPaymentProcessFailedEvent   → Payment(FAILED)
-
-4. Webhook 전송
-   WebClient POST → Cash Gateway webhookUrl
-   5초 타임아웃, 재시도 없음 (fire-and-forget)`}</DocCode>
-          </DocCard>
-
-          <DocCard title="CAS 기반 동시성 제어 — 2단계 상태 전이">
-            <DocParagraph>
-              모든 상태 전이는 CAS(Compare-And-Swap)로 수행됩니다.
-              QueryDSL UPDATE에 WHERE status = 기대상태 조건을 추가하여,
-              이미 다른 스케줄러가 처리 중인 건을 건너뜁니다.
-              반환값이 0이면 이미 처리된 것이므로 무시합니다.
-            </DocParagraph>
-            <DocCode language="kotlin">{`// CAS Phase 1: PENDING → PROCESSING (선점)
-fun casUpdateToProcessing(id: Long, expectedStatus, newStatus, processingStartedAt): Int {
-    return jpaQueryFactory
-        .update(qPaymentProcess)
-        .set(qPaymentProcess.status, newStatus)
-        .set(qPaymentProcess.processingStartedAt, processingStartedAt)
-        .where(
-            qPaymentProcess.id.eq(id)
-                .and(qPaymentProcess.status.eq(expectedStatus))  // CAS 조건
-        )
-        .execute().toInt()
-}
-
-// CAS Phase 2: PROCESSING → SUCCESS/FAILED (최종)
-fun casUpdateToFinal(id: Long, expectedStatus, newStatus, approvalNo, failReason, processedAt): Int {
-    return jpaQueryFactory
-        .update(qPaymentProcess)
-        .set(qPaymentProcess.status, newStatus)
-        .set(qPaymentProcess.approvalNo, approvalNo)
-        .set(qPaymentProcess.failReason, failReason)
-        .set(qPaymentProcess.processedAt, processedAt)
-        .where(
-            qPaymentProcess.id.eq(id)
-                .and(qPaymentProcess.status.eq(expectedStatus))
-        )
-        .execute().toInt()
-}`}</DocCode>
-          </DocCard>
-
-          <DocCard title="실패 시뮬레이션">
-            <DocParagraph>
-              20% 확률로 실패 시 5가지 사유 중 하나를 랜덤 선택합니다.
-              실제 PG의 실패 유형을 모방하여 Cash Gateway의 에러 처리 로직을 테스트할 수 있습니다.
-            </DocParagraph>
-            <DocCode language="kotlin">{`companion object {
-    private const val SUCCESS_RATE = 80
-    private val FAIL_REASONS = listOf(
-        "INSUFFICIENT_BALANCE",  // 잔액 부족
-        "INVALID_CARD",          // 유효하지 않은 카드
-        "EXPIRED_CARD",          // 만료된 카드
-        "LIMIT_EXCEEDED",        // 한도 초과
-        "STOLEN_CARD"            // 도난 카드
-    )
-}
-
-val isSuccess = Random.nextInt(100) < SUCCESS_RATE  // 0~79: 성공
-val failReason = FAIL_REASONS.random()              // 랜덤 사유`}</DocCode>
-          </DocCard>
-
-          <DocCard title="Webhook 전송 — Fire-and-Forget">
-            <DocParagraph>
-              Payment가 생성되면 NotificationService가 WebClient로 Webhook을 전송합니다.
-              MID의 webhookUrl을 조회하여 결과 페이로드를 전달하며,
-              5초 타임아웃 내에 응답하지 않으면 실패로 기록합니다.
-              재시도는 하지 않으며, 필요 시 수동 재발송 API를 제공합니다.
-            </DocParagraph>
-            <DocCode language="kotlin">{`// NotificationService — Webhook 발송
-fun sendNotification(payment: Payment) {
-    val pgMid = pgMidService.getMid(payment.midId)
-
-    try {
-        webClient.post()
-            .uri(pgMid.webhookUrl)
-            .bodyValue(buildPayload(payment))  // tid, status, amount, echo, ...
-            .retrieve()
-            .toBodilessEntity()
-            .timeout(Duration.ofSeconds(5))
-            .block()
-
-        payment.markNotificationSent()
-    } catch (e: Exception) {
-        payment.markNotificationFailed(e.message ?: "Unknown error")
-    }
-    paymentRepository.save(payment)
-}
-
-// 페이로드 구조
-private fun buildPayload(payment: Payment) = mapOf(
-    "tid" to payment.tid, "midId" to payment.midId,
-    "status" to payment.status.name, "amount" to payment.amount,
-    "approvalNo" to payment.approvalNo, "failureReason" to payment.failureReason,
-    "echo" to payment.echo  // Cash Gateway가 보낸 원본 데이터 반환
-)`}</DocCode>
-          </DocCard>
-        </DocBlock>
-
-        {/* 여담 */}
-        <DocBlock id="svc-aside" title="여담">
-          <DocParagraph>
-            햄스터 PG는 Cash Gateway의 폴링 기반 PG 통신 패턴과 동일한 구조를 사용합니다.
-            Cash Gateway가 UNKNOWN → PENDING(폴링 전송) → SUCCESS/FAILED(Webhook 수신) 흐름을 따르듯,
-            햄스터 PG도 PENDING → PROCESSING(폴링 처리) → SUCCESS/FAILED(Webhook 전송) 흐름을 따릅니다.
-            양쪽이 대칭적으로 동작하여 전체 결제 플로우를 완결합니다.
-          </DocParagraph>
+          <DocMiniFlow
+            nodes={PG_FLOW_NODES}
+            edges={PG_FLOW_EDGES}
+            ownerService="햄스터 PG"
+          />
         </DocBlock>
       </div>
     ),

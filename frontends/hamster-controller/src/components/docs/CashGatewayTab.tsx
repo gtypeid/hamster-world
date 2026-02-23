@@ -29,20 +29,10 @@ const cashGatewayContext: BoundedContextData = {
     {
       name: 'PaymentProcess',
       service: 'cashgw',
-      detail: 'PG 결제 거래의 진실의 원천. 요청부터 Webhook 응답까지 전체 통신 이력과 상태 전이를 기록한다. 승인·실패·취소 결과를 이벤트로 발행한다.',
+      detail: 'PG 결제 통신의 진실의 원천. CAS 기반 상태 머신으로 승인·실패·취소를 이벤트로 발행한다.',
       externals: [
-        { service: 'payment', desc: 'OrderStockReservedEvent를 발행하여 PG 결제 실행을 트리거하는 쪽' },
-      ],
-      children: [
-        {
-          name: 'Payment',
-          service: 'cashgw',
-          detail: 'PaymentProcess 이벤트에 반응하여 생성되는 결제 확정 기록. 불변으로 승인·취소 이력을 쌓으며, 재고·정산 처리를 트리거한다.',
-          externals: [
-            { service: 'payment', desc: 'Payment 이벤트에 반응하여 소비. 재고 차감·정산·잔액 처리를 수행한다' },
-            { service: 'ecommerce', desc: 'Payment 이벤트에 반응하여 소비. Order 상태를 전이시킨다' },
-          ],
-        },
+        { service: 'payment', desc: '결제 트리거(OrderStockReservedEvent) 및 확정 기록(Payment) 생성' },
+        { service: 'ecommerce', desc: 'Order 상태 전이' },
       ],
     },
     {
@@ -183,6 +173,46 @@ const STATE_EDGES: MiniFlowEdge[] = [
   { source: 'st-webhook', target: 'st-failed', label: '실패', color: '#dc2626' },
   // 취소
   { source: 'st-success', target: 'st-cancelled', label: '취소 요청', color: '#a855f7' },
+];
+
+/* ── 여담: 엔티티 소유권 변천 토폴로지 ── */
+
+// Before: 모놀리식 — PaymentAttempt + Payment 모두 원형 서비스에 존재
+const monoStyle = { bg: '#92400e', color: '#fef3c7', border: '2px solid #d97706', width: 270 };
+const monoEntityStyle = { bg: '#1e293b', color: '#e2e8f0', border: '1px solid #475569', width: 180 };
+
+const BEFORE_ENTITY_NODES: MiniFlowNode[] = [
+  { id: 'be-cgw', label: 'payment-system\n(원형 서비스, 모놀리식)', x: 0, y: 40,
+    style: monoStyle, sourcePosition: 'right' },
+  { id: 'be-attempt', label: 'PaymentAttempt\nREQUIRES_NEW (이력)', x: 340, y: 0,
+    style: monoEntityStyle, targetPosition: 'left' },
+  { id: 'be-payment', label: 'Payment\n불변 확정 기록', x: 340, y: 80,
+    style: monoEntityStyle, targetPosition: 'left' },
+];
+const BEFORE_ENTITY_EDGES: MiniFlowEdge[] = [
+  { source: 'be-cgw', target: 'be-attempt', color: '#d97706', label: '소유' },
+  { source: 'be-cgw', target: 'be-payment', color: '#d97706', label: '소유' },
+];
+
+// After: EDA — PaymentProcess는 Cash Gateway, Payment는 Payment Service로 분리
+const cgwBoxStyle = { bg: '#92400e', color: '#fef3c7', border: '2px solid #d97706', width: 200 };
+const payBoxStyle = { bg: '#7f1d1d', color: '#fca5a5', border: '2px solid #dc2626', width: 200 };
+const entityStyle = { bg: '#1e293b', color: '#e2e8f0', border: '1px solid #475569', width: 170 };
+
+const AFTER_ENTITY_NODES: MiniFlowNode[] = [
+  { id: 'ae-cgw', label: 'Cash Gateway', x: 0, y: 40,
+    style: cgwBoxStyle, sourcePosition: 'right' },
+  { id: 'ae-process', label: 'PaymentProcess\nMANDATORY (상태 머신)', x: 250, y: 40,
+    style: entityStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ae-pay-svc', label: 'Payment Service', x: 520, y: 40,
+    style: payBoxStyle, targetPosition: 'left', sourcePosition: 'right' },
+  { id: 'ae-payment', label: 'Payment\n불변 확정 기록', x: 770, y: 40,
+    style: entityStyle, targetPosition: 'left' },
+];
+const AFTER_ENTITY_EDGES: MiniFlowEdge[] = [
+  { source: 'ae-cgw', target: 'ae-process', color: '#d97706', label: '소유' },
+  { source: 'ae-process', target: 'ae-pay-svc', color: '#dc2626', animated: true, label: '이벤트' },
+  { source: 'ae-pay-svc', target: 'ae-payment', color: '#dc2626', label: '소유' },
 ];
 
 const sections: DocSection[] = [
@@ -368,6 +398,49 @@ class TossPaymentGatewayProvider : PaymentGatewayProvider { ... }`}</DocCode>
             label="payment-system"
             desc="이 프로젝트의 시작점이 되는 결제 시스템 레포지토리"
           />
+
+          <DocCard title="PaymentProcess (formerly PaymentAttempt)">
+            <DocParagraph>
+              기존 모놀리식 구조에서는 PaymentAttempt를 외부 결제 요청에 대한 이력 엔티티로 사용했으며,
+              이력은 항상 남아야 하므로 REQUIRES_NEW 트랜잭션으로 관리했습니다.
+              이벤트 지향 아키텍처로 전환하면서 결제 결과는 비동기 Webhook으로 확정되는 구조가 되었고,
+              PaymentAttempt는 더 이상 &quot;무조건 남아야 하는 이력&quot;이 아니라,
+              결제 확정 이전의 의사(Intent)와 상태(State)를 표현하는 도메인 엔티티이자
+              트랜잭션 내에서 상태 전이가 이루어지는 상태 머신의 성향을 갖게 되었습니다.
+              이에 따라 MANDATORY 트랜잭션으로 전환하고, 이름도 PaymentProcess로 변경했습니다.
+            </DocParagraph>
+            <DocCode language="kotlin">{`// 모놀리식: 이력이므로 독립 트랜잭션으로 항상 기록
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+fun createAttempt(request: PaymentRequest): PaymentAttempt { ... }`}</DocCode>
+            <DocMiniFlow
+              nodes={BEFORE_ENTITY_NODES}
+              edges={BEFORE_ENTITY_EDGES}
+              direction="LR"
+              height={160}
+            />
+            <DocCode language="kotlin">{`// 현재: 상태 머신이므로 호출자의 트랜잭션에 참여
+@Transactional(propagation = Propagation.MANDATORY)
+fun payment(paymentCtx: ApprovePaymentCtx) {
+    val process = domainConverterAdapter.convert(...)
+    process.requestPayload = jsonBody
+    paymentGatewayCoreService.handleRequest(process)  // UNKNOWN 상태 저장
+}`}</DocCode>
+            <DocMiniFlow
+              nodes={AFTER_ENTITY_NODES}
+              edges={AFTER_ENTITY_EDGES}
+              direction="LR"
+              height={180}
+            />
+            <DocCallout>
+              PaymentProcess는 상태 전이가 있는 가변 엔티티(CAS 기반)이고,
+              Payment는 불변의 확정 기록입니다.
+              처음에는 둘 다 Cash Gateway에 있었으나,
+              결제 확정 기록의 진실의 원천이 두 서비스에 동시에 존재할 수 없으므로
+              Payment를 Payment Service로 이동했습니다.
+              외부 요청의 원본 이력 보존에 의한 REQUIRES_NEW에 준하는 비즈니스 기록이 필요하다면,
+              PaymentLog와 같은 별도의 사실(Fact) 기록 엔티티를 추가 예정입니다.
+            </DocCallout>
+          </DocCard>
         </DocBlock>
       </div>
     ),
