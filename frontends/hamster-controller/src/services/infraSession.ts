@@ -414,6 +414,7 @@ export interface InfraVariableStatus {
   instances?: Record<string, {
     status: string;
     ip?: string;
+    publicIp?: string;
     detail?: string;
   }>;
   updatedAt?: string;

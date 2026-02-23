@@ -19,8 +19,10 @@ _IVAR="https://api.github.com/repos/$${GH_REPO}/actions/variables/INFRA_STATUS"
 _AUTH="Authorization: Bearer $${GH_DEPLOY_TOKEN}"
 push_infra_status() {
   [ -z "$${GH_DEPLOY_TOKEN}" ] && return 0
-  local s="$1" ip="$${2:-}"
-  local d; [ -n "$ip" ] && d="{\"status\":\"$s\",\"ip\":\"$ip\"}" || d="{\"status\":\"$s\"}"
+  local s="$1" ip="$${2:-}" pub="$${3:-}"
+  local d="{\"status\":\"$s\"}"
+  [ -n "$ip" ]  && d=$(echo "$d" | jq --arg v "$ip"  '.ip=$v')
+  [ -n "$pub" ] && d=$(echo "$d" | jq --arg v "$pub" '.publicIp=$v')
   for i in 1 2 3; do
     local c; c=$(curl -sf -H "$_AUTH" "$_IVAR" | jq -r '.value // "{}"')
     local m; m=$(echo "$c" | jq --arg n "$INSTANCE_NAME" --argjson d "$d" '.instances[$n]=$d|.updatedAt=(now|todate)')
@@ -38,9 +40,10 @@ push_infra_status() {
 # IMDSv2: 토큰 발급 → 메타데이터 조회 (Amazon Linux 2023 기본값이 IMDSv2 required)
 TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4 || echo "")
 
-report_status "인스턴스 시작 (IP: $PRIVATE_IP)"
-push_infra_status "provisioning" "$PRIVATE_IP"
+report_status "인스턴스 시작 (Private: $PRIVATE_IP, Public: $PUBLIC_IP)"
+push_infra_status "provisioning" "$PRIVATE_IP" "$PUBLIC_IP"
 
 cat << 'DEPLOY_EOF' > /tmp/deploy.sh
 ${deploy_script}
@@ -51,7 +54,7 @@ if bash /tmp/deploy.sh; then
   report_status "배포 스크립트 완료"
 else
   report_status "배포 스크립트 실패 (exit code: $?)" "failure"
-  push_infra_status "failed" "$PRIVATE_IP"
+  push_infra_status "failed" "$PRIVATE_IP" "$PUBLIC_IP"
   exit 1
 fi
 
@@ -65,4 +68,4 @@ if command -v docker &> /dev/null; then
 fi
 
 report_status "가동 완료" "success"
-push_infra_status "running" "$PRIVATE_IP"
+push_infra_status "running" "$PRIVATE_IP" "$PUBLIC_IP"

@@ -22,7 +22,8 @@ export interface InstanceState {
   id: InstanceId;
   label: string;
   status: InstanceStatus;
-  ip?: string;
+  ip?: string;              // private IP
+  publicIp?: string;        // public IP
   services: string[];       // e.g. ["MySQL 8.0", "MongoDB 7.0"]
   sg: SecurityGroup;        // security group
   ports: string[];          // e.g. [":3306", ":27017"]

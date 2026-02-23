@@ -46,7 +46,7 @@ function simulateDeployment() {
     {
       delay: 3000,
       action: () => {
-        updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5' });
+        updateInstance('hamster-db', { status: 'running', ip: '172.31.10.5', publicIp: '3.35.40.11' });
         addLog({ instanceId: 'hamster-db', message: 'MySQL 8.0 가동 (:3306), 데이터베이스 8개 생성', level: 'success' });
         addLog({ instanceId: 'hamster-db', message: 'MongoDB 7.0 가동 (:27017)', level: 'success' });
       },
@@ -63,14 +63,14 @@ function simulateDeployment() {
     {
       delay: 2500,
       action: () => {
-        updateInstance('hamster-kafka', { status: 'running', ip: '172.31.10.8' });
+        updateInstance('hamster-kafka', { status: 'running', ip: '172.31.10.8', publicIp: '3.35.40.12' });
         addLog({ instanceId: 'hamster-kafka', message: 'Kafka 7.5 KRaft 브로커 준비 완료 (:9092, :9093)', level: 'success' });
       },
     },
     {
       delay: 2000,
       action: () => {
-        updateInstance('hamster-auth', { status: 'running', ip: '172.31.10.6' });
+        updateInstance('hamster-auth', { status: 'running', ip: '172.31.10.6', publicIp: '3.35.40.13' });
         addLog({ instanceId: 'hamster-auth', message: 'Keycloak 23.0 가동 (:8090), realm 임포트 완료', level: 'success' });
       },
     },
@@ -87,28 +87,28 @@ function simulateDeployment() {
     {
       delay: 2500,
       action: () => {
-        updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11' });
+        updateInstance('hamster-commerce', { status: 'running', ip: '172.31.10.11', publicIp: '3.35.40.14' });
         addLog({ instanceId: 'hamster-commerce', message: 'eCommerce API 준비 완료 (:8080)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
-        updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12' });
+        updateInstance('hamster-billing', { status: 'running', ip: '172.31.10.12', publicIp: '3.35.40.15' });
         addLog({ instanceId: 'hamster-billing', message: 'Cash Gateway 가동 (:8082), Hamster PG 가동 (:8086)', level: 'success' });
       },
     },
     {
       delay: 1000,
       action: () => {
-        updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13' });
+        updateInstance('hamster-payment', { status: 'running', ip: '172.31.10.13', publicIp: '3.35.40.16' });
         addLog({ instanceId: 'hamster-payment', message: 'Payment Service 가동 (:8083)', level: 'success' });
       },
     },
     {
       delay: 1500,
       action: () => {
-        updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14' });
+        updateInstance('hamster-support', { status: 'running', ip: '172.31.10.14', publicIp: '3.35.40.17' });
         addLog({ instanceId: 'hamster-support', message: 'Progression 가동 (:8084), Notification 가동 (:8085)', level: 'success' });
       },
     },
@@ -122,7 +122,7 @@ function simulateDeployment() {
     {
       delay: 3000,
       action: () => {
-        updateInstance('hamster-front', { status: 'running', ip: '3.35.42.117' });
+        updateInstance('hamster-front', { status: 'running', ip: '172.31.10.18', publicIp: '3.35.42.117' });
         addLog({ instanceId: 'hamster-front', message: 'Nginx (:80) + React 앱 4개 배포 완료', level: 'success' });
         addLog({ message: `전체 ${INSTANCE_IDS.length}개 인스턴스 온라인 - 인프라 준비 완료`, level: 'success' });
         setSessionPhase('running');

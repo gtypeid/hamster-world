@@ -247,7 +247,7 @@ function handlePhaseTransition(detected: WorkflowPhase): void {
  * 워크플로우 sh가 PATCH로 업데이트한 JSON을 poll하여 인스턴스 상태를 실시간 반영.
  *
  * variable JSON 형태:
- *   { instances: { "hamster-db": { status: "running", ip: "10.0.1.5" }, ... } }
+ *   { instances: { "hamster-db": { status: "running", ip: "10.0.1.5", publicIp: "3.35.x.x" }, ... } }
  */
 function applyInfraVariable(infraVar: InfraVariableStatus): number {
   const { updateInstance, addLog, instances } = useInfraStore.getState();
@@ -261,7 +261,7 @@ function applyInfraVariable(infraVar: InfraVariableStatus): number {
     if (!INSTANCE_IDS.includes(instanceId)) continue;
 
     const prevStatus = instances[instanceId]?.status ?? 'none';
-    const update: Partial<{ status: InstanceStatus; ip: string; detail: string }> = {};
+    const update: Partial<{ status: InstanceStatus; ip: string; publicIp: string; detail: string }> = {};
 
     // status 매핑: variable의 status → store의 InstanceStatus
     switch (info.status) {
@@ -286,6 +286,7 @@ function applyInfraVariable(infraVar: InfraVariableStatus): number {
     }
 
     if (info.ip) update.ip = info.ip;
+    if (info.publicIp) update.publicIp = info.publicIp;
     if (info.detail) update.detail = info.detail;
 
     if (Object.keys(update).length > 0) {
@@ -335,9 +336,11 @@ function applyInfraVariable(infraVar: InfraVariableStatus): number {
         // 상태 전환 로그에서 이미 IP를 포함했으면 중복 방지
         const transKey = `transition-${instanceId}-${update.status}`;
         if (!loggedEvents.has(transKey) || !update.status || update.status === prevStatus) {
+          const ipParts = [`🔒 ${info.ip}`];
+          if (info.publicIp) ipParts.push(`🌐 ${info.publicIp}`);
           addLog({
             instanceId,
-            message: `IP 할당: ${info.ip}`,
+            message: `IP 할당: ${ipParts.join('  ')}`,
             level: 'info',
           });
         }

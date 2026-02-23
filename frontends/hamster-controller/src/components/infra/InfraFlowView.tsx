@@ -350,10 +350,15 @@ export function InfraFlowView() {
                   8 DBs: ecommerce, delivery, cash_gw, payment, progression, notification, hamster_pg, keycloak
                 </div>
               )}
-              {inst.ip && (
-                <div className="text-[8px] mt-0.5 font-mono px-1 py-0.5 rounded"
-                  style={{ background: 'rgba(0,0,0,0.4)', color: '#4ade80' }}>
-                  {inst.ip}
+              {(inst.ip || inst.publicIp) && (
+                <div className="text-[7px] mt-0.5 font-mono px-1 py-0.5 rounded space-y-px"
+                  style={{ background: 'rgba(0,0,0,0.4)' }}>
+                  {inst.ip && (
+                    <div style={{ color: '#4ade80' }}>🔒 {inst.ip}</div>
+                  )}
+                  {inst.publicIp && (
+                    <div style={{ color: '#38bdf8' }}>🌐 {inst.publicIp}</div>
+                  )}
                 </div>
               )}
             </div>
