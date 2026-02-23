@@ -20,19 +20,16 @@ _AUTH="Authorization: Bearer $${GH_DEPLOY_TOKEN}"
 push_infra_status() {
   [ -z "$${GH_DEPLOY_TOKEN}" ] && return 0
   local s="$1" ip="$${2:-}" pub="$${3:-}"
-  local d="{\"status\":\"$s\"}"
-  [ -n "$ip" ]  && d=$(echo "$d" | jq --arg v "$ip"  '.ip=$v')
-  [ -n "$pub" ] && d=$(echo "$d" | jq --arg v "$pub" '.publicIp=$v')
+  local d="{\"status\":\"$s\""
+  [ -n "$ip" ]  && d="$d,\"ip\":\"$ip\""
+  [ -n "$pub" ] && d="$d,\"publicIp\":\"$pub\""
+  d="$d}"
   for i in 1 2 3; do
     local c; c=$(curl -sf -H "$_AUTH" "$_IVAR" | jq -r '.value // "{}"')
     local m; m=$(echo "$c" | jq --arg n "$INSTANCE_NAME" --argjson d "$d" '.instances[$n]=$d|.updatedAt=(now|todate)')
     local e; e=$(echo "$m" | jq -Rs '.')
     curl -sf -X PATCH -H "$_AUTH" -H "Accept: application/vnd.github.v3+json" -d "{\"value\":$e}" "$_IVAR"
-    # 원래 코드: [ $i -lt 3 ] && sleep 1
-    # 문제: i=3일 때 [ 3 -lt 3 ]이 false(exit 1)를 반환하고, && 체인의 전체 exit code가 1이 된다.
-    #       이 1이 for 루프 → 함수 반환값으로 전파되어, 호출 지점에서 set -e가 스크립트를 종료시킨다.
-    #       (&&/|| 내부의 개별 명령은 set -e에서 보호되지만, 전체 표현식의 exit code는 보호되지 않는다)
-    # 수정: if 문은 조건이 false여도 전체 문장의 exit code가 0이므로 set -e를 발동시키지 않는다.
+    # if: false여도 exit 0이므로 set -e 안전 ([ ] && sleep은 exit 1 전파됨)
     if [ $i -lt 3 ]; then sleep 1; fi
   done
 }
