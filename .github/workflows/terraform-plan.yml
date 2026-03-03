@@ -41,6 +41,7 @@ jobs:
           TF_VAR_db_root_password: ${{ secrets.DB_ROOT_PASSWORD }}
           TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
           TF_VAR_mongo_password: ${{ secrets.MONGO_PASSWORD }}
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME }}
 
       - name: Generate Infrastructure Report
         run: |
