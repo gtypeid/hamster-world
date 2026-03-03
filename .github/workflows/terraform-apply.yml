@@ -53,6 +53,8 @@ env:
   # provisioner "remote-exec"용 SSH 키 경로
   # cloud-init 완료를 대기하여 user_data 실패 시 apply를 중단시킨다.
   TF_VAR_ssh_private_key_path: /tmp/aws_ssh_key
+  # Route 53 DNS (도메인 연결, 비워두면 DNS 설정 생략)
+  TF_VAR_domain_name: ${{ vars.DOMAIN_NAME }}
   # destroying/idle INFRA_STATUS push용 (워크플로우 step에서 직접 사용)
   GH_API: https://api.github.com
   GH_REPO: ${{ github.repository }}

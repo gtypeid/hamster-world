@@ -26,3 +26,9 @@ variable "github_repo" {
   default     = ""
   description = "GitHub repository (owner/repo format)"
 }
+
+# Route 53 DNS (도메인 연결)
+variable "domain_name" {
+  default     = ""
+  description = "Route 53 호스팅 영역에 등록된 도메인 (예: mysite.com). 비워두면 DNS 설정 생략."
+}
