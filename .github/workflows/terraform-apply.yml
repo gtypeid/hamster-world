@@ -66,9 +66,9 @@ jobs:
       contents: read
       actions: write          # Repository Variables API (INFRA_STATUS) 업데이트
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: 1.7.0
           # wrapper 기본값(true)이면 terraform 명령 출력에 메타데이터가 섞인다.
