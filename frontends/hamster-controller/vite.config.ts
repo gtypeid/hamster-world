@@ -1,0 +1,26 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  base: process.env.VITE_BASE || '/hamster-controller/',
+  resolve: {
+    alias: {
+      '@common': path.resolve(__dirname, '../common'),
+    },
+    // common/ 디렉토리의 파일들이 hamster-controller의 node_modules를 사용하도록
+    dedupe: ['react', 'react-dom', 'reactflow', 'dagre'],
+  },
+  server: {
+    port: 3000,
+    proxy: {
+      '/lambda': {
+        target: 'https://gm3zsv5tr3v6sguwllhyekjlsy0nymab.lambda-url.ap-northeast-2.on.aws',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/lambda/, ''),
+      },
+    },
+  },
+})

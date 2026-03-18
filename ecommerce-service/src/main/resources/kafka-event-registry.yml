@@ -1,0 +1,17 @@
+event:
+  subscribes:
+    - topic: payment-events
+      events:
+        - PaymentConfirmedEvent
+        - PaymentProcessFailedEvent
+        - PaymentCancelConfirmedEvent
+        - ProductStockSynchronizedEvent
+        - AccountBalanceSynchronizedEvent
+        - OrderStockValidationFailedEvent
+
+  publishes:
+    - topic: ecommerce-events
+      events:
+        - ProductCreatedEvent
+        - StockAdjustmentRequestedEvent
+        - OrderCreatedEvent

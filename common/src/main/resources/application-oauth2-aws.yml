@@ -1,0 +1,9 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://${KEYCLOAK_HOST}:8090/keycloak/realms/hamster-world/protocol/openid-connect/certs
+
+keycloak:
+  server-url: http://${KEYCLOAK_HOST}:8090/keycloak

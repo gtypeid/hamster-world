@@ -1,0 +1,33 @@
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/hamster_pg_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+payment:
+  webhook:
+    base-url: http://${CASH_GATEWAY_HOST}:8082
+
+server:
+  port: 8086
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.hamsterpg: INFO

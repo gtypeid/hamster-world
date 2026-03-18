@@ -1,0 +1,63 @@
+package com.hamsterworld.cashgateway.domain.payment.event
+
+import com.hamsterworld.cashgateway.domain.paymentprocess.model.PaymentProcess
+import com.hamsterworld.cashgateway.web.event.CashGatewayDomainEvent
+import com.hamsterworld.common.tracing.TraceContextHolder
+import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
+import java.math.BigDecimal
+import java.time.LocalDateTime
+
+/**
+ * 결제 실패 이벤트
+ *
+ * **발행 시점**: PaymentProcess FAILED 처리 완료 (CoreService에서 직접 발행)
+ *
+ * **특징**: Payment 엔티티 없음 (실패는 PaymentProcess만 기록)
+ *
+ * **구독자**:
+ * - ecommerce-service: Order 상태 → PAYMENT_FAILED
+ */
+data class PaymentFailedEvent(
+    val processPublicId: String,    // PaymentProcess의 Public ID (Snowflake Base62)
+    val orderPublicId: String?,     // Order의 Public ID (Snowflake Base62)
+    val userKeycloakId: String,      // User의 Keycloak Subject ID (Cash Gateway 필수)
+    val provider: Provider?,
+    val cashGatewayMid: String,  // Cash Gateway MID (≠ PG MID)
+    val amount: BigDecimal,
+    val orderNumber: String?,
+    val code: String?,
+    val message: String?,
+    val reason: String?,
+    val originSource: String,
+    // DomainEvent 메타데이터 (OpenTelemetry trace context)
+    override val eventId: String = java.util.UUID.randomUUID().toString(),
+    override val traceId: String? = TraceContextHolder.getCurrentTraceId(),
+    override val spanId: String? = TraceContextHolder.getCurrentSpanId(),
+    override val occurredAt: LocalDateTime = LocalDateTime.now()
+) : CashGatewayDomainEvent(
+    aggregateId = orderPublicId ?: processPublicId,
+    // 내부 거래(주문 기반): Order / 외부 거래(독립 결제): PaymentProcess — CashGatewayDomainEvent KDoc 참고
+    aggregateType = if (orderPublicId != null) "Order" else "PaymentProcess",
+    eventId = eventId,
+    traceId = traceId,
+    spanId = spanId,
+    occurredAt = occurredAt
+) {
+    companion object {
+        fun from(process: PaymentProcess, reason: String?, userKeycloakId: String): PaymentFailedEvent {
+            return PaymentFailedEvent(
+                processPublicId = process.publicId,
+                orderPublicId = process.orderPublicId,
+                userKeycloakId = userKeycloakId,
+                provider = process.provider,
+                cashGatewayMid = process.cashGatewayMid,
+                amount = process.amount,
+                orderNumber = process.orderNumber,
+                code = process.code,
+                message = process.message,
+                reason = reason,
+                originSource = process.originSource ?: "UNKNOWN"  // nullable 처리
+            )
+        }
+    }
+}

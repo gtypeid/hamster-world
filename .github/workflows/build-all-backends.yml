@@ -1,0 +1,180 @@
+# 백엔드는 :latest 태그 하나만 빌드한다.
+# Spring은 SPRING_PROFILES_ACTIVE=aws 환경변수로 런타임에 환경을 결정하므로
+# 로컬/AWS 구분 없이 같은 이미지를 사용할 수 있다.
+# (프론트엔드는 Vite가 빌드 시점에 환경변수를 번들에 박아넣으므로 :aws 별도 이미지 필요)
+name: Build All Backends
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  ecommerce:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :ecommerce-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=ecommerce-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-ecommerce:latest
+
+  cash-gateway:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :cash-gateway-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=cash-gateway-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-cash-gateway:latest
+
+  payment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :payment-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=payment-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-payment:latest
+
+  hamster-pg:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :hamster-pg-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=hamster-pg-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-pg:latest
+
+  progression:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :progression-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=progression-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-progression:latest
+
+  notification:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Build JAR
+        run: ./gradlew :notification-service:bootJar -x test --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: JAR_FILE=notification-service/build/libs/*.jar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hamster-notification:latest

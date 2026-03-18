@@ -1,0 +1,190 @@
+# ============================================================================
+# Terraform Apply — 인프라 생성 및 시한부 운영 워크플로우
+# ============================================================================
+#
+# 이 워크플로우의 역할은 두 가지뿐이다:
+#   1. terraform apply  — 인프라 생성
+#   2. terraform destroy — 인프라 파괴 (정상 완료, 실패, cancel 모든 경우)
+#
+# Destroy를 같은 워크플로우에서 실행하는 이유:
+#   - terraform state가 local backend(러너 파일시스템)에 저장된다.
+#   - apply가 생성한 state 파일이 같은 러너에 남아있어야 destroy가 가능하다.
+#   - 별도 워크플로우로 분리하면 state가 없어 어떤 리소스를 파괴해야 하는지 모른다.
+#
+# 인스턴스별 실시간 상태(INFRA_STATUS)를 이 워크플로우가 직접 관리하지 않는 이유:
+#   - 인스턴스 생성(provisioning/running) 상태는 각 VM이 부팅 시 user_data
+#     (deploy-template.sh)에서 직접 GitHub Variables API에 push한다.
+#     워크플로우는 apply 명령을 실행할 뿐, 개별 인스턴스의 부팅 완료 시점을 모른다.
+#   - 초기화(pending 리셋)는 클라이언트(프론트엔드)가 디스패치 직전에 수행한다.
+#     워크플로우의 관심사가 아니다.
+#   - 단, destroying/idle는 VM이 죽은 후에는 보고할 수 없으므로
+#     워크플로우에서만 push할 수 있다. 이 두 단계만 여기서 처리한다.
+# ============================================================================
+
+name: Terraform Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Total workflow duration including destroy (minutes)'
+        required: true
+        default: '20'
+        type: string
+      cooldown:
+        description: 'Cooldown buffer for destroy phase (minutes)'
+        required: true
+        default: '5'
+        type: string
+
+defaults:
+  run:
+    working-directory: terraform
+
+env:
+  TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+  TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+  TF_VAR_db_root_password: ${{ secrets.DB_ROOT_PASSWORD }}
+  TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+  TF_VAR_mongo_password: ${{ secrets.MONGO_PASSWORD }}
+  # VM이 INFRA_STATUS를 push하기 위한 토큰 + repo 정보
+  TF_VAR_github_token: ${{ secrets.GH_DEPLOY_TOKEN }}
+  TF_VAR_github_repo: ${{ github.repository }}
+  # provisioner "remote-exec"용 SSH 키 경로
+  # cloud-init 완료를 대기하여 user_data 실패 시 apply를 중단시킨다.
+  TF_VAR_ssh_private_key_path: /tmp/aws_ssh_key
+  # Route 53 DNS (도메인 연결, 비워두면 DNS 설정 생략)
+  TF_VAR_domain_name: ${{ vars.DOMAIN_NAME }}
+  # destroying/idle INFRA_STATUS push용 (워크플로우 step에서 직접 사용)
+  GH_API: https://api.github.com
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write          # Repository Variables API (INFRA_STATUS) 업데이트
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.7.0
+          # wrapper 기본값(true)이면 terraform 명령 출력에 메타데이터가 섞인다.
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      # provisioner "remote-exec"가 각 인스턴스에 SSH 접속하기 위한 키 설정.
+      # terraform apply 중 provisioner가 cloud-init status --wait를 실행하려면
+      # SSH 프라이빗 키가 러너 파일시스템에 있어야 한다.
+      # 키 경로는 TF_VAR_ssh_private_key_path(/tmp/aws_ssh_key)와 일치해야 한다.
+      - name: Setup SSH key for provisioner
+        run: |
+          echo "${{ secrets.AWS_SSH_KEY }}" > /tmp/aws_ssh_key
+          chmod 600 /tmp/aws_ssh_key
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+
+      - name: Wait for active runtime
+        run: |
+          ACTIVE=$(( ${{ inputs.duration }} - ${{ inputs.cooldown }} ))
+          echo "Session started. Active runtime: ${ACTIVE} minutes (total ${{ inputs.duration }}, cooldown ${{ inputs.cooldown }})"
+          sleep $(( ACTIVE * 60 ))
+
+      - name: Push instance status (destroying)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PAYLOAD=$(jq -n --arg ts "$TIMESTAMP" '{
+            phase: "destroying",
+            instances: {
+              "hamster-db":       {"status":"destroying"},
+              "hamster-auth":     {"status":"destroying"},
+              "hamster-kafka":    {"status":"destroying"},
+              "hamster-commerce": {"status":"destroying"},
+              "hamster-billing":  {"status":"destroying"},
+              "hamster-payment":  {"status":"destroying"},
+              "hamster-support":  {"status":"destroying"},
+              "hamster-front":    {"status":"destroying"}
+            },
+            updatedAt: $ts
+          }')
+
+          ESCAPED=$(echo "$PAYLOAD" | jq -Rs '.')
+          curl -sf -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"value\": ${ESCAPED}}" \
+            "${GH_API}/repos/${GH_REPO}/actions/variables/INFRA_STATUS" \
+            || echo "::warning::Failed to update INFRA_STATUS variable"
+
+          echo "INFRA_STATUS updated: phase=destroying"
+
+      - name: Force unlock state
+        if: cancelled()
+        run: |
+          # terraform은 state 파일 동시 수정 방지를 위해 두 가지 lock을 건다:
+          #   1. .terraform.tfstate.lock.info 파일 (lock 메타데이터)
+          #   2. terraform.tfstate 파일 자체에 OS 레벨 flock (파일 잠금)
+          #
+          # cancel로 Apply가 중단되면:
+          #   - SIGINT → terraform graceful shutdown 시도 → 프로세스 종료
+          #   - 하지만 flock은 프로세스가 완전히 종료되어야 해제됨
+          #   - 다음 step이 즉시 시작되면 flock이 아직 남아있을 수 있음
+          #
+          # 해결: lock 파일 삭제 + terraform 프로세스 완전 종료 대기
+          rm -f .terraform.tfstate.lock.info 2>/dev/null || true
+          # terraform 프로세스가 완전히 종료될 때까지 대기 (flock 해제)
+          sleep 5
+
+      - name: Terraform Destroy
+        if: always()
+        run: |
+          # null_resource는 실제 인프라가 아님 (cloud-init SSH 체크용)
+          # apply 실패 시 connection block의 host 참조가 깨져 destroy plan이 실패할 수 있음
+          # state에서 제거하면 평가 자체를 건너뛰고 실제 AWS 리소스만 destroy
+          for nr in $(terraform state list 2>/dev/null | grep '^null_resource\.' || true); do
+            terraform state rm "$nr" 2>/dev/null || true
+          done
+
+          # always: 정상 완료, 실패, cancel 모든 경우에 실행
+          # state에 기록된 리소스만 파괴 (13개 중 4개만 생성됐으면 4개만 destroy)
+          # -lock=false: cancel 후 OS flock이 남아있을 경우를 대비한 안전장치
+          terraform destroy -auto-approve -input=false -lock=false
+
+      - name: Push instance status (idle)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PAYLOAD=$(jq -n --arg ts "$TIMESTAMP" '{
+            phase: "idle",
+            instances: {
+              "hamster-db":       {"status":"idle"},
+              "hamster-auth":     {"status":"idle"},
+              "hamster-kafka":    {"status":"idle"},
+              "hamster-commerce": {"status":"idle"},
+              "hamster-billing":  {"status":"idle"},
+              "hamster-payment":  {"status":"idle"},
+              "hamster-support":  {"status":"idle"},
+              "hamster-front":    {"status":"idle"}
+            },
+            updatedAt: $ts
+          }')
+
+          ESCAPED=$(echo "$PAYLOAD" | jq -Rs '.')
+          curl -sf -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"value\": ${ESCAPED}}" \
+            "${GH_API}/repos/${GH_REPO}/actions/variables/INFRA_STATUS" \
+            || echo "::warning::Failed to update INFRA_STATUS variable"
+
+          echo "INFRA_STATUS updated: phase=idle"

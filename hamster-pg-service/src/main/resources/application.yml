@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: hamster-pg-service
+
+  config:
+    import:
+      - classpath:application-kafka.yml
+      - classpath:application-monitoring.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://localhost:3309/hamster_pg_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 12555!@
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+payment:
+  webhook:
+    base-url: http://localhost:8082
+
+server:
+  port: 8083
+
+logging:
+  level:
+    root: WARN
+    com.hamsterworld.hamsterpg: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql: OFF

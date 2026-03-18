@@ -1,0 +1,40 @@
+spring:
+  config:
+    import:
+      - classpath:application-kafka-aws.yml
+      - classpath:application-oauth2-aws.yml
+      - classpath:application-monitoring-aws.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:3306/ecommerce_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db-init.sql
+      continue-on-error: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.ecommerce: INFO
+
+outbox:
+  processor:
+    enabled: true

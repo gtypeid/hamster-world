@@ -1,0 +1,8 @@
+topology:
+  url-mappings:
+    ecommerce-service: http://${ECOMMERCE_HOST}:8080
+    payment-service: http://${PAYMENT_HOST}:8083
+    cash-gateway-service: http://${BILLING_HOST}:8082
+    hamster-pg-service: http://${BILLING_HOST}:8086
+    notification-service: http://${SUPPORT_HOST}:8085
+    progression-service: http://${SUPPORT_HOST}:8084

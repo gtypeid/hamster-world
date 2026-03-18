@@ -1,0 +1,20 @@
+springBoot {
+    mainClass = 'com.hamsterworld.notification.NotificationApplicationKt'
+}
+
+dependencies {
+    // Common Module
+    implementation project(':common')
+
+    // MongoDB
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+
+    // Jackson YAML (EventRegistryReader용)
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+
+    // Configuration Properties
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    // Swagger / OpenAPI 3
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3'
+}

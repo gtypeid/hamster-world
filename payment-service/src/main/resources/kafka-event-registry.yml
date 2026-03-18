@@ -1,0 +1,30 @@
+event:
+  subscribes:
+    - topic: ecommerce-events
+      events:
+        - ProductCreatedEvent
+        - StockAdjustmentRequestedEvent
+        - OrderCreatedEvent
+
+    - topic: progression-events
+      events:
+        - ArchiveClaimedEvent
+        - QuotaClaimedEvent
+        - SeasonPromotionRewardClaimedEvent
+
+    - topic: cash-gateway-events
+      events:
+        - PaymentApprovedEvent
+        - PaymentFailedEvent
+        - PaymentCancelledEvent
+
+  publishes:
+    - topic: payment-events
+      events:
+        - PaymentConfirmedEvent
+        - PaymentProcessFailedEvent
+        - PaymentCancelConfirmedEvent
+        - OrderStockReservedEvent
+        - OrderStockValidationFailedEvent
+        - ProductStockSynchronizedEvent
+        - AccountBalanceSynchronizedEvent

@@ -1,0 +1,45 @@
+package com.hamsterworld.cashgateway.external.paymentgateway.abs
+
+import com.hamsterworld.cashgateway.external.paymentgateway.constant.Provider
+import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.ApprovePaymentCtx
+import com.hamsterworld.cashgateway.external.paymentgateway.dto.abs.CancelPaymentCtx
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
+
+@Component
+class PaymentGatewayClient(
+    private val registry: PaymentGatewayClientRegistry
+) {
+    private val log = LoggerFactory.getLogger(PaymentGatewayClient::class.java)
+
+    fun <T : PaymentGatewayClientProtocol> bind(clientClass: Class<T>): PaymentGatewayClientProtocol {
+        val delegate = registry.getClient(clientClass)
+        return PaymentGatewayClientRunner(delegate)
+    }
+
+    fun bind(provider: Provider): PaymentGatewayClientProtocol {
+        val delegate = registry.getClientByProvider(provider)
+        return PaymentGatewayClientRunner(delegate)
+    }
+
+    private class PaymentGatewayClientRunner(
+        private val delegate: PaymentGatewayClientProtocol
+    ) : PaymentGatewayClientProtocol {
+
+        override fun payment(paymentCtx: ApprovePaymentCtx) {
+            delegate.payment(paymentCtx)
+        }
+
+        override fun cancel(paymentCtx: CancelPaymentCtx) {
+            delegate.cancel(paymentCtx)
+        }
+
+        override fun handleWebhook(rawPayload: String) {
+            delegate.handleWebhook(rawPayload)
+        }
+
+        override fun getProvider(): Provider {
+            return delegate.getProvider()
+        }
+    }
+}

@@ -1,0 +1,7 @@
+management:
+  tracing:
+    enabled: ${MONITORING_ENABLED:false}
+
+  otlp:
+    tracing:
+      endpoint: ${MONITORING_ENDPOINT:}

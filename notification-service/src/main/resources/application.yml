@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: notification-service
+
+  config:
+    import:
+      - classpath:application-kafka.yml
+      - classpath:application-monitoring.yml
+      - classpath:kafka-topology.yml
+      - classpath:kafka-event-registry.yml
+      - classpath:topology-url-mappings.yml
+
+  datasource:
+    url: jdbc:mysql://localhost:3312/notification_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 12555!@
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: notification_db
+      username: admin
+      password: 12555!@
+      authentication-database: admin
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 8085
+
+logging:
+  level:
+    root: INFO
+    com.hamsterworld.notification: DEBUG
+    org.springframework.data.mongodb: DEBUG
+    org.springframework.kafka: INFO

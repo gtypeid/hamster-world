@@ -1,0 +1,14 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8090/realms/hamster-world/protocol/openid-connect/certs
+
+keycloak:
+  server-url: http://localhost:8090
+  realm: hamster-world
+  admin:
+    username: admin
+    password: admin
+    client-id: admin-cli

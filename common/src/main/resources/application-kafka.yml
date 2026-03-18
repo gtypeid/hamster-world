@@ -1,0 +1,60 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:9093
+
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+
+    producer:
+      acks: all
+
+      retries: 2147483647
+
+      retry-backoff-ms: 100
+
+      enable-idempotence: true
+
+      max-in-flight-requests-per-connection: 5
+
+      request-timeout-ms: 30000
+      delivery-timeout-ms: 120000
+
+      batch-size: 16384
+
+      linger-ms: 10
+
+      compression-type: snappy
+
+      buffer-memory: 33554432
+
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      properties:
+        metadata.max.age.ms: 300000
+
+        reconnect.backoff.ms: 50
+        reconnect.backoff.max.ms: 1000
+
+    consumer:
+      group-id: ${spring.application.name}
+
+      enable-auto-commit: false
+
+      auto-offset-reset: earliest
+
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+      max-poll-records: 500
+      max-poll-interval-ms: 300000
+
+      fetch-min-size: 1
+      fetch-max-wait-ms: 500
+
+      properties:
+        session.timeout.ms: 30000
+
+        heartbeat.interval.ms: 3000

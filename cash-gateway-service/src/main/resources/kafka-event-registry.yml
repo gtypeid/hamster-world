@@ -1,0 +1,12 @@
+event:
+  subscribes:
+    - topic: payment-events
+      events:
+        - OrderStockReservedEvent
+
+  publishes:
+    - topic: cash-gateway-events
+      events:
+        - PaymentApprovedEvent
+        - PaymentFailedEvent
+        - PaymentCancelledEvent

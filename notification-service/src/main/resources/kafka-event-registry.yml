@@ -1,0 +1,15 @@
+event:
+  subscribes:
+    - topic: ecommerce-events-dlt
+      events: []
+
+    - topic: payment-events-dlt
+      events: []
+
+    - topic: cash-gateway-events-dlt
+      events: []
+
+    - topic: progression-events-dlt
+      events: []
+
+  publishes: []

@@ -1,0 +1,22 @@
+springBoot {
+    mainClass = 'com.hamsterworld.cashgateway.CashGatewayApplicationKt'
+}
+
+dependencies {
+    // Common Module
+    implementation project(':common')
+
+    // 서비스 특화 의존성
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // 서비스 특화 테스트
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+}

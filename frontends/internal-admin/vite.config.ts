@@ -1,0 +1,18 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/internal-admin/',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@common': path.resolve(__dirname, '../common'),
+    },
+    dedupe: ['react', 'react-dom', 'reactflow', 'dagre'],
+  },
+  server: {
+    port: 3002,
+  },
+})

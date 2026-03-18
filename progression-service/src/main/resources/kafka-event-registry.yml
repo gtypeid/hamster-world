@@ -1,0 +1,15 @@
+event:
+  subscribes:
+    - topic: ecommerce-events
+      events:
+        - OrderCreatedEvent
+        - ProductCreatedEvent
+
+  publishes:
+    - topic: progression-events
+      events:
+        - ArchiveClaimedEvent
+
+        - QuotaClaimedEvent
+
+        - SeasonPromotionRewardClaimedEvent

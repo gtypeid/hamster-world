@@ -1,0 +1,14 @@
+springBoot {
+    mainClass = 'com.hamsterworld.progression.ProgressionApplicationKt'
+}
+
+dependencies {
+    // Common Module
+    implementation project(':common')
+
+    // CSV parsing (Apache Commons CSV)
+    implementation 'org.apache.commons:commons-csv:1.10.0'
+
+    // Swagger / OpenAPI 3
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3'
+}
